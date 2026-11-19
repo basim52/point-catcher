@@ -14,6 +14,18 @@ type GameStatus =
   | 'GAME_OVER'
   | 'VICTORY';
 type ItemKind = 'pink_circle' | 'blue_triangle' | 'hazard_spike' | 'hazard_square';
+type IndexTab = 'positive' | 'negative';
+
+interface IndexEntry {
+  kind: ItemKind;
+  category: IndexTab;
+  nameAr: string;
+  nameEn: string;
+  valueAr: string;
+  valueEn: string;
+  benefitAr: string;
+  benefitEn: string;
+}
 
 interface StageConfig {
   stage: number;
@@ -77,9 +89,55 @@ const BLUE_TRIANGLE_POINTS = 4;
 const BEST_SCORE_STORAGE_KEY = 'point_catcher_best_score_v1';
 const COINS_STORAGE_KEY = 'point_catcher_coins_v1';
 const COMPLETED_STAGES_STORAGE_KEY = 'point_catcher_completed_stages_v1';
+const DISCOVERED_ITEMS_STORAGE_KEY = 'point_catcher_discovered_items_v1';
 const SFX_STORAGE_KEY = 'point_catcher_sfx_v1';
 const MUSIC_STORAGE_KEY = 'point_catcher_music_v1';
 const LANG_STORAGE_KEY = 'point_catcher_lang_v1';
+
+const INDEX_CATALOG: IndexEntry[] = [
+  {
+    kind: 'pink_circle',
+    category: 'positive',
+    nameAr: 'الدائرة الوردية',
+    nameEn: 'Pink Circle',
+    valueAr: '+3 نقاط',
+    valueEn: '+3 pts',
+    benefitAr: 'تزيد نقاطك بمقدار 3 نقاط عند التقاطها لتقترب من إنهاء المرحلة.',
+    benefitEn: 'Adds 3 points to your stage score when caught.',
+  },
+  {
+    kind: 'blue_triangle',
+    category: 'positive',
+    nameAr: 'المثلث الأزرق',
+    nameEn: 'Blue Triangle',
+    valueAr: '+4 نقاط',
+    valueEn: '+4 pts',
+    benefitAr: 'يعطيك 4 نقاط دفعة واحدة لإكمال هدف المرحلة بسرعة أكبر.',
+    benefitEn: 'Grants 4 points at once to reach the stage goal faster.',
+  },
+  {
+    kind: 'hazard_spike',
+    category: 'negative',
+    nameAr: 'العائق الأحمر الشائك',
+    nameEn: 'Red Spike',
+    valueAr: '-1 روح',
+    valueEn: '-1 Life',
+    benefitAr: 'ينقص قلباً واحداً عند الاصطدام به، تجنّبه للحفاظ على القلوب الكاملة.',
+    benefitEn: 'Removes 1 heart on impact; dodge it to preserve your lives.',
+  },
+  {
+    kind: 'hazard_square',
+    category: 'negative',
+    nameAr: 'المربع الأحمر',
+    nameEn: 'Red Square',
+    valueAr: '-2 أرواح',
+    valueEn: '-2 Lives',
+    benefitAr: 'عائق ثقيل ينقص قلبَين دفعة واحدة عند لمسه (يبدأ من المرحلة 6).',
+    benefitEn: 'Heavy hazard that removes 2 hearts on impact (starts at Stage 6).',
+  },
+];
+
+const VALID_ITEM_KINDS: ItemKind[] = INDEX_CATALOG.map((item) => item.kind);
 
 function getStageClearCoins(remainingLives: number): number {
   if (remainingLives >= 3) return 4;
@@ -163,6 +221,15 @@ const COPY = {
     stagesModalTitle: 'المراحل',
     stagesModalHint: 'فُز بكل مرحلة لفتح التالية — المكافأة: 1 قلب = 1، 2 قلب = 2، 3 قلوب = 4 فلوس.',
     lockedStageAria: (n: number) => `المرحلة ${n} مقفلة`,
+    indexBtn: 'الاندكس',
+    indexModalTitle: 'الاندكس',
+    indexModalHint: 'جميع النقاط والعوائق — كل عنصر يبقى مقفلاً ولا تظهر فائدته إلا بعد نزوله في المرحلة.',
+    indexPlusTab: 'الزائد (+)',
+    indexMinusTab: 'السالب (-)',
+    indexDiscoveredCount: (found: number, total: number) => `${found}/${total} مكتشف`,
+    indexUnknownTitle: '؟؟؟',
+    indexLockedBadge: 'مقفول',
+    indexLockedDesc: 'لم يُكتشف بعد — ينفتح وتظهر فائدته عند نزوله في المرحلة.',
     settingsBtn: 'الإعدادات',
     settingsTitle: 'الإعدادات',
     musicLabel: 'الموسيقى الحماسية',
@@ -221,6 +288,15 @@ const COPY = {
     stagesModalTitle: 'Stages',
     stagesModalHint: 'Clear each stage to unlock the next — Reward: 1♥ = 1, 2♥ = 2, 3♥ = 4 coins.',
     lockedStageAria: (n: number) => `Stage ${n} locked`,
+    indexBtn: 'Index',
+    indexModalTitle: 'Index',
+    indexModalHint: 'All points & hazards — each entry stays locked with hidden details until it drops in a stage.',
+    indexPlusTab: 'Plus (+)',
+    indexMinusTab: 'Minus (-)',
+    indexDiscoveredCount: (found: number, total: number) => `${found}/${total} Discovered`,
+    indexUnknownTitle: '???',
+    indexLockedBadge: 'Locked',
+    indexLockedDesc: 'Not discovered yet — unlocks and reveals its effect once it drops in a stage.',
     settingsBtn: 'Settings',
     settingsTitle: 'Settings',
     musicLabel: 'Energetic Music',
@@ -643,6 +719,21 @@ function readStoredCompletedStages(): number[] {
   }
 }
 
+function readStoredDiscoveredItems(): ItemKind[] {
+  try {
+    const raw = window.localStorage.getItem(DISCOVERED_ITEMS_STORAGE_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return [];
+    return parsed.filter(
+      (k): k is ItemKind =>
+        typeof k === 'string' && VALID_ITEM_KINDS.includes(k as ItemKind)
+    );
+  } catch {
+    return [];
+  }
+}
+
 export default function App() {
   const [lang, setLang] = useState<Lang>(() => readStoredLang());
   const [status, setStatus] = useState<GameStatus>('START');
@@ -658,9 +749,14 @@ export default function App() {
   const [completedStages, setCompletedStages] = useState<number[]>(() =>
     readStoredCompletedStages()
   );
+  const [discoveredItems, setDiscoveredItems] = useState<ItemKind[]>(() =>
+    readStoredDiscoveredItems()
+  );
   const [lives, setLives] = useState<number>(MAX_LIVES);
   const [stageNum, setStageNum] = useState<number>(1);
   const [stagesModalOpen, setStagesModalOpen] = useState<boolean>(false);
+  const [indexModalOpen, setIndexModalOpen] = useState<boolean>(false);
+  const [indexTab, setIndexTab] = useState<IndexTab>('positive');
   const [settingsModalOpen, setSettingsModalOpen] = useState<boolean>(false);
   const [musicEnabled, setMusicEnabled] = useState<boolean>(() =>
     readStoredBoolean(MUSIC_STORAGE_KEY, true)
@@ -678,12 +774,14 @@ export default function App() {
   const statusRef = useRef<GameStatus>('START');
   const statusBeforeModalRef = useRef<GameStatus>('START');
   const stagesModalOpenRef = useRef<boolean>(false);
+  const indexModalOpenRef = useRef<boolean>(false);
   const settingsModalOpenRef = useRef<boolean>(false);
   const scoreRef = useRef<number>(0);
   const stagePointsRef = useRef<number>(0);
   const bestScoreRef = useRef<number>(bestScore);
   const coinsRef = useRef<number>(coins);
   const completedStagesRef = useRef<number[]>(completedStages);
+  const discoveredItemsRef = useRef<ItemKind[]>(discoveredItems);
   const livesRef = useRef<number>(MAX_LIVES);
   const stageNumRef = useRef<number>(1);
   const streakRef = useRef<number>(0);
@@ -771,6 +869,7 @@ export default function App() {
       status === 'PLAYING' &&
       musicEnabled &&
       !stagesModalOpen &&
+      !indexModalOpen &&
       !settingsModalOpen;
 
     if (shouldPlayMusic) {
@@ -778,7 +877,14 @@ export default function App() {
     } else {
       audioRef.current.stopMusic();
     }
-  }, [status, musicEnabled, stagesModalOpen, settingsModalOpen, stageNum]);
+  }, [
+    status,
+    musicEnabled,
+    stagesModalOpen,
+    indexModalOpen,
+    settingsModalOpen,
+    stageNum,
+  ]);
 
   useEffect(() => {
     const audio = audioRef.current;
@@ -835,6 +941,7 @@ export default function App() {
     stageNumRef.current = safeStage;
     streakRef.current = 0;
     stagesModalOpenRef.current = false;
+    indexModalOpenRef.current = false;
     settingsModalOpenRef.current = false;
     statusRef.current = 'PLAYING';
 
@@ -843,6 +950,7 @@ export default function App() {
     setLives(MAX_LIVES);
     setStageNum(safeStage);
     setStagesModalOpen(false);
+    setIndexModalOpen(false);
     setSettingsModalOpen(false);
     setIsNewBest(false);
     setStatus('PLAYING');
@@ -899,10 +1007,17 @@ export default function App() {
       return;
     }
 
+    const hadModalOpen =
+      settingsModalOpenRef.current || indexModalOpenRef.current;
     if (settingsModalOpenRef.current) {
       settingsModalOpenRef.current = false;
       setSettingsModalOpen(false);
-    } else {
+    }
+    if (indexModalOpenRef.current) {
+      indexModalOpenRef.current = false;
+      setIndexModalOpen(false);
+    }
+    if (!hadModalOpen) {
       statusBeforeModalRef.current = statusRef.current;
       if (statusRef.current === 'PLAYING') {
         statusRef.current = 'PAUSED';
@@ -927,6 +1042,52 @@ export default function App() {
     }
   }, []);
 
+  const openIndexModal = useCallback(() => {
+    if (indexModalOpenRef.current) {
+      indexModalOpenRef.current = false;
+      setIndexModalOpen(false);
+      if (statusBeforeModalRef.current === 'PLAYING') {
+        statusRef.current = 'PLAYING';
+        setStatus('PLAYING');
+      }
+      return;
+    }
+
+    const hadModalOpen =
+      stagesModalOpenRef.current || settingsModalOpenRef.current;
+    if (stagesModalOpenRef.current) {
+      stagesModalOpenRef.current = false;
+      setStagesModalOpen(false);
+    }
+    if (settingsModalOpenRef.current) {
+      settingsModalOpenRef.current = false;
+      setSettingsModalOpen(false);
+    }
+    if (!hadModalOpen) {
+      statusBeforeModalRef.current = statusRef.current;
+      if (statusRef.current === 'PLAYING') {
+        statusRef.current = 'PAUSED';
+        setStatus('PAUSED');
+      }
+    }
+
+    simRef.current.input.pointerActive = false;
+    simRef.current.input.leftBtn = false;
+    simRef.current.input.rightBtn = false;
+    indexModalOpenRef.current = true;
+    setIndexModalOpen(true);
+  }, []);
+
+  const closeIndexModal = useCallback(() => {
+    if (!indexModalOpenRef.current) return;
+    indexModalOpenRef.current = false;
+    setIndexModalOpen(false);
+    if (statusBeforeModalRef.current === 'PLAYING') {
+      statusRef.current = 'PLAYING';
+      setStatus('PLAYING');
+    }
+  }, []);
+
   const openSettingsModal = useCallback(() => {
     if (settingsModalOpenRef.current) {
       settingsModalOpenRef.current = false;
@@ -938,10 +1099,17 @@ export default function App() {
       return;
     }
 
+    const hadModalOpen =
+      stagesModalOpenRef.current || indexModalOpenRef.current;
     if (stagesModalOpenRef.current) {
       stagesModalOpenRef.current = false;
       setStagesModalOpen(false);
-    } else {
+    }
+    if (indexModalOpenRef.current) {
+      indexModalOpenRef.current = false;
+      setIndexModalOpen(false);
+    }
+    if (!hadModalOpen) {
       statusBeforeModalRef.current = statusRef.current;
       if (statusRef.current === 'PLAYING') {
         statusRef.current = 'PAUSED';
@@ -967,7 +1135,13 @@ export default function App() {
   }, []);
 
   const togglePause = useCallback(() => {
-    if (stagesModalOpenRef.current || settingsModalOpenRef.current) return;
+    if (
+      stagesModalOpenRef.current ||
+      indexModalOpenRef.current ||
+      settingsModalOpenRef.current
+    ) {
+      return;
+    }
     if (statusRef.current === 'PLAYING') {
       statusRef.current = 'PAUSED';
       setStatus('PAUSED');
@@ -1010,6 +1184,14 @@ export default function App() {
         if (code === 'Escape') {
           e.preventDefault();
           closeSettingsModal();
+        }
+        return;
+      }
+
+      if (indexModalOpenRef.current) {
+        if (code === 'Escape') {
+          e.preventDefault();
+          closeIndexModal();
         }
         return;
       }
@@ -1082,6 +1264,7 @@ export default function App() {
       window.removeEventListener('blur', onBlur);
     };
   }, [
+    closeIndexModal,
     closeSettingsModal,
     closeStagesModal,
     proceedToNextStage,
@@ -1191,6 +1374,21 @@ export default function App() {
       } else {
         // Two collectible types only: Pink Circle (+3) and Blue Triangle (+4)
         kind = Math.random() < 0.54 ? 'pink_circle' : 'blue_triangle';
+      }
+
+      // Discover & unlock this item in the Index once it drops in a stage
+      if (!discoveredItemsRef.current.includes(kind)) {
+        const updated = [...discoveredItemsRef.current, kind];
+        discoveredItemsRef.current = updated;
+        setDiscoveredItems(updated);
+        try {
+          window.localStorage.setItem(
+            DISCOVERED_ITEMS_STORAGE_KEY,
+            JSON.stringify(updated)
+          );
+        } catch {
+          // Ignore storage errors
+        }
       }
 
       const margin = Math.max(30, sim.playerWidth * 0.42);
@@ -2105,29 +2303,41 @@ export default function App() {
     if (active) simRef.current.input.pointerActive = false;
   };
 
+  const anyModalOpen = stagesModalOpen || indexModalOpen || settingsModalOpen;
+  const positiveCatalog = INDEX_CATALOG.filter((e) => e.category === 'positive');
+  const negativeCatalog = INDEX_CATALOG.filter((e) => e.category === 'negative');
+  const activeIndexEntries =
+    indexTab === 'positive' ? positiveCatalog : negativeCatalog;
+  const positiveDiscoveredCount = positiveCatalog.filter((e) =>
+    discoveredItems.includes(e.kind)
+  ).length;
+  const negativeDiscoveredCount = negativeCatalog.filter((e) =>
+    discoveredItems.includes(e.kind)
+  ).length;
+
   return (
     <div
       dir={lang === 'ar' ? 'rtl' : 'ltr'}
       className="h-[100dvh] w-full bg-[#070e1a] text-slate-100 flex flex-col overflow-hidden"
     >
-      {/* Top HUD Bar — 2 compact rows on mobile (zero overlap between Stages & Hearts), single spacious row on md+ */}
+      {/* Top HUD Bar — 2 compact rows on mobile & tablet (zero overlap), single spacious row on lg+ */}
       <header className="w-full border-b border-white/10 bg-[#0b1424]/95 shrink-0">
-        <div className="mx-auto max-w-[1040px] px-3 sm:px-6 flex flex-col md:flex-row md:items-center md:justify-between md:h-16 md:gap-4">
-          {/* Row 1 on mobile (Title + Controls); splits cleanly on md+ via display:contents */}
-          <div className="h-10 md:h-auto flex items-center justify-between gap-2 md:contents">
+        <div className="mx-auto max-w-[1040px] px-3 sm:px-6 flex flex-col lg:flex-row lg:items-center lg:justify-between lg:h-16 lg:gap-4">
+          {/* Row 1 on <lg (Title + Controls); splits cleanly on lg+ via display:contents */}
+          <div className="h-10 lg:h-auto flex items-center justify-between gap-1.5 lg:contents">
             {/* Title Wordmark */}
-            <div className="text-sm sm:text-base md:text-lg font-bold tracking-tight text-white whitespace-nowrap shrink-0 md:order-1">
+            <div className="text-xs sm:text-base lg:text-lg font-bold tracking-tight text-white whitespace-nowrap shrink-0 lg:order-1">
               {t.title}
             </div>
 
             {/* Utility Controls */}
-            <div className="flex items-center gap-1.5 sm:gap-2 shrink-0 md:order-3">
+            <div className="flex items-center gap-1 sm:gap-2 shrink-0 lg:order-3">
               {/* Compact Stages Navigation Button ("المراحل") */}
               <button
                 type="button"
                 onClick={openStagesModal}
                 aria-expanded={stagesModalOpen}
-                className={`h-7 md:h-8 px-2 sm:px-2.5 inline-flex items-center justify-center gap-1 rounded-md border text-[11px] sm:text-xs font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400 whitespace-nowrap shrink-0 cursor-pointer ${
+                className={`h-7 lg:h-8 px-1.5 sm:px-2.5 inline-flex items-center justify-center gap-1 rounded-md border text-[11px] sm:text-xs font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400 whitespace-nowrap shrink-0 cursor-pointer ${
                   stagesModalOpen
                     ? 'border-sky-400/60 bg-sky-500/20 text-sky-200'
                     : 'border-white/12 bg-slate-900/80 text-slate-100 hover:bg-slate-800 hover:text-white'
@@ -2151,37 +2361,62 @@ export default function App() {
                 <span>{t.stagesBtn}</span>
               </button>
 
-              {(status === 'PLAYING' || status === 'PAUSED') &&
-                !stagesModalOpen &&
-                !settingsModalOpen && (
-                  <button
-                    type="button"
-                    onClick={togglePause}
-                    aria-label={status === 'PAUSED' ? t.resume : t.pause}
-                    title={status === 'PAUSED' ? t.resume : t.pause}
-                    className="h-7 w-7 md:h-9 md:w-9 inline-flex items-center justify-center rounded-md md:rounded-lg border border-white/10 bg-slate-900/80 text-slate-200 hover:bg-slate-800 hover:text-white transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400 cursor-pointer shrink-0"
-                  >
-                    {status === 'PAUSED' ? (
-                      <svg
-                        viewBox="0 0 24 24"
-                        className="w-3.5 h-3.5 md:w-4 md:h-4"
-                        fill="currentColor"
-                        aria-hidden="true"
-                      >
-                        <path d="M8 5v14l11-7z" />
-                      </svg>
-                    ) : (
-                      <svg
-                        viewBox="0 0 24 24"
-                        className="w-3.5 h-3.5 md:w-4 md:h-4"
-                        fill="currentColor"
-                        aria-hidden="true"
-                      >
-                        <path d="M6 5h4v14H6zm8 0h4v14h-4z" />
-                      </svg>
-                    )}
-                  </button>
-                )}
+              {/* Index Button ("الاندكس") */}
+              <button
+                type="button"
+                onClick={openIndexModal}
+                aria-expanded={indexModalOpen}
+                className={`h-7 lg:h-8 px-1.5 sm:px-2.5 inline-flex items-center justify-center gap-1 rounded-md border text-[11px] sm:text-xs font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400 whitespace-nowrap shrink-0 cursor-pointer ${
+                  indexModalOpen
+                    ? 'border-sky-400/60 bg-sky-500/20 text-sky-200'
+                    : 'border-white/12 bg-slate-900/80 text-slate-100 hover:bg-slate-800 hover:text-white'
+                }`}
+              >
+                <svg
+                  viewBox="0 0 24 24"
+                  className="w-3 h-3 sm:w-3.5 sm:h-3.5 shrink-0"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  aria-hidden="true"
+                >
+                  <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" />
+                  <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" />
+                </svg>
+                <span>{t.indexBtn}</span>
+              </button>
+
+              {(status === 'PLAYING' || status === 'PAUSED') && !anyModalOpen && (
+                <button
+                  type="button"
+                  onClick={togglePause}
+                  aria-label={status === 'PAUSED' ? t.resume : t.pause}
+                  title={status === 'PAUSED' ? t.resume : t.pause}
+                  className="h-7 w-7 lg:h-8 lg:w-8 inline-flex items-center justify-center rounded-md border border-white/10 bg-slate-900/80 text-slate-200 hover:bg-slate-800 hover:text-white transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400 cursor-pointer shrink-0"
+                >
+                  {status === 'PAUSED' ? (
+                    <svg
+                      viewBox="0 0 24 24"
+                      className="w-3.5 h-3.5"
+                      fill="currentColor"
+                      aria-hidden="true"
+                    >
+                      <path d="M8 5v14l11-7z" />
+                    </svg>
+                  ) : (
+                    <svg
+                      viewBox="0 0 24 24"
+                      className="w-3.5 h-3.5"
+                      fill="currentColor"
+                      aria-hidden="true"
+                    >
+                      <path d="M6 5h4v14H6zm8 0h4v14h-4z" />
+                    </svg>
+                  )}
+                </button>
+              )}
 
               {/* Settings Button ("الإعدادات") */}
               <button
@@ -2189,7 +2424,7 @@ export default function App() {
                 onClick={openSettingsModal}
                 aria-expanded={settingsModalOpen}
                 aria-label={t.settingsBtn}
-                className={`h-7 md:h-9 px-2 md:px-3 inline-flex items-center justify-center gap-1.5 rounded-md md:rounded-lg border text-[11px] sm:text-xs font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400 whitespace-nowrap shrink-0 cursor-pointer ${
+                className={`h-7 lg:h-8 px-1.5 sm:px-2.5 inline-flex items-center justify-center gap-1 rounded-md border text-[11px] sm:text-xs font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400 whitespace-nowrap shrink-0 cursor-pointer ${
                   settingsModalOpen
                     ? 'border-sky-400/60 bg-sky-500/20 text-sky-200'
                     : 'border-white/12 bg-slate-900/80 text-slate-100 hover:bg-slate-800 hover:text-white'
@@ -2197,7 +2432,7 @@ export default function App() {
               >
                 <svg
                   viewBox="0 0 24 24"
-                  className="w-3.5 h-3.5 md:w-4 md:h-4 shrink-0"
+                  className="w-3.5 h-3.5 shrink-0"
                   fill="none"
                   stroke="currentColor"
                   strokeWidth="2"
@@ -2215,21 +2450,21 @@ export default function App() {
                 type="button"
                 onClick={toggleLang}
                 aria-label={t.langToggleAria}
-                className="hidden sm:inline-flex h-7 md:h-9 px-2.5 items-center justify-center rounded-md md:rounded-lg border border-white/10 bg-slate-900/80 text-xs font-semibold text-slate-200 hover:bg-slate-800 hover:text-white transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400 whitespace-nowrap shrink-0 cursor-pointer"
+                className="hidden sm:inline-flex h-7 lg:h-8 px-2.5 items-center justify-center rounded-md border border-white/10 bg-slate-900/80 text-xs font-semibold text-slate-200 hover:bg-slate-800 hover:text-white transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400 whitespace-nowrap shrink-0 cursor-pointer"
               >
                 {t.langToggle}
               </button>
             </div>
           </div>
 
-          {/* Row 2 on mobile (Dedicated Metrics Bar); middle section on md+ */}
+          {/* Row 2 on <lg (Dedicated Metrics Bar); middle section on lg+ */}
           <div
-            className="h-9 md:h-auto border-t border-white/5 md:border-t-0 flex items-center justify-between md:justify-center gap-2 sm:gap-3 lg:gap-4 min-w-0 md:order-2"
+            className="h-9 lg:h-auto border-t border-white/5 lg:border-t-0 flex items-center justify-between lg:justify-center gap-2 sm:gap-3 lg:gap-4 min-w-0 lg:order-2"
             aria-live="polite"
           >
             {/* Stage Indicator */}
             <div className="flex items-baseline gap-1 whitespace-nowrap">
-              <span className="text-[11px] sm:text-xs md:hidden lg:inline text-slate-400">
+              <span className="text-[11px] sm:text-xs text-slate-400">
                 {t.stage}
               </span>
               <span className="font-num text-xs sm:text-sm lg:text-base font-bold text-sky-300">
@@ -2361,7 +2596,7 @@ export default function App() {
           />
 
           {/* Start Overlay */}
-          {status === 'START' && !stagesModalOpen && !settingsModalOpen && (
+          {status === 'START' && !anyModalOpen && (
             <div className="absolute inset-0 flex items-center justify-center p-4 bg-[#060c17]/74 backdrop-blur-[3px]">
               <div className="w-full max-w-md rounded-xl border border-white/12 bg-[#0f1a2e]/95 p-5 sm:p-8 text-center shadow-2xl">
                 <h1 className="text-3xl sm:text-4xl font-bold tracking-tight text-white mb-2.5 text-balance">
@@ -2495,7 +2730,7 @@ export default function App() {
           )}
 
           {/* Pause Overlay */}
-          {status === 'PAUSED' && !stagesModalOpen && !settingsModalOpen && (
+          {status === 'PAUSED' && !anyModalOpen && (
             <div className="absolute inset-0 flex items-center justify-center p-4 bg-[#060c17]/75 backdrop-blur-[3px]">
               <div className="w-full max-w-sm rounded-xl border border-white/12 bg-[#0f1a2e]/95 p-6 sm:p-7 text-center shadow-2xl">
                 <h2 className="text-2xl font-bold text-white mb-6">
@@ -2522,7 +2757,7 @@ export default function App() {
           )}
 
           {/* Stage Clear Overlay with Heart-Based Coin Reward & Next Stage Button */}
-          {status === 'STAGE_CLEAR' && !stagesModalOpen && !settingsModalOpen && (
+          {status === 'STAGE_CLEAR' && !anyModalOpen && (
             <div className="absolute inset-0 flex items-center justify-center p-4 bg-[#060c17]/76 backdrop-blur-[3px]">
               <div className="w-full max-w-md rounded-xl border border-sky-400/25 bg-[#0f1a2e]/95 p-6 sm:p-8 text-center shadow-2xl">
                 <h2 className="text-2xl sm:text-3xl font-bold text-white mb-2 text-balance">
@@ -2574,9 +2809,7 @@ export default function App() {
           )}
 
           {/* Game Over / Victory Overlay */}
-          {(status === 'GAME_OVER' || status === 'VICTORY') &&
-            !stagesModalOpen &&
-            !settingsModalOpen && (
+          {(status === 'GAME_OVER' || status === 'VICTORY') && !anyModalOpen && (
               <div className="absolute inset-0 flex items-center justify-center p-4 bg-[#060c17]/78 backdrop-blur-[3px]">
                 <div className="w-full max-w-md rounded-xl border border-white/12 bg-[#0f1a2e]/95 p-6 sm:p-8 text-center shadow-2xl">
                   <h2 className="text-2xl sm:text-3xl font-bold text-white mb-2 text-balance">
@@ -2763,6 +2996,268 @@ export default function App() {
                             {cfg.pointsNeeded} {t.ptsShort}
                           </span>
                         </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Index Overlay ("الاندكس") — Plus (+) & Minus (-) tabs with drop-based discovery lock */}
+          {indexModalOpen && (
+            <div className="absolute inset-0 z-20 flex items-center justify-center p-3 sm:p-5 bg-[#060c17]/82 backdrop-blur-[4px]">
+              <div className="w-full max-w-md max-h-full flex flex-col rounded-xl border border-white/14 bg-[#0f1a2e]/98 shadow-2xl overflow-hidden">
+                <div className="flex items-center justify-between gap-3 px-5 py-4 border-b border-white/10 shrink-0">
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    <h2 className="text-lg sm:text-xl font-bold text-white whitespace-nowrap">
+                      {t.indexModalTitle}
+                    </h2>
+                    <span className="text-xs sm:text-sm text-sky-300 font-semibold font-num whitespace-nowrap">
+                      · {t.indexDiscoveredCount(discoveredItems.length, INDEX_CATALOG.length)}
+                    </span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={closeIndexModal}
+                    aria-label={t.close}
+                    className="h-9 w-9 inline-flex items-center justify-center rounded-lg border border-white/10 bg-slate-900/80 text-slate-300 hover:bg-slate-800 hover:text-white transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400 cursor-pointer shrink-0"
+                  >
+                    <svg
+                      viewBox="0 0 24 24"
+                      className="w-4 h-4"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2.2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      aria-hidden="true"
+                    >
+                      <line x1="18" y1="6" x2="6" y2="18" />
+                      <line x1="6" y1="6" x2="18" y2="18" />
+                    </svg>
+                  </button>
+                </div>
+
+                <div className="px-5 pt-3.5 pb-5 overflow-y-auto">
+                  <p className="text-xs sm:text-sm text-slate-300 mb-4 leading-relaxed">
+                    {t.indexModalHint}
+                  </p>
+
+                  {/* Two Filter Buttons: Plus (+) and Minus (-) */}
+                  <div
+                    role="tablist"
+                    aria-label={t.indexModalTitle}
+                    className="grid grid-cols-2 gap-2 p-1 rounded-lg bg-slate-950/70 border border-white/10 mb-4"
+                  >
+                    <button
+                      type="button"
+                      role="tab"
+                      aria-selected={indexTab === 'positive'}
+                      onClick={() => setIndexTab('positive')}
+                      className={`h-10 px-3 rounded-md inline-flex items-center justify-center gap-2 text-xs sm:text-sm font-bold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400 whitespace-nowrap cursor-pointer ${
+                        indexTab === 'positive'
+                          ? 'bg-sky-500 text-slate-950'
+                          : 'text-slate-300 hover:text-white hover:bg-slate-800/70'
+                      }`}
+                    >
+                      <span>{t.indexPlusTab}</span>
+                      <span
+                        className={`font-num text-[11px] ${
+                          indexTab === 'positive' ? 'text-slate-900' : 'text-slate-400'
+                        }`}
+                      >
+                        {positiveDiscoveredCount}/{positiveCatalog.length}
+                      </span>
+                    </button>
+
+                    <button
+                      type="button"
+                      role="tab"
+                      aria-selected={indexTab === 'negative'}
+                      onClick={() => setIndexTab('negative')}
+                      className={`h-10 px-3 rounded-md inline-flex items-center justify-center gap-2 text-xs sm:text-sm font-bold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-400 whitespace-nowrap cursor-pointer ${
+                        indexTab === 'negative'
+                          ? 'bg-rose-500 text-white'
+                          : 'text-slate-300 hover:text-white hover:bg-slate-800/70'
+                      }`}
+                    >
+                      <span>{t.indexMinusTab}</span>
+                      <span
+                        className={`font-num text-[11px] ${
+                          indexTab === 'negative' ? 'text-rose-100' : 'text-slate-400'
+                        }`}
+                      >
+                        {negativeDiscoveredCount}/{negativeCatalog.length}
+                      </span>
+                    </button>
+                  </div>
+
+                  {/* Entries List */}
+                  <div className="space-y-3" role="tabpanel">
+                    {activeIndexEntries.map((entry) => {
+                      const discovered = discoveredItems.includes(entry.kind);
+                      const isPositive = entry.category === 'positive';
+                      return (
+                        <div
+                          key={entry.kind}
+                          className={`flex items-center gap-3.5 p-3.5 rounded-lg border transition-colors ${
+                            discovered
+                              ? isPositive
+                                ? 'border-sky-400/25 bg-slate-900/85'
+                                : 'border-rose-400/25 bg-slate-900/85'
+                              : 'border-white/8 bg-slate-950/75 opacity-85'
+                          }`}
+                        >
+                          {/* Item Artwork or Padlock */}
+                          <div
+                            className={`w-12 h-12 rounded-lg border flex items-center justify-center shrink-0 ${
+                              discovered
+                                ? 'border-white/12 bg-[#0a1324]'
+                                : 'border-white/8 bg-slate-900/80 text-slate-500'
+                            }`}
+                            aria-hidden="true"
+                          >
+                            {!discovered ? (
+                              <svg
+                                viewBox="0 0 24 24"
+                                className="w-5 h-5"
+                                fill="none"
+                                stroke="currentColor"
+                                strokeWidth="2.1"
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                              >
+                                <rect x="5" y="11" width="14" height="10" rx="2" />
+                                <path d="M8 11V7a4 4 0 0 1 8 0v4" />
+                              </svg>
+                            ) : entry.kind === 'pink_circle' ? (
+                              <svg viewBox="0 0 24 24" className="w-8 h-8">
+                                <circle
+                                  cx="12"
+                                  cy="12"
+                                  r="10"
+                                  fill="#ec4899"
+                                  stroke="#fbcfe8"
+                                  strokeWidth="1.8"
+                                />
+                                <text
+                                  x="12"
+                                  y="16"
+                                  textAnchor="middle"
+                                  fill="#ffffff"
+                                  fontSize="11"
+                                  fontWeight="700"
+                                >
+                                  3
+                                </text>
+                              </svg>
+                            ) : entry.kind === 'blue_triangle' ? (
+                              <svg viewBox="0 0 24 24" className="w-8 h-8">
+                                <polygon
+                                  points="12,2 22,20 2,20"
+                                  fill="#0284c7"
+                                  stroke="#bae6fd"
+                                  strokeWidth="1.8"
+                                  strokeLinejoin="round"
+                                />
+                                <text
+                                  x="12"
+                                  y="17.5"
+                                  textAnchor="middle"
+                                  fill="#ffffff"
+                                  fontSize="10"
+                                  fontWeight="700"
+                                >
+                                  4
+                                </text>
+                              </svg>
+                            ) : entry.kind === 'hazard_spike' ? (
+                              <svg viewBox="0 0 24 24" className="w-8 h-8">
+                                <polygon
+                                  points="12,1 14.8,6.2 20.5,4.5 18.2,10 23,12 18.2,14 20.5,19.5 14.8,17.8 12,23 9.2,17.8 3.5,19.5 5.8,14 1,12 5.8,10 3.5,4.5 9.2,6.2"
+                                  fill="#dc2626"
+                                />
+                                <text
+                                  x="12"
+                                  y="15.5"
+                                  textAnchor="middle"
+                                  fill="#ffffff"
+                                  fontSize="9"
+                                  fontWeight="800"
+                                >
+                                  -1
+                                </text>
+                              </svg>
+                            ) : (
+                              <svg viewBox="0 0 24 24" className="w-8 h-8">
+                                <rect
+                                  x="3"
+                                  y="3"
+                                  width="18"
+                                  height="18"
+                                  rx="2.5"
+                                  fill="#b91c1c"
+                                  stroke="#fca5a5"
+                                  strokeWidth="1.8"
+                                />
+                                <text
+                                  x="12"
+                                  y="15.5"
+                                  textAnchor="middle"
+                                  fill="#ffffff"
+                                  fontSize="9.5"
+                                  fontWeight="800"
+                                >
+                                  -2
+                                </text>
+                              </svg>
+                            )}
+                          </div>
+
+                          {/* Entry Text */}
+                          <div className="min-w-0 flex-1">
+                            {discovered ? (
+                              <>
+                                <div className="flex items-baseline justify-between gap-2">
+                                  <span className="text-sm sm:text-base font-bold text-white truncate">
+                                    {lang === 'ar' ? entry.nameAr : entry.nameEn}
+                                  </span>
+                                  <span
+                                    className={`font-num text-xs sm:text-sm font-bold whitespace-nowrap shrink-0 ${
+                                      entry.kind === 'pink_circle'
+                                        ? 'text-pink-300'
+                                        : entry.kind === 'blue_triangle'
+                                        ? 'text-sky-300'
+                                        : 'text-rose-400'
+                                    }`}
+                                  >
+                                    {lang === 'ar' ? entry.valueAr : entry.valueEn}
+                                  </span>
+                                </div>
+                                <p className="text-xs text-slate-300 mt-1 leading-relaxed">
+                                  {lang === 'ar'
+                                    ? entry.benefitAr
+                                    : entry.benefitEn}
+                                </p>
+                              </>
+                            ) : (
+                              <>
+                                <div className="flex items-baseline justify-between gap-2">
+                                  <span className="text-sm sm:text-base font-bold text-slate-400">
+                                    {t.indexUnknownTitle}
+                                  </span>
+                                  <span className="text-[11px] font-semibold text-slate-500 whitespace-nowrap shrink-0">
+                                    {t.indexLockedBadge}
+                                  </span>
+                                </div>
+                                <p className="text-xs text-slate-500 mt-1 leading-relaxed">
+                                  {t.indexLockedDesc}
+                                </p>
+                              </>
+                            )}
+                          </div>
+                        </div>
                       );
                     })}
                   </div>
