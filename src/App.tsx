@@ -140,8 +140,8 @@ const INDEX_CATALOG: IndexEntry[] = [
     nameEn: 'Red Square',
     valueAr: '-2 أرواح',
     valueEn: '-2 Lives',
-    benefitAr: 'عائق ثقيل ينقص قلبَين دفعة واحدة عند لمسه (يبدأ من المرحلة 6).',
-    benefitEn: 'Heavy hazard that removes 2 hearts on impact (starts at Stage 6).',
+    benefitAr: 'عائق ثقيل ينقص قلبَين دفعة واحدة عند لمسه (يبدأ من المرحلة 5).',
+    benefitEn: 'Heavy hazard that removes 2 hearts on impact (starts at Stage 5).',
   },
   {
     kind: 'hazard_star',
@@ -164,7 +164,7 @@ function getStageClearCoins(remainingLives: number): number {
 }
 
 // Build 25 stages (5% easier overall):
-// Stages 1–5: only -1 spiky hazards; Stage 6+: -2 red squares; Stage 10+: Red Freeze Star (4s freeze + 3 pts).
+// Stages 1–4: only -1 spiky hazards; Stage 5+: -2 red squares; Stage 10+: Red Freeze Star (4s freeze + 3 pts).
 const STAGES: StageConfig[] = (() => {
   const list: StageConfig[] = [];
   let cumulative = 0;
@@ -174,7 +174,7 @@ const STAGES: StageConfig[] = (() => {
     const startScore = cumulative;
     cumulative += pointsNeeded;
     const rawSquareRatio =
-      s <= 5 ? 0 : 0.3 + ((s - 6) / (TOTAL_STAGES - 6)) * 0.34;
+      s < 5 ? 0 : 0.3 + ((s - 5) / (TOTAL_STAGES - 5)) * 0.34;
     const starHazardRatio =
       s < 10 ? 0 : 0.18 + ((s - 10) / (TOTAL_STAGES - 10)) * 0.08;
     list.push({
@@ -240,7 +240,7 @@ const COPY = {
     nextGoalText: (pts: number) => `هدف المرحلة التالية: ${pts} نقطة`,
     stagesBtn: 'المراحل',
     stagesModalTitle: 'المراحل',
-    stagesModalHint: 'فُز بكل مرحلة لفتح التالية — المكافأة: 1 قلب = 1، 2 قلب = 2، 3 قلوب = 4 فلوس.',
+    stagesModalHint: 'فُز بكل مرحلة لفتح التالية — مكافأة أول فوز: 1 قلب = 1، 2 قلب = 2، 3 قلوب = 4 فلوس.',
     lockedStageAria: (n: number) => `المرحلة ${n} مقفلة`,
     indexBtn: 'الاندكس',
     indexModalTitle: 'الاندكس',
@@ -262,9 +262,11 @@ const COPY = {
     offLabel: 'إيقاف',
     coins: 'الفلوس',
     coinsEarned: (earned: number, remainingLives: number) =>
-      `+${earned} فلوس مكافأة إنهاء المرحلة (${remainingLives} ${
-        remainingLives === 1 ? 'قلب' : remainingLives === 2 ? 'قلبان' : 'قلوب'
-      })!`,
+      earned <= 0
+        ? 'تم استلام مكافأة هذه المرحلة مسبقاً (بدون فلوس إضافية)'
+        : `+${earned} فلوس مكافأة إنهاء المرحلة (${remainingLives} ${
+            remainingLives === 1 ? 'قلب' : remainingLives === 2 ? 'قلبان' : 'قلوب'
+          })!`,
     ptsShort: 'نقطة',
     close: 'إغلاق',
   },
@@ -307,7 +309,7 @@ const COPY = {
     nextGoalText: (pts: number) => `Next Stage Goal: ${pts} pts`,
     stagesBtn: 'Stages',
     stagesModalTitle: 'Stages',
-    stagesModalHint: 'Clear each stage to unlock the next — Reward: 1♥ = 1, 2♥ = 2, 3♥ = 4 coins.',
+    stagesModalHint: 'Clear each stage to unlock the next — First-clear reward: 1♥ = 1, 2♥ = 2, 3♥ = 4 coins.',
     lockedStageAria: (n: number) => `Stage ${n} locked`,
     indexBtn: 'Index',
     indexModalTitle: 'Index',
@@ -329,9 +331,11 @@ const COPY = {
     offLabel: 'Off',
     coins: 'Coins',
     coinsEarned: (earned: number, remainingLives: number) =>
-      `+${earned} ${earned === 1 ? 'Coin' : 'Coins'} Reward (${remainingLives} ${
-        remainingLives === 1 ? 'Heart' : 'Hearts'
-      })!`,
+      earned <= 0
+        ? 'Stage coin reward already claimed (no extra coins)'
+        : `+${earned} ${earned === 1 ? 'Coin' : 'Coins'} Reward (${remainingLives} ${
+            remainingLives === 1 ? 'Heart' : 'Hearts'
+          })!`,
     ptsShort: 'pts',
     close: 'Close',
   },
@@ -1008,6 +1012,10 @@ export default function App() {
     startAtStage(1);
   }, [startAtStage]);
 
+  const retryCurrentStage = useCallback(() => {
+    startAtStage(stageNumRef.current);
+  }, [startAtStage]);
+
   const proceedToNextStage = useCallback(() => {
     if (statusRef.current !== 'STAGE_CLEAR') return;
     const sim = simRef.current;
@@ -1271,9 +1279,11 @@ export default function App() {
           if (statusRef.current === 'STAGE_CLEAR') {
             e.preventDefault();
             proceedToNextStage();
+          } else if (statusRef.current === 'GAME_OVER') {
+            e.preventDefault();
+            retryCurrentStage();
           } else if (
             statusRef.current === 'START' ||
-            statusRef.current === 'GAME_OVER' ||
             statusRef.current === 'VICTORY'
           ) {
             e.preventDefault();
@@ -1315,6 +1325,7 @@ export default function App() {
     closeStagesModal,
     proceedToNextStage,
     resetAndStartGame,
+    retryCurrentStage,
     toggleMusic,
     togglePause,
   ]);
@@ -1715,24 +1726,30 @@ export default function App() {
 
             if (nextStagePoints >= currentStageCfg.pointsNeeded) {
               const clearedStage = stageNumRef.current;
-              const earnedCoins = getStageClearCoins(livesRef.current);
-              const nextCoins = coinsRef.current + earnedCoins;
-              coinsRef.current = nextCoins;
+              const alreadyCompleted =
+                completedStagesRef.current.includes(clearedStage);
+              const earnedCoins = alreadyCompleted
+                ? 0
+                : getStageClearCoins(livesRef.current);
               setLastEarnedCoins(earnedCoins);
-              setCoins(nextCoins);
-              try {
-                window.localStorage.setItem(
-                  COINS_STORAGE_KEY,
-                  String(nextCoins)
-                );
-              } catch {
-                // Ignore storage errors
+              if (earnedCoins > 0) {
+                const nextCoins = coinsRef.current + earnedCoins;
+                coinsRef.current = nextCoins;
+                setCoins(nextCoins);
+                try {
+                  window.localStorage.setItem(
+                    COINS_STORAGE_KEY,
+                    String(nextCoins)
+                  );
+                } catch {
+                  // Ignore storage errors
+                }
               }
 
-              setCompletedStages((prev) => {
-                if (prev.includes(clearedStage)) return prev;
-                const updated = [...prev, clearedStage];
+              if (!alreadyCompleted) {
+                const updated = [...completedStagesRef.current, clearedStage];
                 completedStagesRef.current = updated;
+                setCompletedStages(updated);
                 try {
                   window.localStorage.setItem(
                     COMPLETED_STAGES_STORAGE_KEY,
@@ -1741,8 +1758,7 @@ export default function App() {
                 } catch {
                   // Ignore storage errors
                 }
-                return updated;
-              });
+              }
 
               sim.input.pointerActive = false;
               sim.input.pointerId = null;
@@ -1821,24 +1837,30 @@ export default function App() {
 
             if (nextStagePoints >= currentStageCfg.pointsNeeded) {
               const clearedStage = stageNumRef.current;
-              const earnedCoins = getStageClearCoins(livesRef.current);
-              const nextCoins = coinsRef.current + earnedCoins;
-              coinsRef.current = nextCoins;
+              const alreadyCompleted =
+                completedStagesRef.current.includes(clearedStage);
+              const earnedCoins = alreadyCompleted
+                ? 0
+                : getStageClearCoins(livesRef.current);
               setLastEarnedCoins(earnedCoins);
-              setCoins(nextCoins);
-              try {
-                window.localStorage.setItem(
-                  COINS_STORAGE_KEY,
-                  String(nextCoins)
-                );
-              } catch {
-                // Ignore storage errors
+              if (earnedCoins > 0) {
+                const nextCoins = coinsRef.current + earnedCoins;
+                coinsRef.current = nextCoins;
+                setCoins(nextCoins);
+                try {
+                  window.localStorage.setItem(
+                    COINS_STORAGE_KEY,
+                    String(nextCoins)
+                  );
+                } catch {
+                  // Ignore storage errors
+                }
               }
 
-              setCompletedStages((prev) => {
-                if (prev.includes(clearedStage)) return prev;
-                const updated = [...prev, clearedStage];
+              if (!alreadyCompleted) {
+                const updated = [...completedStagesRef.current, clearedStage];
                 completedStagesRef.current = updated;
+                setCompletedStages(updated);
                 try {
                   window.localStorage.setItem(
                     COMPLETED_STAGES_STORAGE_KEY,
@@ -1847,8 +1869,7 @@ export default function App() {
                 } catch {
                   // Ignore storage errors
                 }
-                return updated;
-              });
+              }
 
               sim.freezeTimer = 0;
               sim.input.pointerActive = false;
@@ -3264,7 +3285,7 @@ export default function App() {
                   </button>
                   <button
                     type="button"
-                    onClick={resetAndStartGame}
+                    onClick={retryCurrentStage}
                     className="w-full sm:w-auto px-6 py-3 rounded-lg border border-white/15 bg-slate-800/80 hover:bg-slate-700 text-slate-100 font-semibold text-sm sm:text-base transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-300 whitespace-nowrap cursor-pointer"
                   >
                     {t.restartBtn}
@@ -3281,7 +3302,11 @@ export default function App() {
                 <h2 className="text-2xl sm:text-3xl font-bold text-white mb-2 text-balance">
                   {t.stageCompleteTitle(stageNum)}
                 </h2>
-                <p className="text-sm sm:text-base font-bold text-amber-300 mb-1.5">
+                <p
+                  className={`text-sm sm:text-base font-bold mb-1.5 ${
+                    lastEarnedCoins > 0 ? 'text-amber-300' : 'text-slate-400'
+                  }`}
+                >
                   {t.coinsEarned(lastEarnedCoins, lives)}
                 </p>
                 <p className="text-xs sm:text-sm text-sky-300 font-medium mb-5">
@@ -3336,7 +3361,11 @@ export default function App() {
 
                   {status === 'VICTORY' ? (
                     <>
-                      <p className="text-sm font-bold text-amber-300 mb-1">
+                      <p
+                        className={`text-sm font-bold mb-1 ${
+                          lastEarnedCoins > 0 ? 'text-amber-300' : 'text-slate-400'
+                        }`}
+                      >
                         {t.coinsEarned(lastEarnedCoins, lives)}
                       </p>
                       <p className="text-sm font-medium text-emerald-300 mb-3">
@@ -3388,7 +3417,11 @@ export default function App() {
 
                   <button
                     type="button"
-                    onClick={resetAndStartGame}
+                    onClick={
+                      status === 'GAME_OVER'
+                        ? retryCurrentStage
+                        : resetAndStartGame
+                    }
                     className="w-full sm:w-auto min-w-[200px] px-8 py-3.5 rounded-lg bg-sky-500 hover:bg-sky-400 active:scale-[0.98] text-slate-950 font-bold text-base transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-300 focus-visible:ring-offset-2 focus-visible:ring-offset-[#0f1a2e] whitespace-nowrap cursor-pointer"
                   >
                     {t.playAgainBtn}
