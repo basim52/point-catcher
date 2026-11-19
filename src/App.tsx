@@ -23,6 +23,29 @@ import {
   TOTAL_FRUIT_STAGES,
   VALID_FRUIT_KINDS,
 } from './fruitWorld';
+import {
+  CatcherSkinId,
+  drawCatcherShieldBubble,
+  drawCustomMinusPoint,
+  drawCustomPlusPoint,
+  drawUfoCatcher,
+  getSkinPalette,
+  MAX_SHIELDS,
+  MINUS_POINT_CATALOG,
+  MinusPointSkinId,
+  persistShopState,
+  PLUS_POINT_CATALOG,
+  PlusPointSkinId,
+  PointsSubTab,
+  readStoredShopState,
+  SHIELD_DURATION,
+  ShopModal,
+  ShopState,
+  ShopTab,
+  SKIN_CATALOG,
+  SUPPLY_CATALOG,
+  SupplyId,
+} from './shop';
 
 type Lang = 'ar' | 'en';
 type GameStatus =
@@ -316,6 +339,7 @@ const COPY = {
     indexUnknownTitle: '؟؟؟',
     indexLockedBadge: 'مقفول',
     indexLockedDesc: 'لم يُكتشف بعد — ينفتح وتظهر فائدته عندما تلتقطه أو تلمسه.',
+    shopBtn: 'المتجر',
     settingsBtn: 'الإعدادات',
     settingsTitle: 'الإعدادات',
     musicLabel: 'الموسيقى الحماسية',
@@ -423,6 +447,7 @@ const COPY = {
     indexUnknownTitle: '???',
     indexLockedBadge: 'Locked',
     indexLockedDesc: 'Not discovered yet — unlocks and reveals its effect once you catch or touch it.',
+    shopBtn: 'Shop',
     settingsBtn: 'Settings',
     settingsTitle: 'Settings',
     musicLabel: 'Energetic Music',
@@ -1144,6 +1169,10 @@ export default function App() {
   const [indexModalOpen, setIndexModalOpen] = useState<boolean>(false);
   const [indexModalWorld, setIndexModalWorld] = useState<GameMode>('normal');
   const [indexTab, setIndexTab] = useState<IndexTab>('positive');
+  const [shopModalOpen, setShopModalOpen] = useState<boolean>(false);
+  const [shopTab, setShopTab] = useState<ShopTab>('skins');
+  const [shopPointsSubTab, setShopPointsSubTab] = useState<PointsSubTab>('plus');
+  const [shop, setShop] = useState<ShopState>(() => readStoredShopState());
   const [settingsModalOpen, setSettingsModalOpen] = useState<boolean>(false);
   const [musicEnabled, setMusicEnabled] = useState<boolean>(() =>
     readStoredBoolean(MUSIC_STORAGE_KEY, true)
@@ -1163,7 +1192,9 @@ export default function App() {
   const statusBeforeModalRef = useRef<GameStatus>('START');
   const stagesModalOpenRef = useRef<boolean>(false);
   const indexModalOpenRef = useRef<boolean>(false);
+  const shopModalOpenRef = useRef<boolean>(false);
   const settingsModalOpenRef = useRef<boolean>(false);
+  const shopRef = useRef<ShopState>(shop);
   const scoreRef = useRef<number>(0);
   const stagePointsRef = useRef<number>(0);
   const bestScoreRef = useRef<number>(bestScore);
@@ -1192,6 +1223,7 @@ export default function App() {
     playerGlowColor: '#38bdf8',
     playerGlowAlpha: 0,
     invulnTimer: 0,
+    shieldTimer: 0,
     freezeTimer: 0,
     speedBoostTimer: 0,
     shakeTimer: 0,
@@ -1279,6 +1311,7 @@ export default function App() {
       musicEnabled &&
       !stagesModalOpen &&
       !indexModalOpen &&
+      !shopModalOpen &&
       !settingsModalOpen;
 
     if (shouldPlayMusic) {
@@ -1291,6 +1324,7 @@ export default function App() {
     musicEnabled,
     stagesModalOpen,
     indexModalOpen,
+    shopModalOpen,
     settingsModalOpen,
     stageNum,
   ]);
@@ -1479,6 +1513,7 @@ export default function App() {
       sim.playerBounce = 0;
       sim.playerGlowAlpha = 0;
       sim.invulnTimer = 0;
+      sim.shieldTimer = 0;
       sim.freezeTimer = 0;
       sim.speedBoostTimer = 0;
       sim.shakeTimer = 0;
@@ -1499,6 +1534,7 @@ export default function App() {
       streakRef.current = 0;
       stagesModalOpenRef.current = false;
       indexModalOpenRef.current = false;
+      shopModalOpenRef.current = false;
       settingsModalOpenRef.current = false;
       statusRef.current = 'PLAYING';
 
@@ -1507,6 +1543,7 @@ export default function App() {
       setStageNum(safeStage);
       setStagesModalOpen(false);
       setIndexModalOpen(false);
+      setShopModalOpen(false);
       setSettingsModalOpen(false);
       setIsNewBest(false);
       setStatus('PLAYING');
@@ -1534,6 +1571,7 @@ export default function App() {
     sim.playerBounce = 0;
     sim.playerGlowAlpha = 0;
     sim.invulnTimer = 0;
+    sim.shieldTimer = 0;
     sim.freezeTimer = 0;
     sim.speedBoostTimer = 0;
     sim.shakeTimer = 0;
@@ -1554,6 +1592,7 @@ export default function App() {
     streakRef.current = 0;
     stagesModalOpenRef.current = false;
     indexModalOpenRef.current = false;
+    shopModalOpenRef.current = false;
     settingsModalOpenRef.current = false;
     statusRef.current = 'PLAYING';
 
@@ -1562,6 +1601,7 @@ export default function App() {
     setStageNum(safeStage);
     setStagesModalOpen(false);
     setIndexModalOpen(false);
+    setShopModalOpen(false);
     setSettingsModalOpen(false);
     setIsNewBest(false);
     setStatus('PLAYING');
@@ -1594,6 +1634,7 @@ export default function App() {
     sim.items = [];
     sim.playerVx = 0;
     sim.invulnTimer = 0;
+    sim.shieldTimer = 0;
     sim.freezeTimer = 0;
     sim.speedBoostTimer = 0;
     sim.spawnTimer = 0.3;
@@ -1619,6 +1660,195 @@ export default function App() {
     audioRef.current.startMusic(isFruit ? nextStage * 2 : nextStage);
   }, []);
 
+  const selectOrBuySkin = useCallback((id: CatcherSkinId) => {
+    const def = SKIN_CATALOG.find((s) => s.id === id);
+    if (!def) return;
+    const cur = shopRef.current;
+    const owned = cur.ownedSkins.includes(id);
+
+    if (owned) {
+      if (cur.equippedSkin === id) return;
+      const nextShop: ShopState = { ...cur, equippedSkin: id };
+      shopRef.current = nextShop;
+      setShop(nextShop);
+      persistShopState(nextShop);
+      audioRef.current.playStart();
+      return;
+    }
+
+    if (coinsRef.current < def.price) return;
+    const nextCoins = coinsRef.current - def.price;
+    coinsRef.current = nextCoins;
+    setCoins(nextCoins);
+    try {
+      window.localStorage.setItem(COINS_STORAGE_KEY, String(nextCoins));
+    } catch {
+      // Ignore storage errors
+    }
+
+    const nextShop: ShopState = {
+      ...cur,
+      ownedSkins: [...cur.ownedSkins, id],
+      equippedSkin: id,
+    };
+    shopRef.current = nextShop;
+    setShop(nextShop);
+    persistShopState(nextShop);
+    audioRef.current.playStageUp();
+  }, []);
+
+  const selectOrBuyPlusSkin = useCallback((id: PlusPointSkinId) => {
+    const def = PLUS_POINT_CATALOG.find((s) => s.id === id);
+    if (!def) return;
+    const cur = shopRef.current;
+    const owned = cur.ownedPlusSkins.includes(id);
+
+    if (owned) {
+      if (cur.equippedPlusSkin === id) return;
+      const nextShop: ShopState = { ...cur, equippedPlusSkin: id };
+      shopRef.current = nextShop;
+      setShop(nextShop);
+      persistShopState(nextShop);
+      audioRef.current.playStart();
+      return;
+    }
+
+    if (coinsRef.current < def.price) return;
+    const nextCoins = coinsRef.current - def.price;
+    coinsRef.current = nextCoins;
+    setCoins(nextCoins);
+    try {
+      window.localStorage.setItem(COINS_STORAGE_KEY, String(nextCoins));
+    } catch {
+      // Ignore storage errors
+    }
+
+    const nextShop: ShopState = {
+      ...cur,
+      ownedPlusSkins: [...cur.ownedPlusSkins, id],
+      equippedPlusSkin: id,
+    };
+    shopRef.current = nextShop;
+    setShop(nextShop);
+    persistShopState(nextShop);
+    audioRef.current.playStageUp();
+  }, []);
+
+  const selectOrBuyMinusSkin = useCallback((id: MinusPointSkinId) => {
+    const def = MINUS_POINT_CATALOG.find((s) => s.id === id);
+    if (!def) return;
+    const cur = shopRef.current;
+    const owned = cur.ownedMinusSkins.includes(id);
+
+    if (owned) {
+      if (cur.equippedMinusSkin === id) return;
+      const nextShop: ShopState = { ...cur, equippedMinusSkin: id };
+      shopRef.current = nextShop;
+      setShop(nextShop);
+      persistShopState(nextShop);
+      audioRef.current.playStart();
+      return;
+    }
+
+    if (coinsRef.current < def.price) return;
+    const nextCoins = coinsRef.current - def.price;
+    coinsRef.current = nextCoins;
+    setCoins(nextCoins);
+    try {
+      window.localStorage.setItem(COINS_STORAGE_KEY, String(nextCoins));
+    } catch {
+      // Ignore storage errors
+    }
+
+    const nextShop: ShopState = {
+      ...cur,
+      ownedMinusSkins: [...cur.ownedMinusSkins, id],
+      equippedMinusSkin: id,
+    };
+    shopRef.current = nextShop;
+    setShop(nextShop);
+    persistShopState(nextShop);
+    audioRef.current.playStageUp();
+  }, []);
+
+  const buySupply = useCallback(
+    (id: SupplyId) => {
+      const def = SUPPLY_CATALOG.find((s) => s.id === id);
+      if (!def) return;
+
+      if (id === 'one_heart') {
+        buyLifeForMode('normal');
+        return;
+      }
+      if (id === 'one_corn') {
+        buyLifeForMode('fruit');
+        return;
+      }
+
+      if (coinsRef.current < def.price) return;
+
+      if (id === 'shield') {
+        const cur = shopRef.current;
+        if (cur.shields >= MAX_SHIELDS) return;
+        const nextCoins = coinsRef.current - def.price;
+        coinsRef.current = nextCoins;
+        setCoins(nextCoins);
+        try {
+          window.localStorage.setItem(COINS_STORAGE_KEY, String(nextCoins));
+        } catch {
+          // Ignore storage errors
+        }
+        const nextShop: ShopState = {
+          ...cur,
+          shields: Math.min(MAX_SHIELDS, cur.shields + 1),
+        };
+        shopRef.current = nextShop;
+        setShop(nextShop);
+        persistShopState(nextShop);
+        audioRef.current.playBuyHeart();
+        return;
+      }
+
+      if (id === 'full_hearts') {
+        if (livesRef.current >= MAX_LIVES) return;
+        const nextCoins = coinsRef.current - def.price;
+        coinsRef.current = nextCoins;
+        setCoins(nextCoins);
+        try {
+          window.localStorage.setItem(COINS_STORAGE_KEY, String(nextCoins));
+        } catch {
+          // Ignore storage errors
+        }
+        livesRef.current = MAX_LIVES;
+        lastHeartRegenAtRef.current = 0;
+        setLives(MAX_LIVES);
+        setNextHeartInMs(0);
+        persistLivesState(MAX_LIVES, 0);
+        audioRef.current.playStageUp();
+        return;
+      }
+
+      if (id === 'full_corn') {
+        if (cornRef.current >= MAX_CORN) return;
+        const nextCoins = coinsRef.current - def.price;
+        coinsRef.current = nextCoins;
+        setCoins(nextCoins);
+        try {
+          window.localStorage.setItem(COINS_STORAGE_KEY, String(nextCoins));
+        } catch {
+          // Ignore storage errors
+        }
+        cornRef.current = MAX_CORN;
+        lastCornRegenAtRef.current = 0;
+        setCorn(MAX_CORN);
+        setNextCornInMs(0);
+        persistCornState(MAX_CORN, 0);
+        audioRef.current.playStageUp();
+      }
+    },
+    [buyLifeForMode]
+  );
+
   const openStagesModal = useCallback(() => {
     if (stagesModalOpenRef.current) {
       stagesModalOpenRef.current = false;
@@ -1631,7 +1861,9 @@ export default function App() {
     }
 
     const hadModalOpen =
-      settingsModalOpenRef.current || indexModalOpenRef.current;
+      settingsModalOpenRef.current ||
+      indexModalOpenRef.current ||
+      shopModalOpenRef.current;
     if (settingsModalOpenRef.current) {
       settingsModalOpenRef.current = false;
       setSettingsModalOpen(false);
@@ -1639,6 +1871,10 @@ export default function App() {
     if (indexModalOpenRef.current) {
       indexModalOpenRef.current = false;
       setIndexModalOpen(false);
+    }
+    if (shopModalOpenRef.current) {
+      shopModalOpenRef.current = false;
+      setShopModalOpen(false);
     }
     if (!hadModalOpen) {
       statusBeforeModalRef.current = statusRef.current;
@@ -1666,6 +1902,58 @@ export default function App() {
     }
   }, []);
 
+  const openShopModal = useCallback(() => {
+    if (shopModalOpenRef.current) {
+      shopModalOpenRef.current = false;
+      setShopModalOpen(false);
+      if (statusBeforeModalRef.current === 'PLAYING') {
+        statusRef.current = 'PLAYING';
+        setStatus('PLAYING');
+      }
+      return;
+    }
+
+    const hadModalOpen =
+      stagesModalOpenRef.current ||
+      indexModalOpenRef.current ||
+      settingsModalOpenRef.current;
+    if (stagesModalOpenRef.current) {
+      stagesModalOpenRef.current = false;
+      setStagesModalOpen(false);
+    }
+    if (indexModalOpenRef.current) {
+      indexModalOpenRef.current = false;
+      setIndexModalOpen(false);
+    }
+    if (settingsModalOpenRef.current) {
+      settingsModalOpenRef.current = false;
+      setSettingsModalOpen(false);
+    }
+    if (!hadModalOpen) {
+      statusBeforeModalRef.current = statusRef.current;
+      if (statusRef.current === 'PLAYING') {
+        statusRef.current = 'PAUSED';
+        setStatus('PAUSED');
+      }
+    }
+
+    simRef.current.input.pointerActive = false;
+    simRef.current.input.leftBtn = false;
+    simRef.current.input.rightBtn = false;
+    shopModalOpenRef.current = true;
+    setShopModalOpen(true);
+  }, []);
+
+  const closeShopModal = useCallback(() => {
+    if (!shopModalOpenRef.current) return;
+    shopModalOpenRef.current = false;
+    setShopModalOpen(false);
+    if (statusBeforeModalRef.current === 'PLAYING') {
+      statusRef.current = 'PLAYING';
+      setStatus('PLAYING');
+    }
+  }, []);
+
   const openIndexModal = useCallback(() => {
     if (indexModalOpenRef.current) {
       indexModalOpenRef.current = false;
@@ -1678,7 +1966,9 @@ export default function App() {
     }
 
     const hadModalOpen =
-      stagesModalOpenRef.current || settingsModalOpenRef.current;
+      stagesModalOpenRef.current ||
+      settingsModalOpenRef.current ||
+      shopModalOpenRef.current;
     if (stagesModalOpenRef.current) {
       stagesModalOpenRef.current = false;
       setStagesModalOpen(false);
@@ -1686,6 +1976,10 @@ export default function App() {
     if (settingsModalOpenRef.current) {
       settingsModalOpenRef.current = false;
       setSettingsModalOpen(false);
+    }
+    if (shopModalOpenRef.current) {
+      shopModalOpenRef.current = false;
+      setShopModalOpen(false);
     }
     if (!hadModalOpen) {
       statusBeforeModalRef.current = statusRef.current;
@@ -1725,7 +2019,9 @@ export default function App() {
     }
 
     const hadModalOpen =
-      stagesModalOpenRef.current || indexModalOpenRef.current;
+      stagesModalOpenRef.current ||
+      indexModalOpenRef.current ||
+      shopModalOpenRef.current;
     if (stagesModalOpenRef.current) {
       stagesModalOpenRef.current = false;
       setStagesModalOpen(false);
@@ -1733,6 +2029,10 @@ export default function App() {
     if (indexModalOpenRef.current) {
       indexModalOpenRef.current = false;
       setIndexModalOpen(false);
+    }
+    if (shopModalOpenRef.current) {
+      shopModalOpenRef.current = false;
+      setShopModalOpen(false);
     }
     if (!hadModalOpen) {
       statusBeforeModalRef.current = statusRef.current;
@@ -1763,6 +2063,7 @@ export default function App() {
     if (
       stagesModalOpenRef.current ||
       indexModalOpenRef.current ||
+      shopModalOpenRef.current ||
       settingsModalOpenRef.current
     ) {
       return;
@@ -1804,6 +2105,14 @@ export default function App() {
     const onKeyDown = (e: KeyboardEvent) => {
       const code = e.code;
       const key = e.key.toLowerCase();
+
+      if (shopModalOpenRef.current) {
+        if (code === 'Escape') {
+          e.preventDefault();
+          closeShopModal();
+        }
+        return;
+      }
 
       if (settingsModalOpenRef.current) {
         if (code === 'Escape') {
@@ -1893,6 +2202,7 @@ export default function App() {
   }, [
     closeIndexModal,
     closeSettingsModal,
+    closeShopModal,
     closeStagesModal,
     proceedToNextStage,
     resetAndStartGame,
@@ -2306,6 +2616,7 @@ export default function App() {
       }
 
       if (sim.invulnTimer > 0) sim.invulnTimer = Math.max(0, sim.invulnTimer - dt);
+      if (sim.shieldTimer > 0) sim.shieldTimer = Math.max(0, sim.shieldTimer - dt);
       if (sim.playerBounce > 0) sim.playerBounce = Math.max(0, sim.playerBounce - dt * 5.2);
       if (sim.playerGlowAlpha > 0)
         sim.playerGlowAlpha = Math.max(0, sim.playerGlowAlpha - dt * 2.8);
@@ -2505,6 +2816,54 @@ export default function App() {
                 streakRef.current = Math.min(streakRef.current + 1, 10);
               }
             } else {
+              // Active 2-second shield barrier blocks all vegetables cleanly without losing points or corn
+              if (sim.shieldTimer > 0) {
+                sim.playerGlowColor = '#38bdf8';
+                sim.playerGlowAlpha = 0.9;
+                spawnBurst(item.x, item.y, '#7dd3fc', 16, 1.1);
+                sim.floatingTexts.push({
+                  x: item.x,
+                  y: item.y - 12,
+                  vy: -50,
+                  text: langRef.current === 'ar' ? 'محمي!' : 'Shielded!',
+                  color: '#bae6fd',
+                  life: 0.75,
+                  maxLife: 0.75,
+                });
+                audioRef.current.playBuyHeart();
+                continue;
+              }
+
+              // Shop Shield auto-activates for 2 full seconds on vegetable contact
+              if (sim.invulnTimer <= 0 && shopRef.current.shields > 0) {
+                const nextShop: ShopState = {
+                  ...shopRef.current,
+                  shields: Math.max(0, shopRef.current.shields - 1),
+                };
+                shopRef.current = nextShop;
+                setShop(nextShop);
+                persistShopState(nextShop);
+
+                sim.shieldTimer = SHIELD_DURATION;
+                sim.playerGlowColor = '#38bdf8';
+                sim.playerGlowAlpha = 1;
+                spawnBurst(item.x, item.y, '#7dd3fc', 22, 1.25);
+                sim.floatingTexts.push({
+                  x: item.x,
+                  y: item.y - 12,
+                  vy: -52,
+                  text:
+                    langRef.current === 'ar'
+                      ? `درع الحماية · ${SHIELD_DURATION}ث!`
+                      : `Shield · ${SHIELD_DURATION}s!`,
+                  color: '#bae6fd',
+                  life: 0.95,
+                  maxLife: 0.95,
+                });
+                audioRef.current.playBuyHeart();
+                continue;
+              }
+
               // Vegetable hit: subtracts stage points & score AND deducts Corn lives
               const penalty = Math.abs(fStats.pointsDelta);
               const nextStagePoints = Math.max(0, stagePointsRef.current - penalty);
@@ -2838,7 +3197,54 @@ export default function App() {
             const isHeavySquare = item.kind === 'hazard_square';
             const damage = isHeavySquare ? 2 : 1;
 
+            // Active 2-second shield barrier blocks all red hazards cleanly without losing hearts
+            if (sim.shieldTimer > 0) {
+              sim.playerGlowColor = '#38bdf8';
+              sim.playerGlowAlpha = 0.9;
+              spawnBurst(item.x, item.y, '#7dd3fc', 16, 1.1);
+              sim.floatingTexts.push({
+                x: item.x,
+                y: item.y - 12,
+                vy: -50,
+                text: langRef.current === 'ar' ? 'محمي!' : 'Shielded!',
+                color: '#bae6fd',
+                life: 0.75,
+                maxLife: 0.75,
+              });
+              audioRef.current.playBuyHeart();
+              continue;
+            }
+
             if (sim.invulnTimer <= 0) {
+              // Shop Shield auto-activates for 2 full seconds without losing hearts
+              if (shopRef.current.shields > 0) {
+                const nextShop: ShopState = {
+                  ...shopRef.current,
+                  shields: Math.max(0, shopRef.current.shields - 1),
+                };
+                shopRef.current = nextShop;
+                setShop(nextShop);
+                persistShopState(nextShop);
+
+                sim.shieldTimer = SHIELD_DURATION;
+                sim.playerGlowColor = '#38bdf8';
+                sim.playerGlowAlpha = 1;
+                spawnBurst(item.x, item.y, '#7dd3fc', 22, 1.25);
+                sim.floatingTexts.push({
+                  x: item.x,
+                  y: item.y - 12,
+                  vy: -52,
+                  text:
+                    langRef.current === 'ar'
+                      ? `درع الحماية · ${SHIELD_DURATION}ث!`
+                      : `Shield · ${SHIELD_DURATION}s!`,
+                  color: '#bae6fd',
+                  life: 0.95,
+                  maxLife: 0.95,
+                });
+                audioRef.current.playBuyHeart();
+                continue;
+              }
               const prevLives = livesRef.current;
               const nextLives = Math.max(0, prevLives - damage);
               livesRef.current = nextLives;
@@ -3630,9 +4036,74 @@ export default function App() {
           sim.playerGlowColor,
           sim.playerGlowAlpha
         );
+        drawCatcherShieldBubble(
+          ctx,
+          sim.playerX,
+          sim.playerY,
+          w,
+          h,
+          shopRef.current.shields,
+          true,
+          sim.shieldTimer
+        );
         return;
       }
 
+      const activeSkin = shopRef.current.equippedSkin;
+      if (activeSkin === 'ufo') {
+        drawUfoCatcher(
+          ctx,
+          sim.playerX,
+          sim.playerY,
+          w,
+          h,
+          tilt,
+          scaleX,
+          scaleY,
+          isFrozen,
+          isTurbo,
+          sim.playerGlowColor,
+          sim.playerGlowAlpha
+        );
+        drawCatcherShieldBubble(
+          ctx,
+          sim.playerX,
+          sim.playerY,
+          w,
+          h,
+          shopRef.current.shields,
+          false,
+          sim.shieldTimer
+        );
+        if (isFrozen) {
+          ctx.save();
+          ctx.translate(sim.playerX, sim.playerY);
+          drawRoundedRectPath(ctx, -halfW - 6, -halfH - 9, w + 12, h + 16, 10);
+          ctx.fillStyle = 'rgba(186, 230, 253, 0.32)';
+          ctx.fill();
+          ctx.strokeStyle = 'rgba(224, 242, 254, 0.92)';
+          ctx.lineWidth = 2.2;
+          ctx.stroke();
+          const freezeFrac = Math.max(0, Math.min(1, sim.freezeTimer / FREEZE_DURATION));
+          const meterW = w * 0.9;
+          const meterY = -halfH - 21;
+          drawRoundedRectPath(ctx, -meterW / 2, meterY, meterW, 5, 2.5);
+          ctx.fillStyle = 'rgba(15, 23, 42, 0.8)';
+          ctx.fill();
+          drawRoundedRectPath(ctx, -meterW / 2, meterY, meterW * freezeFrac, 5, 2.5);
+          ctx.fillStyle = '#7dd3fc';
+          ctx.fill();
+          ctx.fillStyle = '#e0f2fe';
+          ctx.font = '700 12px "Segoe UI", system-ui, sans-serif';
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'bottom';
+          ctx.fillText(`❄ ${sim.freezeTimer.toFixed(1)}s`, 0, meterY - 3);
+          ctx.restore();
+        }
+        return;
+      }
+
+      const skinPal = getSkinPalette(activeSkin);
       const pulse = 0.5 + 0.5 * Math.sin(performance.now() * (isTurbo ? 0.018 : 0.008));
       const isCatchFlash = sim.playerGlowAlpha > 0.05;
       const accentColor = isFrozen
@@ -3641,7 +4112,7 @@ export default function App() {
         ? sim.playerGlowColor
         : isTurbo
         ? '#34d399'
-        : '#38bdf8';
+        : skinPal.accent;
 
       ctx.save();
       ctx.translate(sim.playerX, sim.playerY);
@@ -3658,7 +4129,7 @@ export default function App() {
           ? `${sim.playerGlowColor}99`
           : isTurbo
           ? 'rgba(16, 185, 129, 0.62)'
-          : 'rgba(56, 189, 248, 0.52)'
+          : skinPal.aura0
       );
       auraGrad.addColorStop(
         0.55,
@@ -3668,7 +4139,7 @@ export default function App() {
           ? `${sim.playerGlowColor}33`
           : isTurbo
           ? 'rgba(16, 185, 129, 0.24)'
-          : 'rgba(14, 165, 233, 0.18)'
+          : skinPal.auraMid
       );
       auraGrad.addColorStop(1, 'rgba(56, 189, 248, 0)');
       ctx.fillStyle = auraGrad;
@@ -3685,7 +4156,7 @@ export default function App() {
           ? `${sim.playerGlowColor}88`
           : isTurbo
           ? 'rgba(52, 211, 153, 0.55)'
-          : 'rgba(125, 211, 252, 0.42)'
+          : skinPal.beam1
       );
       ctx.fillStyle = beamGrad;
       ctx.beginPath();
@@ -3708,8 +4179,8 @@ export default function App() {
             halfH + thrusterLen
           );
           flameGrad.addColorStop(0, '#ffffff');
-          flameGrad.addColorStop(0.4, isTurbo ? '#34d399' : '#38bdf8');
-          flameGrad.addColorStop(1, isTurbo ? 'rgba(16, 185, 129, 0)' : 'rgba(56, 189, 248, 0)');
+          flameGrad.addColorStop(0.4, isTurbo ? '#34d399' : skinPal.flameMid);
+          flameGrad.addColorStop(1, isTurbo ? 'rgba(16, 185, 129, 0)' : skinPal.flameEnd);
           ctx.fillStyle = flameGrad;
           ctx.beginPath();
           ctx.moveTo(tx - 6, halfH - 2);
@@ -3734,10 +4205,10 @@ export default function App() {
       ctx.closePath();
 
       const hullGrad = ctx.createLinearGradient(0, -halfH - 5, 0, halfH);
-      hullGrad.addColorStop(0, '#ffffff');
-      hullGrad.addColorStop(0.35, '#e0f2fe');
-      hullGrad.addColorStop(0.7, '#38bdf8');
-      hullGrad.addColorStop(1, '#0369a1');
+      hullGrad.addColorStop(0, skinPal.hullStops[0]);
+      hullGrad.addColorStop(0.35, skinPal.hullStops[1]);
+      hullGrad.addColorStop(0.7, skinPal.hullStops[2]);
+      hullGrad.addColorStop(1, skinPal.hullStops[3]);
       ctx.fillStyle = hullGrad;
       ctx.fill();
 
@@ -3749,7 +4220,7 @@ export default function App() {
 
       // Dark inner cockpit band for crisp depth contrast
       drawRoundedRectPath(ctx, -halfW + 14, -halfH + 7, w - 28, h - 13, 6);
-      ctx.fillStyle = '#0c1930';
+      ctx.fillStyle = skinPal.cockpit;
       ctx.fill();
 
       // Bright luminous catch bar along the top rim
@@ -3768,18 +4239,18 @@ export default function App() {
         ? '#bae6fd'
         : isCatchFlash
         ? sim.playerGlowColor
-        : '#fde047';
+        : skinPal.core;
       ctx.fill();
       ctx.beginPath();
       ctx.arc(0, 2, 2, 0, Math.PI * 2);
       ctx.fillStyle = '#ffffff';
       ctx.fill();
 
-      // High-visibility amber tip beacons on left & right wings so edges are unmistakable
+      // High-visibility tip beacons on left & right wings so edges are unmistakable
       for (const tipX of [-halfW + 5.5, halfW - 5.5]) {
         ctx.beginPath();
         ctx.arc(tipX, -halfH - 1, 3.2, 0, Math.PI * 2);
-        ctx.fillStyle = isFrozen ? '#bae6fd' : '#fbbf24';
+        ctx.fillStyle = isFrozen ? '#bae6fd' : skinPal.tip;
         ctx.fill();
         ctx.strokeStyle = '#ffffff';
         ctx.lineWidth = 1.1;
@@ -3814,6 +4285,17 @@ export default function App() {
       }
 
       ctx.restore();
+
+      drawCatcherShieldBubble(
+        ctx,
+        sim.playerX,
+        sim.playerY,
+        w,
+        h,
+        shopRef.current.shields,
+        false,
+        sim.shieldTimer
+      );
     };
 
     const render = () => {
@@ -3939,15 +4421,28 @@ export default function App() {
       ctx.lineTo(Math.min(width - 20, sim.playerX + sim.playerWidth * 0.9), railY);
       ctx.stroke();
 
+      const activePlusSkin = shopRef.current.equippedPlusSkin;
+      const activeMinusSkin = shopRef.current.equippedMinusSkin;
+
       for (const item of sim.items) {
         if (isFruitRender) {
           drawFruitCanvasItem(ctx, item as FruitRenderItem);
-        } else if (item.kind === 'pink_circle') {
-          drawPinkCircle(item);
-        } else if (item.kind === 'green_circle') {
-          drawGreenCircle(item);
-        } else if (item.kind === 'blue_triangle') {
-          drawBlueTriangle(item);
+        } else if (
+          item.kind === 'pink_circle' ||
+          item.kind === 'green_circle' ||
+          item.kind === 'blue_triangle'
+        ) {
+          if (activePlusSkin !== 'classic') {
+            drawCustomPlusPoint(ctx, item, activePlusSkin);
+          } else if (item.kind === 'pink_circle') {
+            drawPinkCircle(item);
+          } else if (item.kind === 'green_circle') {
+            drawGreenCircle(item);
+          } else {
+            drawBlueTriangle(item);
+          }
+        } else if (activeMinusSkin !== 'classic') {
+          drawCustomMinusPoint(ctx, item, activeMinusSkin);
         } else if (item.kind === 'hazard_square') {
           drawHazardSquare(item);
         } else if (item.kind === 'hazard_star') {
@@ -4121,7 +4616,8 @@ export default function App() {
     if (active) simRef.current.input.pointerActive = false;
   };
 
-  const anyModalOpen = stagesModalOpen || indexModalOpen || settingsModalOpen;
+  const anyModalOpen =
+    stagesModalOpen || indexModalOpen || shopModalOpen || settingsModalOpen;
   const positiveCatalog = INDEX_CATALOG.filter((e) => e.category === 'positive');
   const negativeCatalog = INDEX_CATALOG.filter((e) => e.category === 'negative');
   const activeIndexEntries =
@@ -4192,6 +4688,34 @@ export default function App() {
                   <rect x="14" y="14" width="7" height="7" rx="1" />
                 </svg>
                 <span>{t.stagesBtn}</span>
+              </button>
+
+              {/* Shop Button ("المتجر") */}
+              <button
+                type="button"
+                onClick={openShopModal}
+                aria-expanded={shopModalOpen}
+                className={`h-7 lg:h-8 px-1.5 sm:px-2.5 inline-flex items-center justify-center gap-1 rounded-md border text-[11px] sm:text-xs font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400 whitespace-nowrap shrink-0 cursor-pointer ${
+                  shopModalOpen
+                    ? 'border-amber-400/60 bg-amber-500/20 text-amber-200'
+                    : 'border-amber-400/30 bg-amber-500/10 text-amber-200 hover:bg-amber-500/20 hover:text-amber-100'
+                }`}
+              >
+                <svg
+                  viewBox="0 0 24 24"
+                  className="w-3 h-3 sm:w-3.5 sm:h-3.5 shrink-0"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  aria-hidden="true"
+                >
+                  <path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z" />
+                  <line x1="3" y1="6" x2="21" y2="6" />
+                  <path d="M16 10a4 4 0 0 1-8 0" />
+                </svg>
+                <span>{t.shopBtn}</span>
               </button>
 
               {/* Index Button ("الاندكس") */}
@@ -4276,7 +4800,7 @@ export default function App() {
                   <circle cx="12" cy="12" r="3" />
                   <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
                 </svg>
-                <span>{t.settingsBtn}</span>
+                <span className="hidden sm:inline">{t.settingsBtn}</span>
               </button>
 
               <button
@@ -5767,6 +6291,28 @@ export default function App() {
                 </div>
               </div>
             </div>
+          )}
+
+          {/* Shop Overlay ("المتجر") */}
+          {shopModalOpen && (
+            <ShopModal
+              lang={lang}
+              coins={coins}
+              lives={lives}
+              maxLives={MAX_LIVES}
+              corn={corn}
+              maxCorn={MAX_CORN}
+              shop={shop}
+              activeTab={shopTab}
+              pointsSubTab={shopPointsSubTab}
+              onChangeTab={setShopTab}
+              onChangePointsSubTab={setShopPointsSubTab}
+              onClose={closeShopModal}
+              onSelectOrBuySkin={selectOrBuySkin}
+              onSelectOrBuyPlusSkin={selectOrBuyPlusSkin}
+              onSelectOrBuyMinusSkin={selectOrBuyMinusSkin}
+              onBuySupply={buySupply}
+            />
           )}
 
           {/* Settings Overlay ("الإعدادات") */}
