@@ -4,6 +4,25 @@
  */
 
 import React, { useCallback, useEffect, useRef, useState } from 'react';
+import {
+  CornIcon,
+  drawFruitBackground,
+  drawFruitCanvasItem,
+  drawFruitPearCatcher,
+  FRUIT_INDEX_CATALOG,
+  FRUIT_ITEM_STATS,
+  FRUIT_STAGES,
+  FRUIT_UNLOCK_COST,
+  FruitBgMotif,
+  FruitIndexIcon,
+  FruitItemKind,
+  FruitRenderItem,
+  GameMode,
+  initFruitBgMotifs,
+  MAX_CORN,
+  TOTAL_FRUIT_STAGES,
+  VALID_FRUIT_KINDS,
+} from './fruitWorld';
 
 type Lang = 'ar' | 'en';
 type GameStatus =
@@ -21,6 +40,7 @@ type ItemKind =
   | 'hazard_square'
   | 'hazard_star'
   | 'hazard_arrow';
+type AnyItemKind = ItemKind | FruitItemKind;
 type IndexTab = 'positive' | 'negative';
 
 interface IndexEntry {
@@ -50,7 +70,7 @@ interface StageConfig {
 
 interface FallingItem {
   id: number;
-  kind: ItemKind;
+  kind: AnyItemKind;
   x: number;
   y: number;
   radius: number;
@@ -93,6 +113,7 @@ interface AmbientStar {
 
 const MAX_LIVES = 10;
 const HEART_REGEN_MS = 5 * 60 * 1000;
+const HEART_COST_COINS = 13;
 const TOTAL_STAGES = 50;
 const PINK_CIRCLE_POINTS = 3;
 const BLUE_TRIANGLE_POINTS = 4;
@@ -108,6 +129,10 @@ const COINS_STORAGE_KEY = 'point_catcher_coins_v1';
 const LIVES_STATE_STORAGE_KEY = 'point_catcher_lives_state_v1';
 const COMPLETED_STAGES_STORAGE_KEY = 'point_catcher_completed_stages_v1';
 const DISCOVERED_ITEMS_STORAGE_KEY = 'point_catcher_discovered_items_v2';
+const FRUIT_UNLOCKED_STORAGE_KEY = 'point_catcher_fruit_unlocked_v1';
+const COMPLETED_FRUIT_STAGES_STORAGE_KEY = 'point_catcher_completed_fruit_stages_v1';
+const DISCOVERED_FRUIT_ITEMS_STORAGE_KEY = 'point_catcher_discovered_fruit_items_v1';
+const CORN_STATE_STORAGE_KEY = 'point_catcher_corn_state_v1';
 const SFX_STORAGE_KEY = 'point_catcher_sfx_v1';
 const MUSIC_STORAGE_KEY = 'point_catcher_music_v1';
 const LANG_STORAGE_KEY = 'point_catcher_lang_v1';
@@ -277,6 +302,10 @@ const COPY = {
     noHeartsNotice: (timer: string) => `نفدت القلوب — يتجدد القلب القادم خلال ${timer}`,
     waitHeartBtn: (timer: string) => `انتظر تجدد القلب (${timer})`,
     nextHeartShort: (timer: string) => `+1♥ خلال ${timer}`,
+    buyHeartBtn: '+1 قلب (13 فلوس)',
+    buyHeartAria: 'شراء قلب واحد مقابل 13 فلوس',
+    heartsFullTip: 'القلوب ممتلئة (10/10)',
+    needCoinsTip: 'تحتاج 13 فلوس لشراء قلب',
     lockedStageAria: (n: number) => `المرحلة ${n} مقفلة`,
     indexBtn: 'الاندكس',
     indexModalTitle: 'الاندكس',
@@ -305,6 +334,37 @@ const COPY = {
           })!`,
     ptsShort: 'نقطة',
     close: 'إغلاق',
+    normalWorldLabel: 'المراحل العادية',
+    fruitWorldLabel: 'مراحل الفواكه',
+    cornLabel: 'الذرة',
+    fruitVictoryTitle: 'مبروك! أنهيت مراحل الفواكه',
+    fruitVictorySubtitle: 'أكملت مراحل الفواكه الـ 15 بنجاح!',
+    fruitStageBanner: (n: number) => `الفواكه · المرحلة ${n}`,
+    fruitStageCompleteTitle: (n: number) => `أكملت مرحلة الفواكه ${n}!`,
+    fruitNextStageBtn: (n: number) => `الانتقال إلى مرحلة الفواكه ${n}`,
+    fruitUnlockTitle: 'عالم الفواكه (15 مرحلة)',
+    fruitUnlockDesc:
+      'افتح 15 مرحلة بخلفية بستان الفواكه مع فواكه تزيد النقاط (+2 إلى +5) وخضار تنقص النقاط والذرة (10 ذرة خاصة)، بالإضافة إلى اندكس خاص بالفواكه.',
+    fruitUnlockBtn: `فتح مراحل الفواكه (${FRUIT_UNLOCK_COST} فلوس)`,
+    fruitNeedCoins: (need: number) => `تحتاج ${need} فلوس إضافية لفتح مراحل الفواكه`,
+    fruitStagesModalHint:
+      '15 مرحلة للفواكه — الخضار تنقص النقاط والذرة (10 ذرة تتجدد كل 5 دقائق). مكافأة أول فوز: 1–3 ذرة = 1، 4–7 = 2، 8–10 = 4 فلوس.',
+    noCornNotice: (timer: string) => `نفدت الذرة — تتجدد الذرة القادمة خلال ${timer}`,
+    waitCornBtn: (timer: string) => `انتظر تجدد الذرة (${timer})`,
+    buyCornBtn: '+1 ذرة (13 فلوس)',
+    buyCornAria: 'شراء ذرة واحدة مقابل 13 فلوس',
+    cornFullTip: 'الذرة ممتلئة (10/10)',
+    needCoinsCornTip: 'تحتاج 13 فلوس لشراء ذرة',
+    fruitIndexWorldBtn: 'اندكس الفواكه',
+    normalIndexWorldBtn: 'الاندكس العادي',
+    fruitIndexModalHint:
+      'جميع الفواكه والخضار — كل عنصر يبقى مقفلاً ولا تظهر فائدته إلا عندما تلتقطه أو تلمسه في مراحل الفواكه.',
+    fruitIndexPlusTab: 'الفواكه (+)',
+    fruitIndexMinusTab: 'الخضار (-)',
+    fruitCoinsEarned: (earned: number, remainingCorn: number) =>
+      earned <= 0
+        ? 'تم استلام مكافأة هذه المرحلة مسبقاً (بدون فلوس إضافية)'
+        : `+${earned} فلوس مكافأة إنهاء المرحلة (${remainingCorn} ذرة)!`,
   },
   en: {
     title: 'Point Catcher',
@@ -349,6 +409,10 @@ const COPY = {
     noHeartsNotice: (timer: string) => `Out of hearts — next heart regenerates in ${timer}`,
     waitHeartBtn: (timer: string) => `Next Heart in ${timer}`,
     nextHeartShort: (timer: string) => `+1♥ in ${timer}`,
+    buyHeartBtn: 'Buy +1 Heart (13 Coins)',
+    buyHeartAria: 'Buy 1 heart for 13 coins',
+    heartsFullTip: 'Hearts full (10/10)',
+    needCoinsTip: 'Need 13 coins to buy a heart',
     lockedStageAria: (n: number) => `Stage ${n} locked`,
     indexBtn: 'Index',
     indexModalTitle: 'Index',
@@ -377,6 +441,37 @@ const COPY = {
           })!`,
     ptsShort: 'pts',
     close: 'Close',
+    normalWorldLabel: 'Normal Stages',
+    fruitWorldLabel: 'Fruit Stages',
+    cornLabel: 'Corn',
+    fruitVictoryTitle: 'Victory! All 15 Fruit Stages Cleared',
+    fruitVictorySubtitle: 'You mastered all 15 fruit orchard stages!',
+    fruitStageBanner: (n: number) => `Fruit · Stage ${n}`,
+    fruitStageCompleteTitle: (n: number) => `Fruit Stage ${n} Complete!`,
+    fruitNextStageBtn: (n: number) => `Continue to Fruit Stage ${n}`,
+    fruitUnlockTitle: 'Fruit World (15 Stages)',
+    fruitUnlockDesc:
+      'Unlock 15 stages with an orchard fruit background, juicy fruits (+2 to +5 pts), vegetables that subtract points & corn lives (10 corn pool), plus a dedicated Fruit Index.',
+    fruitUnlockBtn: `Unlock Fruit Stages (${FRUIT_UNLOCK_COST} Coins)`,
+    fruitNeedCoins: (need: number) => `Need ${need} more coins to unlock Fruit Stages`,
+    fruitStagesModalHint:
+      '15 Fruit stages — vegetables subtract points and corn (10 corn, +1 every 5 min). First-clear reward: 1–3 = 1, 4–7 = 2, 8–10 = 4 coins.',
+    noCornNotice: (timer: string) => `Out of corn — next corn regenerates in ${timer}`,
+    waitCornBtn: (timer: string) => `Next Corn in ${timer}`,
+    buyCornBtn: 'Buy +1 Corn (13 Coins)',
+    buyCornAria: 'Buy 1 corn for 13 coins',
+    cornFullTip: 'Corn full (10/10)',
+    needCoinsCornTip: 'Need 13 coins to buy corn',
+    fruitIndexWorldBtn: 'Fruit Index',
+    normalIndexWorldBtn: 'Normal Index',
+    fruitIndexModalHint:
+      'All fruits & vegetables — each entry stays locked until you catch or touch it in Fruit Stages.',
+    fruitIndexPlusTab: 'Fruits (+)',
+    fruitIndexMinusTab: 'Vegetables (-)',
+    fruitCoinsEarned: (earned: number, remainingCorn: number) =>
+      earned <= 0
+        ? 'Stage coin reward already claimed (no extra coins)'
+        : `+${earned} ${earned === 1 ? 'Coin' : 'Coins'} Reward (${remainingCorn} Corn)!`,
   },
 } as const;
 
@@ -667,6 +762,27 @@ class ArcadeAudio {
     });
   }
 
+  public playBuyHeart(): void {
+    const ctx = this.ensureContext();
+    if (!ctx) return;
+    const now = ctx.currentTime;
+    const notes = [659.25, 987.77];
+    notes.forEach((freq, idx) => {
+      const start = now + idx * 0.06;
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = 'triangle';
+      osc.frequency.setValueAtTime(freq, start);
+      gain.gain.setValueAtTime(0.001, start);
+      gain.gain.exponentialRampToValueAtTime(0.09, start + 0.012);
+      gain.gain.exponentialRampToValueAtTime(0.0008, start + 0.16);
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start(start);
+      osc.stop(start + 0.17);
+    });
+  }
+
   public playSpeedBoost(): void {
     const ctx = this.ensureContext();
     if (!ctx) return;
@@ -889,11 +1005,74 @@ function readStoredLivesState(): StoredLivesState {
   }
 }
 
+function readStoredCompletedFruitStages(): number[] {
+  try {
+    const raw = window.localStorage.getItem(COMPLETED_FRUIT_STAGES_STORAGE_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return [];
+    return parsed.filter(
+      (n): n is number =>
+        typeof n === 'number' &&
+        Number.isInteger(n) &&
+        n >= 1 &&
+        n <= TOTAL_FRUIT_STAGES
+    );
+  } catch {
+    return [];
+  }
+}
+
+function readStoredDiscoveredFruitItems(): FruitItemKind[] {
+  try {
+    const raw = window.localStorage.getItem(DISCOVERED_FRUIT_ITEMS_STORAGE_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return [];
+    return parsed.filter(
+      (k): k is FruitItemKind =>
+        typeof k === 'string' && VALID_FRUIT_KINDS.includes(k as FruitItemKind)
+    );
+  } catch {
+    return [];
+  }
+}
+
+function readStoredCornState(): StoredLivesState {
+  const now = Date.now();
+  try {
+    const raw = window.localStorage.getItem(CORN_STATE_STORAGE_KEY);
+    if (!raw) return { lives: MAX_CORN, lastRegenAt: 0 };
+    const parsed = JSON.parse(raw);
+    if (
+      parsed &&
+      typeof parsed.lives === 'number' &&
+      typeof parsed.lastRegenAt === 'number'
+    ) {
+      return computeSyncedLivesState(parsed.lives, parsed.lastRegenAt, now);
+    }
+    return { lives: MAX_CORN, lastRegenAt: 0 };
+  } catch {
+    return { lives: MAX_CORN, lastRegenAt: 0 };
+  }
+}
+
 function persistLivesState(lives: number, lastRegenAt: number): void {
   try {
     window.localStorage.setItem(
       LIVES_STATE_STORAGE_KEY,
       JSON.stringify({ lives, lastRegenAt })
+    );
+  } catch {
+    // Ignore storage errors
+  }
+}
+
+function persistCornState(corn: number, lastRegenAt: number): void {
+  try {
+    window.localStorage.setItem(
+      CORN_STATE_STORAGE_KEY,
+      JSON.stringify({ lives: corn, lastRegenAt })
     );
   } catch {
     // Ignore storage errors
@@ -914,7 +1093,14 @@ export default function App() {
   }
   const initialLivesState = initialLivesRef.current;
 
+  const initialCornRef = useRef<StoredLivesState | null>(null);
+  if (initialCornRef.current === null) {
+    initialCornRef.current = readStoredCornState();
+  }
+  const initialCornState = initialCornRef.current;
+
   const [lang, setLang] = useState<Lang>(() => readStoredLang());
+  const [gameMode, setGameMode] = useState<GameMode>('normal');
   const [status, setStatus] = useState<GameStatus>('START');
   const [score, setScore] = useState<number>(0);
   const [stagePoints, setStagePoints] = useState<number>(0);
@@ -931,15 +1117,32 @@ export default function App() {
   const [discoveredItems, setDiscoveredItems] = useState<ItemKind[]>(() =>
     readStoredDiscoveredItems()
   );
+  const [fruitUnlocked, setFruitUnlocked] = useState<boolean>(() =>
+    FRUIT_UNLOCK_COST <= 0 ? true : readStoredBoolean(FRUIT_UNLOCKED_STORAGE_KEY, false)
+  );
+  const [completedFruitStages, setCompletedFruitStages] = useState<number[]>(() =>
+    readStoredCompletedFruitStages()
+  );
+  const [discoveredFruitItems, setDiscoveredFruitItems] = useState<FruitItemKind[]>(
+    () => readStoredDiscoveredFruitItems()
+  );
   const [lives, setLives] = useState<number>(initialLivesState.lives);
   const [nextHeartInMs, setNextHeartInMs] = useState<number>(() =>
     initialLivesState.lives < MAX_LIVES
       ? Math.max(0, HEART_REGEN_MS - (Date.now() - initialLivesState.lastRegenAt))
       : 0
   );
+  const [corn, setCorn] = useState<number>(initialCornState.lives);
+  const [nextCornInMs, setNextCornInMs] = useState<number>(() =>
+    initialCornState.lives < MAX_CORN
+      ? Math.max(0, HEART_REGEN_MS - (Date.now() - initialCornState.lastRegenAt))
+      : 0
+  );
   const [stageNum, setStageNum] = useState<number>(1);
   const [stagesModalOpen, setStagesModalOpen] = useState<boolean>(false);
+  const [stagesModalTab, setStagesModalTab] = useState<GameMode>('normal');
   const [indexModalOpen, setIndexModalOpen] = useState<boolean>(false);
+  const [indexModalWorld, setIndexModalWorld] = useState<GameMode>('normal');
   const [indexTab, setIndexTab] = useState<IndexTab>('positive');
   const [settingsModalOpen, setSettingsModalOpen] = useState<boolean>(false);
   const [musicEnabled, setMusicEnabled] = useState<boolean>(() =>
@@ -955,6 +1158,7 @@ export default function App() {
   const audioRef = useRef<ArcadeAudio>(new ArcadeAudio());
 
   const langRef = useRef<Lang>(lang);
+  const gameModeRef = useRef<GameMode>('normal');
   const statusRef = useRef<GameStatus>('START');
   const statusBeforeModalRef = useRef<GameStatus>('START');
   const stagesModalOpenRef = useRef<boolean>(false);
@@ -966,8 +1170,13 @@ export default function App() {
   const coinsRef = useRef<number>(coins);
   const completedStagesRef = useRef<number[]>(completedStages);
   const discoveredItemsRef = useRef<ItemKind[]>(discoveredItems);
+  const fruitUnlockedRef = useRef<boolean>(fruitUnlocked);
+  const completedFruitStagesRef = useRef<number[]>(completedFruitStages);
+  const discoveredFruitItemsRef = useRef<FruitItemKind[]>(discoveredFruitItems);
   const livesRef = useRef<number>(initialLivesState.lives);
   const lastHeartRegenAtRef = useRef<number>(initialLivesState.lastRegenAt);
+  const cornRef = useRef<number>(initialCornState.lives);
+  const lastCornRegenAtRef = useRef<number>(initialCornState.lastRegenAt);
   const stageNumRef = useRef<number>(1);
   const streakRef = useRef<number>(0);
 
@@ -998,6 +1207,7 @@ export default function App() {
     particles: [] as Particle[],
     floatingTexts: [] as FloatingText[],
     stars: [] as AmbientStar[],
+    fruitMotifs: [] as FruitBgMotif[],
     input: {
       leftKey: false,
       rightKey: false,
@@ -1010,9 +1220,21 @@ export default function App() {
   });
 
   const t = COPY[lang];
-  const currentStageConfig = STAGES[Math.min(stageNum - 1, TOTAL_STAGES - 1)];
-  const nextStageConfig =
-    stageNum < TOTAL_STAGES ? STAGES[stageNum] : currentStageConfig;
+  const isFruitMode = gameMode === 'fruit';
+  const activeTotalStages = isFruitMode ? TOTAL_FRUIT_STAGES : TOTAL_STAGES;
+  const activeLives = isFruitMode ? corn : lives;
+  const activeMaxLives = isFruitMode ? MAX_CORN : MAX_LIVES;
+  const activeNextRegenMs = isFruitMode ? nextCornInMs : nextHeartInMs;
+  const currentStageConfig = isFruitMode
+    ? FRUIT_STAGES[Math.min(stageNum - 1, TOTAL_FRUIT_STAGES - 1)]
+    : STAGES[Math.min(stageNum - 1, TOTAL_STAGES - 1)];
+  const nextStageConfig = isFruitMode
+    ? stageNum < TOTAL_FRUIT_STAGES
+      ? FRUIT_STAGES[stageNum]
+      : currentStageConfig
+    : stageNum < TOTAL_STAGES
+    ? STAGES[stageNum]
+    : currentStageConfig;
   const stageProgressRatio =
     status === 'VICTORY' || status === 'STAGE_CLEAR'
       ? 1
@@ -1093,53 +1315,216 @@ export default function App() {
       });
     }
     simRef.current.stars = stars;
+    simRef.current.fruitMotifs = initFruitBgMotifs(width, height);
   }, []);
 
-  // Automatic +1 heart regeneration every 5 minutes when below MAX_LIVES (10)
+  // Automatic +1 heart & +1 corn regeneration every 5 minutes when below 10
   useEffect(() => {
-    const syncHearts = () => {
+    const syncPools = () => {
+      const now = Date.now();
+
+      // Normal hearts pool
       if (livesRef.current >= MAX_LIVES) {
         if (lastHeartRegenAtRef.current !== 0) {
           lastHeartRegenAtRef.current = 0;
           persistLivesState(MAX_LIVES, 0);
         }
         setNextHeartInMs(0);
-        return;
+      } else {
+        const synced = computeSyncedLivesState(
+          livesRef.current,
+          lastHeartRegenAtRef.current,
+          now
+        );
+        if (
+          synced.lives !== livesRef.current ||
+          synced.lastRegenAt !== lastHeartRegenAtRef.current
+        ) {
+          livesRef.current = synced.lives;
+          lastHeartRegenAtRef.current = synced.lastRegenAt;
+          setLives(synced.lives);
+          persistLivesState(synced.lives, synced.lastRegenAt);
+        }
+        setNextHeartInMs(
+          synced.lives < MAX_LIVES
+            ? Math.max(0, HEART_REGEN_MS - (now - synced.lastRegenAt))
+            : 0
+        );
       }
-      const now = Date.now();
-      const synced = computeSyncedLivesState(
-        livesRef.current,
-        lastHeartRegenAtRef.current,
-        now
-      );
-      if (
-        synced.lives !== livesRef.current ||
-        synced.lastRegenAt !== lastHeartRegenAtRef.current
-      ) {
-        livesRef.current = synced.lives;
-        lastHeartRegenAtRef.current = synced.lastRegenAt;
-        setLives(synced.lives);
-        persistLivesState(synced.lives, synced.lastRegenAt);
+
+      // Fruit mode corn lives pool
+      if (cornRef.current >= MAX_CORN) {
+        if (lastCornRegenAtRef.current !== 0) {
+          lastCornRegenAtRef.current = 0;
+          persistCornState(MAX_CORN, 0);
+        }
+        setNextCornInMs(0);
+      } else {
+        const syncedCorn = computeSyncedLivesState(
+          cornRef.current,
+          lastCornRegenAtRef.current,
+          now
+        );
+        if (
+          syncedCorn.lives !== cornRef.current ||
+          syncedCorn.lastRegenAt !== lastCornRegenAtRef.current
+        ) {
+          cornRef.current = syncedCorn.lives;
+          lastCornRegenAtRef.current = syncedCorn.lastRegenAt;
+          setCorn(syncedCorn.lives);
+          persistCornState(syncedCorn.lives, syncedCorn.lastRegenAt);
+        }
+        setNextCornInMs(
+          syncedCorn.lives < MAX_CORN
+            ? Math.max(0, HEART_REGEN_MS - (now - syncedCorn.lastRegenAt))
+            : 0
+        );
       }
-      setNextHeartInMs(
-        synced.lives < MAX_LIVES
-          ? Math.max(0, HEART_REGEN_MS - (now - synced.lastRegenAt))
-          : 0
-      );
     };
 
-    syncHearts();
-    const timerId = window.setInterval(syncHearts, 1000);
+    syncPools();
+    const timerId = window.setInterval(syncPools, 1000);
     return () => window.clearInterval(timerId);
   }, []);
 
-  const startAtStage = useCallback((targetStage: number) => {
+  const buyLifeForMode = useCallback((targetMode?: GameMode) => {
+    const mode = targetMode ?? gameModeRef.current;
+    if (coinsRef.current < HEART_COST_COINS) return;
+
+    if (mode === 'fruit') {
+      if (cornRef.current >= MAX_CORN) return;
+      const nextCoins = coinsRef.current - HEART_COST_COINS;
+      coinsRef.current = nextCoins;
+      setCoins(nextCoins);
+      try {
+        window.localStorage.setItem(COINS_STORAGE_KEY, String(nextCoins));
+      } catch {
+        // Ignore storage errors
+      }
+      const nextCorn = Math.min(MAX_CORN, cornRef.current + 1);
+      cornRef.current = nextCorn;
+      setCorn(nextCorn);
+      if (nextCorn >= MAX_CORN) {
+        lastCornRegenAtRef.current = 0;
+        setNextCornInMs(0);
+      }
+      persistCornState(nextCorn, lastCornRegenAtRef.current);
+      audioRef.current.playBuyHeart();
+      return;
+    }
+
+    if (livesRef.current >= MAX_LIVES) return;
+    const nextCoins = coinsRef.current - HEART_COST_COINS;
+    coinsRef.current = nextCoins;
+    setCoins(nextCoins);
+    try {
+      window.localStorage.setItem(COINS_STORAGE_KEY, String(nextCoins));
+    } catch {
+      // Ignore storage errors
+    }
+
+    const nextLives = Math.min(MAX_LIVES, livesRef.current + 1);
+    livesRef.current = nextLives;
+    setLives(nextLives);
+    if (nextLives >= MAX_LIVES) {
+      lastHeartRegenAtRef.current = 0;
+      setNextHeartInMs(0);
+    }
+    persistLivesState(nextLives, lastHeartRegenAtRef.current);
+    audioRef.current.playBuyHeart();
+  }, []);
+
+  const buyHeart = useCallback(() => {
+    buyLifeForMode();
+  }, [buyLifeForMode]);
+
+  const unlockFruitWorld = useCallback(() => {
+    if (fruitUnlockedRef.current || coinsRef.current < FRUIT_UNLOCK_COST) {
+      return;
+    }
+    const nextCoins = coinsRef.current - FRUIT_UNLOCK_COST;
+    coinsRef.current = nextCoins;
+    setCoins(nextCoins);
+    fruitUnlockedRef.current = true;
+    setFruitUnlocked(true);
+    try {
+      window.localStorage.setItem(COINS_STORAGE_KEY, String(nextCoins));
+      window.localStorage.setItem(FRUIT_UNLOCKED_STORAGE_KEY, 'true');
+    } catch {
+      // Ignore storage errors
+    }
+    audioRef.current.playStageUp();
+  }, []);
+
+  const startAtStage = useCallback((targetStage: number, targetMode?: GameMode) => {
+    const mode = targetMode ?? gameModeRef.current;
+    if (mode === 'fruit') {
+      if (!fruitUnlockedRef.current) return;
+      const safeStage = Math.max(1, Math.min(TOTAL_FRUIT_STAGES, targetStage));
+      if (!isStageUnlocked(safeStage, completedFruitStagesRef.current)) return;
+      if (cornRef.current <= 0) return;
+
+      const cfg = FRUIT_STAGES[safeStage - 1];
+      const sim = simRef.current;
+      const activeCopy = COPY[langRef.current];
+
+      gameModeRef.current = 'fruit';
+      setGameMode('fruit');
+
+      sim.items = [];
+      sim.particles = [];
+      sim.floatingTexts = [];
+      sim.playerX = sim.width / 2;
+      sim.playerVx = 0;
+      sim.playerBounce = 0;
+      sim.playerGlowAlpha = 0;
+      sim.invulnTimer = 0;
+      sim.freezeTimer = 0;
+      sim.speedBoostTimer = 0;
+      sim.shakeTimer = 0;
+      sim.hitFlashAlpha = 0;
+      sim.stageBannerTimer = 1.5;
+      sim.stageBannerText = activeCopy.fruitStageBanner(safeStage);
+      sim.stageBannerSub = activeCopy.stageGoalLabel(cfg.pointsNeeded);
+      sim.spawnTimer = 0.28;
+      sim.lastHazardX = -999;
+      sim.input.pointerActive = false;
+      sim.input.pointerId = null;
+      sim.input.leftBtn = false;
+      sim.input.rightBtn = false;
+
+      scoreRef.current = 0;
+      stagePointsRef.current = 0;
+      stageNumRef.current = safeStage;
+      streakRef.current = 0;
+      stagesModalOpenRef.current = false;
+      indexModalOpenRef.current = false;
+      settingsModalOpenRef.current = false;
+      statusRef.current = 'PLAYING';
+
+      setScore(0);
+      setStagePoints(0);
+      setStageNum(safeStage);
+      setStagesModalOpen(false);
+      setIndexModalOpen(false);
+      setSettingsModalOpen(false);
+      setIsNewBest(false);
+      setStatus('PLAYING');
+
+      audioRef.current.playStart();
+      audioRef.current.startMusic(safeStage * 2);
+      return;
+    }
+
     const safeStage = Math.max(1, Math.min(TOTAL_STAGES, targetStage));
     if (!isStageUnlocked(safeStage, completedStagesRef.current)) return;
     if (livesRef.current <= 0) return;
     const cfg = STAGES[safeStage - 1];
     const sim = simRef.current;
     const activeCopy = COPY[langRef.current];
+
+    gameModeRef.current = 'normal';
+    setGameMode('normal');
 
     sim.items = [];
     sim.particles = [];
@@ -1186,19 +1571,24 @@ export default function App() {
   }, []);
 
   const resetAndStartGame = useCallback(() => {
-    startAtStage(1);
+    startAtStage(1, gameModeRef.current);
   }, [startAtStage]);
 
   const retryCurrentStage = useCallback(() => {
-    startAtStage(stageNumRef.current);
+    startAtStage(stageNumRef.current, gameModeRef.current);
   }, [startAtStage]);
 
   const proceedToNextStage = useCallback(() => {
     if (statusRef.current !== 'STAGE_CLEAR') return;
-    if (livesRef.current <= 0) return;
+    const isFruit = gameModeRef.current === 'fruit';
+    if (isFruit ? cornRef.current <= 0 : livesRef.current <= 0) return;
+
     const sim = simRef.current;
-    const nextStage = Math.min(TOTAL_STAGES, stageNumRef.current + 1);
-    const nextCfg = STAGES[nextStage - 1];
+    const maxStages = isFruit ? TOTAL_FRUIT_STAGES : TOTAL_STAGES;
+    const nextStage = Math.min(maxStages, stageNumRef.current + 1);
+    const nextCfg = isFruit
+      ? FRUIT_STAGES[nextStage - 1]
+      : STAGES[nextStage - 1];
     const activeCopy = COPY[langRef.current];
 
     sim.items = [];
@@ -1212,7 +1602,9 @@ export default function App() {
     sim.input.pointerId = null;
     sim.input.leftBtn = false;
     sim.input.rightBtn = false;
-    sim.stageBannerText = activeCopy.stageBanner(nextStage);
+    sim.stageBannerText = isFruit
+      ? activeCopy.fruitStageBanner(nextStage)
+      : activeCopy.stageBanner(nextStage);
     sim.stageBannerSub = activeCopy.stageGoalLabel(nextCfg.pointsNeeded);
     sim.stageBannerTimer = 1.5;
 
@@ -1224,7 +1616,7 @@ export default function App() {
     setStatus('PLAYING');
 
     audioRef.current.playStart();
-    audioRef.current.startMusic(nextStage);
+    audioRef.current.startMusic(isFruit ? nextStage * 2 : nextStage);
   }, []);
 
   const openStagesModal = useCallback(() => {
@@ -1259,6 +1651,7 @@ export default function App() {
     simRef.current.input.pointerActive = false;
     simRef.current.input.leftBtn = false;
     simRef.current.input.rightBtn = false;
+    setStagesModalTab(gameModeRef.current);
     stagesModalOpenRef.current = true;
     setStagesModalOpen(true);
   }, []);
@@ -1305,6 +1698,7 @@ export default function App() {
     simRef.current.input.pointerActive = false;
     simRef.current.input.leftBtn = false;
     simRef.current.input.rightBtn = false;
+    setIndexModalWorld(gameModeRef.current);
     indexModalOpenRef.current = true;
     setIndexModalOpen(true);
   }, []);
@@ -1549,6 +1943,14 @@ export default function App() {
           s.x = Math.min(w, s.x);
           s.y = Math.min(h, s.y);
         }
+        if (sim.fruitMotifs.length === 0) {
+          sim.fruitMotifs = initFruitBgMotifs(w, h);
+        } else {
+          for (const m of sim.fruitMotifs) {
+            m.x = Math.min(w, m.x);
+            m.y = Math.min(h, m.y);
+          }
+        }
       }
     };
 
@@ -1596,6 +1998,86 @@ export default function App() {
 
     const spawnFallingObject = () => {
       const sim = simRef.current;
+
+      if (gameModeRef.current === 'fruit') {
+        const fCfg =
+          FRUIT_STAGES[Math.min(stageNumRef.current - 1, TOTAL_FRUIT_STAGES - 1)];
+        const isVeg = Math.random() < fCfg.vegChance;
+        let fKind: FruitItemKind;
+        if (isVeg) {
+          const roll = Math.random();
+          if (roll < fCfg.pepperRatio) {
+            fKind = 'veg_pepper';
+          } else if (roll < fCfg.pepperRatio + (1 - fCfg.pepperRatio) * 0.52) {
+            fKind = 'veg_broccoli';
+          } else {
+            fKind = 'veg_carrot';
+          }
+        } else {
+          const roll = Math.random();
+          if (roll < 0.34) {
+            fKind = 'fruit_apple';
+          } else if (roll < 0.64) {
+            fKind = 'fruit_orange';
+          } else if (roll < 0.86) {
+            fKind = 'fruit_strawberry';
+          } else {
+            fKind = 'fruit_watermelon';
+          }
+        }
+
+        const margin = Math.max(30, sim.playerWidth * 0.42);
+        const usableW = Math.max(80, sim.width - margin * 2);
+        let spawnX = margin + Math.random() * usableW;
+        for (let attempt = 0; attempt < 6; attempt++) {
+          const candidate = margin + Math.random() * usableW;
+          const tooCloseToRecentTop = sim.items.some(
+            (item) => item.y < 105 && Math.abs(item.x - candidate) < 62
+          );
+          const tooCloseToHazard =
+            isVeg && Math.abs(candidate - sim.lastHazardX) < 58;
+          if (!tooCloseToRecentTop && !tooCloseToHazard) {
+            spawnX = candidate;
+            break;
+          }
+        }
+        if (isVeg) {
+          sim.lastHazardX = spawnX;
+        }
+
+        const speedVariance =
+          fKind === 'veg_pepper'
+            ? 1.12 + Math.random() * 0.24
+            : isVeg
+            ? 0.92 + Math.random() * 0.3
+            : fKind === 'fruit_watermelon'
+            ? 0.96 + Math.random() * 0.28
+            : 0.86 + Math.random() * 0.32;
+        const heightFactor = Math.max(0.82, Math.min(1.22, sim.height / 540));
+        const speed = fCfg.baseSpeed * speedVariance * heightFactor;
+        const radius =
+          fKind === 'fruit_watermelon'
+            ? Math.max(17, Math.min(21, sim.width * 0.026))
+            : isVeg
+            ? Math.max(16, Math.min(20, sim.width * 0.025))
+            : Math.max(15, Math.min(19, sim.width * 0.024));
+        const driftRange = isVeg ? fCfg.lateralDrift : fCfg.lateralDrift * 0.7;
+
+        sim.items.push({
+          id: sim.nextId++,
+          kind: fKind,
+          x: spawnX,
+          y: -radius - 10,
+          radius,
+          speed,
+          vx: driftRange > 0 ? (Math.random() * 2 - 1) * driftRange : 0,
+          rotation: 0,
+          rotSpeed: isVeg ? (Math.random() > 0.5 ? 1 : -1) * 1.1 : 0,
+          pulsePhase: Math.random() * Math.PI * 2,
+        });
+        return;
+      }
+
       const cfg = STAGES[Math.min(stageNumRef.current - 1, TOTAL_STAGES - 1)];
 
       const isHazard = Math.random() < cfg.hazardChance;
@@ -1721,6 +2203,14 @@ export default function App() {
           s.x = Math.random() * sim.width;
         }
       }
+      for (const m of sim.fruitMotifs) {
+        m.y += m.speed * starSpeedMul * dt;
+        m.rotation += m.rotSpeed * dt;
+        if (m.y > sim.height + m.size + 24) {
+          m.y = -m.size - 24;
+          m.x = Math.random() * sim.width;
+        }
+      }
 
       if (statusRef.current !== 'PLAYING') {
         if (
@@ -1826,11 +2316,16 @@ export default function App() {
         sim.stageBannerTimer = Math.max(0, sim.stageBannerTimer - dt);
 
       // Spawning cadence governed by current stage (scales 2x during green orb speed boost)
-      const activeCfg = STAGES[Math.min(stageNumRef.current - 1, TOTAL_STAGES - 1)];
+      const activeSpawnInterval =
+        gameModeRef.current === 'fruit'
+          ? FRUIT_STAGES[Math.min(stageNumRef.current - 1, TOTAL_FRUIT_STAGES - 1)]
+              .spawnInterval
+          : STAGES[Math.min(stageNumRef.current - 1, TOTAL_STAGES - 1)]
+              .spawnInterval;
       sim.spawnTimer -= simDt;
       if (sim.spawnTimer <= 0) {
         spawnFallingObject();
-        sim.spawnTimer = activeCfg.spawnInterval * (0.82 + Math.random() * 0.36);
+        sim.spawnTimer = activeSpawnInterval * (0.82 + Math.random() * 0.36);
       }
 
       // Collision checks
@@ -1854,10 +2349,12 @@ export default function App() {
           item.vx = -Math.abs(item.vx);
         }
 
-        const isPoint =
-          item.kind === 'pink_circle' ||
-          item.kind === 'blue_triangle' ||
-          item.kind === 'green_circle';
+        const isFruitWorld = gameModeRef.current === 'fruit';
+        const isPoint = isFruitWorld
+          ? FRUIT_ITEM_STATS[item.kind as FruitItemKind]?.isFruit ?? false
+          : item.kind === 'pink_circle' ||
+            item.kind === 'blue_triangle' ||
+            item.kind === 'green_circle';
 
         if (item.y - item.radius > sim.height + 24) {
           if (isPoint) {
@@ -1883,9 +2380,202 @@ export default function App() {
         if (dx * dx + dy * dy <= effectiveRadius * effectiveRadius) {
           sim.items.splice(i, 1);
 
-          // Discover & unlock this item in the Index ONLY when caught/touched by the player
-          if (!discoveredItemsRef.current.includes(item.kind)) {
-            const updated = [...discoveredItemsRef.current, item.kind];
+          if (isFruitWorld) {
+            const fKind = item.kind as FruitItemKind;
+            const fStats = FRUIT_ITEM_STATS[fKind];
+
+            // Discover & unlock this fruit/vegetable in the dedicated Fruit Index on catch/touch
+            if (!discoveredFruitItemsRef.current.includes(fKind)) {
+              const updated = [...discoveredFruitItemsRef.current, fKind];
+              discoveredFruitItemsRef.current = updated;
+              setDiscoveredFruitItems(updated);
+              try {
+                window.localStorage.setItem(
+                  DISCOVERED_FRUIT_ITEMS_STORAGE_KEY,
+                  JSON.stringify(updated)
+                );
+              } catch {
+                // Ignore storage errors
+              }
+            }
+
+            if (fStats.isFruit) {
+              const value = fStats.pointsDelta;
+              const nextScore = scoreRef.current + value;
+              scoreRef.current = nextScore;
+              setScore(nextScore);
+
+              const nextStagePoints = stagePointsRef.current + value;
+              stagePointsRef.current = nextStagePoints;
+              setStagePoints(nextStagePoints);
+
+              if (nextScore > bestScoreRef.current) {
+                bestScoreRef.current = nextScore;
+                setBestScore(nextScore);
+                setIsNewBest(true);
+                try {
+                  window.localStorage.setItem(
+                    BEST_SCORE_STORAGE_KEY,
+                    String(nextScore)
+                  );
+                } catch {
+                  // Ignore storage errors
+                }
+              }
+
+              sim.playerBounce = 1;
+              sim.playerGlowColor = fStats.color;
+              sim.playerGlowAlpha = 1;
+
+              spawnBurst(item.x, item.y, fStats.color, 15, 1.05);
+              spawnBurst(item.x, item.y, '#fef9c3', 5, 0.72);
+              sim.floatingTexts.push({
+                x: item.x,
+                y: item.y - 10,
+                vy: -56,
+                text: `+${value}`,
+                color: fStats.textColor,
+                life: 0.68,
+                maxLife: 0.68,
+              });
+
+              const currentFruitCfg =
+                FRUIT_STAGES[
+                  Math.min(stageNumRef.current - 1, TOTAL_FRUIT_STAGES - 1)
+                ];
+
+              if (nextStagePoints >= currentFruitCfg.pointsNeeded) {
+                const clearedStage = stageNumRef.current;
+                const alreadyCompleted =
+                  completedFruitStagesRef.current.includes(clearedStage);
+                const earnedCoins = alreadyCompleted
+                  ? 0
+                  : getStageClearCoins(cornRef.current);
+                setLastEarnedCoins(earnedCoins);
+                if (earnedCoins > 0) {
+                  const nextCoins = coinsRef.current + earnedCoins;
+                  coinsRef.current = nextCoins;
+                  setCoins(nextCoins);
+                  try {
+                    window.localStorage.setItem(
+                      COINS_STORAGE_KEY,
+                      String(nextCoins)
+                    );
+                  } catch {
+                    // Ignore storage errors
+                  }
+                }
+
+                if (!alreadyCompleted) {
+                  const updated = [...completedFruitStagesRef.current, clearedStage];
+                  completedFruitStagesRef.current = updated;
+                  setCompletedFruitStages(updated);
+                  try {
+                    window.localStorage.setItem(
+                      COMPLETED_FRUIT_STAGES_STORAGE_KEY,
+                      JSON.stringify(updated)
+                    );
+                  } catch {
+                    // Ignore storage errors
+                  }
+                }
+
+                sim.input.pointerActive = false;
+                sim.input.pointerId = null;
+                sim.input.leftBtn = false;
+                sim.input.rightBtn = false;
+
+                if (clearedStage >= TOTAL_FRUIT_STAGES) {
+                  statusRef.current = 'VICTORY';
+                  setStatus('VICTORY');
+                  spawnBurst(sim.width * 0.35, sim.height * 0.4, '#facc15', 22, 1.3);
+                  spawnBurst(sim.width * 0.65, sim.height * 0.4, '#4ade80', 22, 1.3);
+                  audioRef.current.playVictory();
+                } else {
+                  statusRef.current = 'STAGE_CLEAR';
+                  setStatus('STAGE_CLEAR');
+                  spawnBurst(sim.width * 0.35, sim.height * 0.42, '#fb923c', 16, 1.15);
+                  spawnBurst(sim.width * 0.65, sim.height * 0.42, '#4ade80', 16, 1.15);
+                  audioRef.current.playStageUp();
+                }
+                streakRef.current = Math.min(streakRef.current + 1, 10);
+                break;
+              } else {
+                audioRef.current.playCatch(streakRef.current, value >= 4);
+                streakRef.current = Math.min(streakRef.current + 1, 10);
+              }
+            } else {
+              // Vegetable hit: subtracts stage points & score AND deducts Corn lives
+              const penalty = Math.abs(fStats.pointsDelta);
+              const nextStagePoints = Math.max(0, stagePointsRef.current - penalty);
+              stagePointsRef.current = nextStagePoints;
+              setStagePoints(nextStagePoints);
+
+              const nextScore = Math.max(0, scoreRef.current - penalty);
+              scoreRef.current = nextScore;
+              setScore(nextScore);
+              streakRef.current = 0;
+
+              if (sim.invulnTimer <= 0) {
+                const prevCorn = cornRef.current;
+                const nextCorn = Math.max(0, prevCorn - fStats.cornDamage);
+                cornRef.current = nextCorn;
+                setCorn(nextCorn);
+                if (prevCorn >= MAX_CORN && nextCorn < MAX_CORN) {
+                  lastCornRegenAtRef.current = Date.now();
+                  setNextCornInMs(HEART_REGEN_MS);
+                }
+                persistCornState(nextCorn, lastCornRegenAtRef.current);
+
+                const isHeavyVeg = fStats.cornDamage >= 2;
+                sim.shakeTimer = isHeavyVeg ? 0.32 : 0.24;
+                sim.shakeIntensity = isHeavyVeg ? 10 : 7;
+                sim.hitFlashAlpha = isHeavyVeg ? 0.42 : 0.3;
+                sim.invulnTimer = 0.75;
+
+                spawnBurst(item.x, item.y, '#ef4444', isHeavyVeg ? 22 : 16, 1.2);
+                spawnBurst(item.x, item.y, '#facc15', 8, 0.9);
+                sim.floatingTexts.push({
+                  x: item.x,
+                  y: item.y - 12,
+                  vy: -52,
+                  text:
+                    langRef.current === 'ar'
+                      ? `-${penalty} · -${fStats.cornDamage} ذرة`
+                      : `-${penalty} · -${fStats.cornDamage} Corn`,
+                  color: '#fecaca',
+                  life: 0.9,
+                  maxLife: 0.9,
+                });
+
+                if (nextCorn <= 0) {
+                  statusRef.current = 'GAME_OVER';
+                  setStatus('GAME_OVER');
+                  audioRef.current.playGameOver();
+                  break;
+                } else {
+                  audioRef.current.playHazardHit(isHeavyVeg);
+                }
+              } else {
+                spawnBurst(item.x, item.y, '#fca5a5', 8, 0.85);
+                sim.floatingTexts.push({
+                  x: item.x,
+                  y: item.y - 12,
+                  vy: -48,
+                  text: `-${penalty}`,
+                  color: '#fecaca',
+                  life: 0.7,
+                  maxLife: 0.7,
+                });
+              }
+            }
+            continue;
+          }
+
+          // Discover & unlock this item in the Normal Index ONLY when caught/touched by the player
+          const normalKind = item.kind as ItemKind;
+          if (!discoveredItemsRef.current.includes(normalKind)) {
+            const updated = [...discoveredItemsRef.current, normalKind];
             discoveredItemsRef.current = updated;
             setDiscoveredItems(updated);
             try {
@@ -2926,6 +3616,23 @@ export default function App() {
         : Math.max(-0.14, Math.min(0.14, sim.playerVx / 3000));
       const scaleX = 1 + sim.playerBounce * 0.11;
       const scaleY = 1 - sim.playerBounce * 0.13;
+
+      if (gameModeRef.current === 'fruit') {
+        drawFruitPearCatcher(
+          ctx,
+          sim.playerX,
+          sim.playerY,
+          w,
+          h,
+          tilt,
+          scaleX,
+          scaleY,
+          sim.playerGlowColor,
+          sim.playerGlowAlpha
+        );
+        return;
+      }
+
       const pulse = 0.5 + 0.5 * Math.sin(performance.now() * (isTurbo ? 0.018 : 0.008));
       const isCatchFlash = sim.playerGlowAlpha > 0.05;
       const accentColor = isFrozen
@@ -3123,62 +3830,71 @@ export default function App() {
         );
       }
 
-      const bgGrad = ctx.createLinearGradient(0, 0, 0, height);
-      bgGrad.addColorStop(0, '#070f1e');
-      bgGrad.addColorStop(0.55, '#0b1629');
-      bgGrad.addColorStop(1, '#101f38');
-      ctx.fillStyle = bgGrad;
-      ctx.fillRect(-14, -14, width + 28, height + 28);
-
-      ctx.strokeStyle = 'rgba(148, 163, 184, 0.045)';
-      ctx.lineWidth = 1;
-      const gridStep = Math.max(48, Math.round(width / 12));
-      ctx.beginPath();
-      for (let gx = gridStep; gx < width; gx += gridStep) {
-        ctx.moveTo(gx, 0);
-        ctx.lineTo(gx, height);
-      }
-      for (let gy = gridStep; gy < height; gy += gridStep) {
-        ctx.moveTo(0, gy);
-        ctx.lineTo(width, gy);
-      }
-      ctx.stroke();
-
+      const isFruitRender = gameModeRef.current === 'fruit';
       const isSpeedBoost =
-        sim.speedBoostTimer > 0 && statusRef.current === 'PLAYING';
+        !isFruitRender &&
+        sim.speedBoostTimer > 0 &&
+        statusRef.current === 'PLAYING';
 
-      for (const s of sim.stars) {
-        ctx.fillStyle = isSpeedBoost
-          ? `rgba(167, 243, 208, ${Math.min(0.85, s.alpha * 1.6)})`
-          : `rgba(226, 232, 240, ${s.alpha})`;
+      if (isFruitRender) {
+        drawFruitBackground(ctx, width, height, sim.fruitMotifs);
+      } else {
+        const bgGrad = ctx.createLinearGradient(0, 0, 0, height);
+        bgGrad.addColorStop(0, '#070f1e');
+        bgGrad.addColorStop(0.55, '#0b1629');
+        bgGrad.addColorStop(1, '#101f38');
+        ctx.fillStyle = bgGrad;
+        ctx.fillRect(-14, -14, width + 28, height + 28);
+
+        ctx.strokeStyle = 'rgba(148, 163, 184, 0.045)';
+        ctx.lineWidth = 1;
+        const gridStep = Math.max(48, Math.round(width / 12));
         ctx.beginPath();
+        for (let gx = gridStep; gx < width; gx += gridStep) {
+          ctx.moveTo(gx, 0);
+          ctx.lineTo(gx, height);
+        }
+        for (let gy = gridStep; gy < height; gy += gridStep) {
+          ctx.moveTo(0, gy);
+          ctx.lineTo(width, gy);
+        }
+        ctx.stroke();
+
+        for (const s of sim.stars) {
+          ctx.fillStyle = isSpeedBoost
+            ? `rgba(167, 243, 208, ${Math.min(0.85, s.alpha * 1.6)})`
+            : `rgba(226, 232, 240, ${s.alpha})`;
+          ctx.beginPath();
+          if (isSpeedBoost) {
+            ctx.fillRect(s.x - s.r * 0.5, s.y - s.r * 5, s.r, s.r * 9);
+          } else {
+            ctx.arc(s.x, s.y, s.r, 0, Math.PI * 2);
+            ctx.fill();
+          }
+        }
+
+        // Subtle emerald turbo edge streaks during +100% (2x) speed boost
         if (isSpeedBoost) {
-          ctx.fillRect(s.x - s.r * 0.5, s.y - s.r * 5, s.r, s.r * 9);
-        } else {
-          ctx.arc(s.x, s.y, s.r, 0, Math.PI * 2);
-          ctx.fill();
+          const boostFade = Math.min(1, sim.speedBoostTimer / 0.4);
+          const turboVignette = ctx.createRadialGradient(
+            width / 2,
+            height / 2,
+            Math.min(width, height) * 0.32,
+            width / 2,
+            height / 2,
+            Math.max(width, height) * 0.72
+          );
+          turboVignette.addColorStop(0, 'rgba(16, 185, 129, 0)');
+          turboVignette.addColorStop(1, `rgba(16, 185, 129, ${0.18 * boostFade})`);
+          ctx.fillStyle = turboVignette;
+          ctx.fillRect(0, 0, width, height);
         }
       }
 
-      // Subtle emerald turbo edge streaks during +100% (2x) speed boost
-      if (isSpeedBoost) {
-        const boostFade = Math.min(1, sim.speedBoostTimer / 0.4);
-        const turboVignette = ctx.createRadialGradient(
-          width / 2,
-          height / 2,
-          Math.min(width, height) * 0.32,
-          width / 2,
-          height / 2,
-          Math.max(width, height) * 0.72
-        );
-        turboVignette.addColorStop(0, 'rgba(16, 185, 129, 0)');
-        turboVignette.addColorStop(1, `rgba(16, 185, 129, ${0.18 * boostFade})`);
-        ctx.fillStyle = turboVignette;
-        ctx.fillRect(0, 0, width, height);
-      }
-
       const railY = sim.playerY + sim.playerHeight / 2 + 10;
-      ctx.strokeStyle = 'rgba(148, 163, 184, 0.2)';
+      ctx.strokeStyle = isFruitRender
+        ? 'rgba(250, 204, 21, 0.25)'
+        : 'rgba(148, 163, 184, 0.2)';
       ctx.lineWidth = 2;
       ctx.beginPath();
       ctx.moveTo(20, railY);
@@ -3192,9 +3908,30 @@ export default function App() {
         sim.playerX + sim.playerWidth * 0.9,
         railY
       );
-      railGlow.addColorStop(0, isSpeedBoost ? 'rgba(16, 185, 129, 0)' : 'rgba(56, 189, 248, 0)');
-      railGlow.addColorStop(0.5, isSpeedBoost ? 'rgba(52, 211, 153, 0.95)' : 'rgba(125, 211, 252, 0.95)');
-      railGlow.addColorStop(1, isSpeedBoost ? 'rgba(16, 185, 129, 0)' : 'rgba(56, 189, 248, 0)');
+      railGlow.addColorStop(
+        0,
+        isFruitRender
+          ? 'rgba(250, 204, 21, 0)'
+          : isSpeedBoost
+          ? 'rgba(16, 185, 129, 0)'
+          : 'rgba(56, 189, 248, 0)'
+      );
+      railGlow.addColorStop(
+        0.5,
+        isFruitRender
+          ? 'rgba(250, 204, 21, 0.92)'
+          : isSpeedBoost
+          ? 'rgba(52, 211, 153, 0.95)'
+          : 'rgba(125, 211, 252, 0.95)'
+      );
+      railGlow.addColorStop(
+        1,
+        isFruitRender
+          ? 'rgba(250, 204, 21, 0)'
+          : isSpeedBoost
+          ? 'rgba(16, 185, 129, 0)'
+          : 'rgba(56, 189, 248, 0)'
+      );
       ctx.strokeStyle = railGlow;
       ctx.lineWidth = 3;
       ctx.beginPath();
@@ -3203,7 +3940,9 @@ export default function App() {
       ctx.stroke();
 
       for (const item of sim.items) {
-        if (item.kind === 'pink_circle') {
+        if (isFruitRender) {
+          drawFruitCanvasItem(ctx, item as FruitRenderItem);
+        } else if (item.kind === 'pink_circle') {
           drawPinkCircle(item);
         } else if (item.kind === 'green_circle') {
           drawGreenCircle(item);
@@ -3394,6 +4133,21 @@ export default function App() {
     discoveredItems.includes(e.kind)
   ).length;
 
+  const fruitPositiveCatalog = FRUIT_INDEX_CATALOG.filter(
+    (e) => e.category === 'positive'
+  );
+  const fruitNegativeCatalog = FRUIT_INDEX_CATALOG.filter(
+    (e) => e.category === 'negative'
+  );
+  const activeFruitIndexEntries =
+    indexTab === 'positive' ? fruitPositiveCatalog : fruitNegativeCatalog;
+  const fruitPositiveDiscoveredCount = fruitPositiveCatalog.filter((e) =>
+    discoveredFruitItems.includes(e.kind)
+  ).length;
+  const fruitNegativeDiscoveredCount = fruitNegativeCatalog.filter((e) =>
+    discoveredFruitItems.includes(e.kind)
+  ).length;
+
   return (
     <div
       dir={lang === 'ar' ? 'rtl' : 'ltr'}
@@ -3546,8 +4300,12 @@ export default function App() {
               <span className="text-[11px] sm:text-xs text-slate-400">
                 {t.stage}
               </span>
-              <span className="font-num text-xs sm:text-sm lg:text-base font-bold text-sky-300">
-                {stageNum}/{TOTAL_STAGES}
+              <span
+                className={`font-num text-xs sm:text-sm lg:text-base font-bold ${
+                  isFruitMode ? 'text-amber-300' : 'text-sky-300'
+                }`}
+              >
+                {stageNum}/{activeTotalStages}
               </span>
             </div>
 
@@ -3612,33 +4370,86 @@ export default function App() {
 
             <div className="h-3.5 sm:h-4 w-px bg-white/10 shrink-0" aria-hidden="true" />
 
-            {/* Lives (10-heart pool + live 5-min regen countdown) */}
+            {/* Lives (Hearts in Normal mode, Corn in Fruit mode) + live 5-min regen + buy for 13 coins */}
             <div
-              className="flex items-center gap-1.5 whitespace-nowrap"
-              aria-label={`${t.lives}: ${lives}/${MAX_LIVES}`}
+              className="flex items-center gap-1 sm:gap-1.5 whitespace-nowrap"
+              aria-label={`${isFruitMode ? t.cornLabel : t.lives}: ${activeLives}/${activeMaxLives}`}
             >
-              <svg
-                viewBox="0 0 24 24"
-                className={`w-4 h-4 sm:w-4.5 sm:h-4.5 shrink-0 ${
-                  lives > 0 ? 'text-rose-500' : 'text-slate-600'
-                }`}
-                fill="currentColor"
-                aria-hidden="true"
-              >
-                <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z" />
-              </svg>
+              {isFruitMode ? (
+                <CornIcon
+                  className={`w-4 h-4 sm:w-5 sm:h-5 shrink-0 ${
+                    activeLives > 0 ? '' : 'opacity-40 grayscale'
+                  }`}
+                />
+              ) : (
+                <svg
+                  viewBox="0 0 24 24"
+                  className={`w-4 h-4 sm:w-4.5 sm:h-4.5 shrink-0 ${
+                    activeLives > 0 ? 'text-rose-500' : 'text-slate-600'
+                  }`}
+                  fill="currentColor"
+                  aria-hidden="true"
+                >
+                  <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z" />
+                </svg>
+              )}
               <span
                 className={`font-num text-xs sm:text-sm lg:text-base font-bold ${
-                  lives > 0 ? 'text-rose-300' : 'text-slate-400'
+                  activeLives > 0
+                    ? isFruitMode
+                      ? 'text-amber-300'
+                      : 'text-rose-300'
+                    : 'text-slate-400'
                 }`}
               >
-                {lives}/{MAX_LIVES}
+                {activeLives}/{activeMaxLives}
               </span>
-              {lives < MAX_LIVES && (
-                <span className="font-num text-[10px] sm:text-xs font-semibold text-sky-300 bg-sky-500/15 border border-sky-400/25 rounded px-1.5 py-0.5">
-                  {formatCountdown(nextHeartInMs)}
+              {activeLives < activeMaxLives && (
+                <span className="font-num text-[10px] sm:text-xs font-semibold text-sky-300 bg-sky-500/15 border border-sky-400/25 rounded px-1 py-0.5">
+                  {formatCountdown(activeNextRegenMs)}
                 </span>
               )}
+              <button
+                type="button"
+                onClick={buyHeart}
+                disabled={activeLives >= activeMaxLives || coins < HEART_COST_COINS}
+                aria-label={isFruitMode ? t.buyCornAria : t.buyHeartAria}
+                title={
+                  activeLives >= activeMaxLives
+                    ? isFruitMode
+                      ? t.cornFullTip
+                      : t.heartsFullTip
+                    : coins < HEART_COST_COINS
+                    ? isFruitMode
+                      ? t.needCoinsCornTip
+                      : t.needCoinsTip
+                    : isFruitMode
+                    ? t.buyCornAria
+                    : t.buyHeartAria
+                }
+                className={`h-6 px-1.5 inline-flex items-center justify-center gap-0.5 rounded border text-[10px] sm:text-[11px] font-bold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400 shrink-0 ${
+                  activeLives < activeMaxLives && coins >= HEART_COST_COINS
+                    ? 'border-amber-400/50 bg-amber-500/20 text-amber-200 hover:bg-amber-500/35 active:scale-95 cursor-pointer'
+                    : 'border-white/10 bg-slate-900/70 text-slate-500 cursor-not-allowed'
+                }`}
+              >
+                <span>+</span>
+                <span className="font-num">{HEART_COST_COINS}</span>
+                <svg
+                  viewBox="0 0 24 24"
+                  className="w-2.5 h-2.5 sm:w-3 sm:h-3 text-amber-400 shrink-0"
+                  aria-hidden="true"
+                >
+                  <circle
+                    cx="12"
+                    cy="12"
+                    r="9.5"
+                    fill="currentColor"
+                    stroke="#fef3c7"
+                    strokeWidth="1.6"
+                  />
+                </svg>
+              </button>
             </div>
           </div>
         </div>
@@ -3653,7 +4464,11 @@ export default function App() {
           aria-label={t.stage}
         >
           <div
-            className="h-full bg-gradient-to-r from-pink-400 to-sky-400 transition-transform duration-150 origin-left rtl:origin-right"
+            className={`h-full transition-transform duration-150 origin-left rtl:origin-right ${
+              isFruitMode
+                ? 'bg-gradient-to-r from-amber-400 via-lime-400 to-rose-400'
+                : 'bg-gradient-to-r from-pink-400 to-sky-400'
+            }`}
             style={{ transform: `scaleX(${stageProgressRatio})` }}
           />
         </div>
@@ -3803,20 +4618,36 @@ export default function App() {
                   </p>
                 )}
 
-                <button
-                  type="button"
-                  disabled={lives <= 0}
-                  onClick={resetAndStartGame}
-                  className={`w-full sm:w-auto min-w-[200px] px-8 py-3.5 rounded-lg font-bold text-base transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-300 focus-visible:ring-offset-2 focus-visible:ring-offset-[#0f1a2e] whitespace-nowrap ${
-                    lives <= 0
-                      ? 'bg-slate-700 text-slate-300 cursor-not-allowed'
-                      : 'bg-sky-500 hover:bg-sky-400 active:scale-[0.98] text-slate-950 cursor-pointer'
-                  }`}
-                >
-                  {lives <= 0
-                    ? t.waitHeartBtn(formatCountdown(nextHeartInMs))
-                    : t.startBtn}
-                </button>
+                <div className="flex flex-col sm:flex-row items-center justify-center gap-2.5">
+                  {lives <= 0 && (
+                    <button
+                      type="button"
+                      disabled={coins < HEART_COST_COINS}
+                      onClick={buyHeart}
+                      className={`w-full sm:w-auto px-5 py-3.5 rounded-lg font-bold text-sm sm:text-base transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-300 whitespace-nowrap ${
+                        coins >= HEART_COST_COINS
+                          ? 'bg-amber-400 hover:bg-amber-300 active:scale-[0.98] text-slate-950 cursor-pointer'
+                          : 'bg-slate-800 text-slate-500 border border-white/10 cursor-not-allowed'
+                      }`}
+                    >
+                      {t.buyHeartBtn}
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    disabled={lives <= 0}
+                    onClick={resetAndStartGame}
+                    className={`w-full sm:w-auto min-w-[200px] px-8 py-3.5 rounded-lg font-bold text-base transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-300 focus-visible:ring-offset-2 focus-visible:ring-offset-[#0f1a2e] whitespace-nowrap ${
+                      lives <= 0
+                        ? 'bg-slate-700 text-slate-300 cursor-not-allowed'
+                        : 'bg-sky-500 hover:bg-sky-400 active:scale-[0.98] text-slate-950 cursor-pointer'
+                    }`}
+                  >
+                    {lives <= 0
+                      ? t.waitHeartBtn(formatCountdown(nextHeartInMs))
+                      : t.startBtn}
+                  </button>
+                </div>
               </div>
             </div>
           )}
@@ -3848,19 +4679,27 @@ export default function App() {
             </div>
           )}
 
-          {/* Stage Clear Overlay with Heart-Based Coin Reward & Next Stage Button */}
+          {/* Stage Clear Overlay with Coin Reward & Next Stage Button */}
           {status === 'STAGE_CLEAR' && !anyModalOpen && (
             <div className="absolute inset-0 flex items-center justify-center p-4 bg-[#060c17]/76 backdrop-blur-[3px]">
-              <div className="w-full max-w-md rounded-xl border border-sky-400/25 bg-[#0f1a2e]/95 p-6 sm:p-8 text-center shadow-2xl">
+              <div
+                className={`w-full max-w-md rounded-xl border bg-[#0f1a2e]/95 p-6 sm:p-8 text-center shadow-2xl ${
+                  isFruitMode ? 'border-amber-400/30' : 'border-sky-400/25'
+                }`}
+              >
                 <h2 className="text-2xl sm:text-3xl font-bold text-white mb-2 text-balance">
-                  {t.stageCompleteTitle(stageNum)}
+                  {isFruitMode
+                    ? t.fruitStageCompleteTitle(stageNum)
+                    : t.stageCompleteTitle(stageNum)}
                 </h2>
                 <p
                   className={`text-sm sm:text-base font-bold mb-1.5 ${
                     lastEarnedCoins > 0 ? 'text-amber-300' : 'text-slate-400'
                   }`}
                 >
-                  {t.coinsEarned(lastEarnedCoins, lives)}
+                  {isFruitMode
+                    ? t.fruitCoinsEarned(lastEarnedCoins, corn)
+                    : t.coinsEarned(lastEarnedCoins, lives)}
                 </p>
                 <p className="text-xs sm:text-sm text-sky-300 font-medium mb-5">
                   {t.nextGoalText(nextStageConfig.pointsNeeded)}
@@ -3885,26 +4724,36 @@ export default function App() {
                   </div>
                   <div className="px-2">
                     <div className="text-xs text-slate-400 mb-1">
-                      {t.lives}
+                      {isFruitMode ? t.cornLabel : t.lives}
                     </div>
-                    <div className="font-num text-2xl sm:text-3xl font-bold text-rose-400">
-                      {lives}/{MAX_LIVES}
+                    <div
+                      className={`font-num text-2xl sm:text-3xl font-bold ${
+                        isFruitMode ? 'text-amber-300' : 'text-rose-400'
+                      }`}
+                    >
+                      {activeLives}/{activeMaxLives}
                     </div>
                   </div>
                 </div>
 
                 <button
                   type="button"
-                  disabled={lives <= 0}
+                  disabled={activeLives <= 0}
                   onClick={proceedToNextStage}
                   className={`w-full sm:w-auto min-w-[220px] px-8 py-3.5 rounded-lg font-bold text-base transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-300 focus-visible:ring-offset-2 focus-visible:ring-offset-[#0f1a2e] whitespace-nowrap ${
-                    lives <= 0
+                    activeLives <= 0
                       ? 'bg-slate-700 text-slate-300 cursor-not-allowed'
+                      : isFruitMode
+                      ? 'bg-amber-400 hover:bg-amber-300 active:scale-[0.98] text-slate-950 cursor-pointer'
                       : 'bg-sky-500 hover:bg-sky-400 active:scale-[0.98] text-slate-950 cursor-pointer'
                   }`}
                 >
-                  {lives <= 0
-                    ? t.waitHeartBtn(formatCountdown(nextHeartInMs))
+                  {activeLives <= 0
+                    ? isFruitMode
+                      ? t.waitCornBtn(formatCountdown(activeNextRegenMs))
+                      : t.waitHeartBtn(formatCountdown(activeNextRegenMs))
+                    : isFruitMode
+                    ? t.fruitNextStageBtn(stageNum + 1)
                     : t.nextStageBtn(stageNum + 1)}
                 </button>
               </div>
@@ -3916,7 +4765,11 @@ export default function App() {
               <div className="absolute inset-0 flex items-center justify-center p-4 bg-[#060c17]/78 backdrop-blur-[3px]">
                 <div className="w-full max-w-md rounded-xl border border-white/12 bg-[#0f1a2e]/95 p-6 sm:p-8 text-center shadow-2xl">
                   <h2 className="text-2xl sm:text-3xl font-bold text-white mb-2 text-balance">
-                    {status === 'VICTORY' ? t.victoryTitle : t.gameOver}
+                    {status === 'VICTORY'
+                      ? isFruitMode
+                        ? t.fruitVictoryTitle
+                        : t.victoryTitle
+                      : t.gameOver}
                   </h2>
 
                   {status === 'VICTORY' ? (
@@ -3926,10 +4779,14 @@ export default function App() {
                           lastEarnedCoins > 0 ? 'text-amber-300' : 'text-slate-400'
                         }`}
                       >
-                        {t.coinsEarned(lastEarnedCoins, lives)}
+                        {isFruitMode
+                          ? t.fruitCoinsEarned(lastEarnedCoins, corn)
+                          : t.coinsEarned(lastEarnedCoins, lives)}
                       </p>
                       <p className="text-sm font-medium text-emerald-300 mb-3">
-                        {t.victorySubtitle}
+                        {isFruitMode
+                          ? t.fruitVictorySubtitle
+                          : t.victorySubtitle}
                       </p>
                     </>
                   ) : (
@@ -3962,8 +4819,12 @@ export default function App() {
                       <div className="text-xs text-slate-400 mb-1">
                         {t.stage}
                       </div>
-                      <div className="font-num text-2xl sm:text-3xl font-bold text-sky-300">
-                        {stageNum}/{TOTAL_STAGES}
+                      <div
+                        className={`font-num text-2xl sm:text-3xl font-bold ${
+                          isFruitMode ? 'text-amber-300' : 'text-sky-300'
+                        }`}
+                      >
+                        {stageNum}/{activeTotalStages}
                       </div>
                     </div>
                   </div>
@@ -3975,35 +4836,57 @@ export default function App() {
                     </span>
                   </div>
 
-                  {lives <= 0 && (
+                  {activeLives <= 0 && (
                     <p className="text-xs sm:text-sm font-semibold text-rose-300 mb-3">
-                      {t.noHeartsNotice(formatCountdown(nextHeartInMs))}
+                      {isFruitMode
+                        ? t.noCornNotice(formatCountdown(activeNextRegenMs))
+                        : t.noHeartsNotice(formatCountdown(activeNextRegenMs))}
                     </p>
                   )}
 
-                  <button
-                    type="button"
-                    disabled={lives <= 0}
-                    onClick={
-                      status === 'GAME_OVER'
-                        ? retryCurrentStage
-                        : resetAndStartGame
-                    }
-                    className={`w-full sm:w-auto min-w-[200px] px-8 py-3.5 rounded-lg font-bold text-base transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-300 focus-visible:ring-offset-2 focus-visible:ring-offset-[#0f1a2e] whitespace-nowrap ${
-                      lives <= 0
-                        ? 'bg-slate-700 text-slate-300 cursor-not-allowed'
-                        : 'bg-sky-500 hover:bg-sky-400 active:scale-[0.98] text-slate-950 cursor-pointer'
-                    }`}
-                  >
-                    {lives <= 0
-                      ? t.waitHeartBtn(formatCountdown(nextHeartInMs))
-                      : t.playAgainBtn}
-                  </button>
+                  <div className="flex flex-col sm:flex-row items-center justify-center gap-2.5">
+                    {activeLives <= 0 && (
+                      <button
+                        type="button"
+                        disabled={coins < HEART_COST_COINS}
+                        onClick={buyHeart}
+                        className={`w-full sm:w-auto px-5 py-3.5 rounded-lg font-bold text-sm sm:text-base transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-300 whitespace-nowrap ${
+                          coins >= HEART_COST_COINS
+                            ? 'bg-amber-400 hover:bg-amber-300 active:scale-[0.98] text-slate-950 cursor-pointer'
+                            : 'bg-slate-800 text-slate-500 border border-white/10 cursor-not-allowed'
+                        }`}
+                      >
+                        {isFruitMode ? t.buyCornBtn : t.buyHeartBtn}
+                      </button>
+                    )}
+                    <button
+                      type="button"
+                      disabled={activeLives <= 0}
+                      onClick={
+                        status === 'GAME_OVER'
+                          ? retryCurrentStage
+                          : resetAndStartGame
+                      }
+                      className={`w-full sm:w-auto min-w-[200px] px-8 py-3.5 rounded-lg font-bold text-base transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-300 focus-visible:ring-offset-2 focus-visible:ring-offset-[#0f1a2e] whitespace-nowrap ${
+                        activeLives <= 0
+                          ? 'bg-slate-700 text-slate-300 cursor-not-allowed'
+                          : isFruitMode
+                          ? 'bg-amber-400 hover:bg-amber-300 active:scale-[0.98] text-slate-950 cursor-pointer'
+                          : 'bg-sky-500 hover:bg-sky-400 active:scale-[0.98] text-slate-950 cursor-pointer'
+                      }`}
+                    >
+                      {activeLives <= 0
+                        ? isFruitMode
+                          ? t.waitCornBtn(formatCountdown(activeNextRegenMs))
+                          : t.waitHeartBtn(formatCountdown(activeNextRegenMs))
+                        : t.playAgainBtn}
+                    </button>
+                  </div>
                 </div>
               </div>
             )}
 
-          {/* Stages Selector Overlay ("المراحل") */}
+          {/* Stages Selector Overlay ("المراحل") — Normal Stages (50) + Fruit Stages (15, 32-coin unlock) */}
           {stagesModalOpen && (
             <div className="absolute inset-0 z-20 flex items-center justify-center p-3 sm:p-5 bg-[#060c17]/82 backdrop-blur-[4px]">
               <div className="w-full max-w-lg max-h-full flex flex-col rounded-xl border border-white/14 bg-[#0f1a2e]/98 shadow-2xl overflow-hidden">
@@ -4038,113 +4921,390 @@ export default function App() {
                   </button>
                 </div>
 
-                <div className="px-5 pt-3 pb-5 overflow-y-auto">
-                  <p className="text-xs sm:text-sm text-slate-300 mb-3">
-                    {t.stagesModalHint}
-                  </p>
-                  {lives <= 0 && (
-                    <p className="text-xs sm:text-sm font-semibold text-rose-300 mb-3">
-                      {t.noHeartsNotice(formatCountdown(nextHeartInMs))}
-                    </p>
-                  )}
+                <div className="px-5 pt-3.5 pb-5 overflow-y-auto">
+                  {/* World Tabs inside Stages Modal: Normal Stages vs Fruit Stages (32 Coins) */}
+                  <div
+                    role="tablist"
+                    aria-label={t.stagesModalTitle}
+                    className="grid grid-cols-2 gap-2 p-1 rounded-lg bg-slate-950/75 border border-white/10 mb-3.5"
+                  >
+                    <button
+                      type="button"
+                      role="tab"
+                      aria-selected={stagesModalTab === 'normal'}
+                      onClick={() => setStagesModalTab('normal')}
+                      className={`h-10 px-2.5 rounded-md inline-flex items-center justify-center gap-1.5 text-xs sm:text-sm font-bold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400 whitespace-nowrap cursor-pointer ${
+                        stagesModalTab === 'normal'
+                          ? 'bg-sky-500 text-slate-950'
+                          : 'text-slate-300 hover:text-white hover:bg-slate-800/70'
+                      }`}
+                    >
+                      <span>{t.normalWorldLabel}</span>
+                      <span
+                        className={`font-num text-[11px] ${
+                          stagesModalTab === 'normal'
+                            ? 'text-slate-900'
+                            : 'text-slate-400'
+                        }`}
+                      >
+                        ({TOTAL_STAGES})
+                      </span>
+                    </button>
 
-                  <div className="grid grid-cols-4 sm:grid-cols-5 gap-2.5">
-                    {STAGES.map((cfg) => {
-                      const isCurrent = cfg.stage === stageNum;
-                      const isCompleted = completedStages.includes(cfg.stage);
-                      const unlocked = isStageUnlocked(cfg.stage, completedStages);
-                      const canEnter = unlocked && lives > 0;
-                      return (
-                        <button
-                          key={cfg.stage}
-                          type="button"
-                          disabled={!canEnter}
-                          aria-label={
-                            unlocked
-                              ? `${t.stageBanner(cfg.stage)} — ${cfg.pointsNeeded} ${t.ptsShort}`
-                              : t.lockedStageAria(cfg.stage)
-                          }
-                          onClick={() => {
-                            if (canEnter) startAtStage(cfg.stage);
-                          }}
-                          className={`relative flex flex-col items-center justify-center py-3 px-2 rounded-lg border transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400 ${
-                            !unlocked
-                              ? 'border-white/5 bg-slate-950/70 text-slate-500 opacity-65 cursor-not-allowed'
-                              : isCurrent
-                              ? 'border-sky-400 bg-sky-500/20 text-white cursor-pointer'
-                              : isCompleted
-                              ? 'border-emerald-400/35 bg-emerald-500/10 text-slate-100 hover:bg-emerald-500/20 cursor-pointer'
-                              : 'border-white/12 bg-slate-900/80 text-slate-200 hover:bg-slate-800 hover:border-white/25 cursor-pointer'
+                    <button
+                      type="button"
+                      role="tab"
+                      aria-selected={stagesModalTab === 'fruit'}
+                      onClick={() => setStagesModalTab('fruit')}
+                      className={`h-10 px-2.5 rounded-md inline-flex items-center justify-center gap-1.5 text-xs sm:text-sm font-bold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400 whitespace-nowrap cursor-pointer ${
+                        stagesModalTab === 'fruit'
+                          ? 'bg-amber-400 text-slate-950'
+                          : 'text-amber-200 hover:text-white hover:bg-amber-500/15'
+                      }`}
+                    >
+                      <span>{t.fruitWorldLabel}</span>
+                      {!fruitUnlocked ? (
+                        <span
+                          className={`font-num text-[11px] inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded ${
+                            stagesModalTab === 'fruit'
+                              ? 'bg-slate-950/20 text-slate-950'
+                              : 'bg-amber-500/20 text-amber-300'
                           }`}
                         >
-                          {!unlocked ? (
-                            <span
-                              className="absolute top-1.5 end-1.5 text-slate-500"
-                              aria-hidden="true"
-                            >
-                              <svg
-                                viewBox="0 0 24 24"
-                                className="w-3.5 h-3.5"
-                                fill="none"
-                                stroke="currentColor"
-                                strokeWidth="2.2"
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                              >
-                                <rect x="5" y="11" width="14" height="10" rx="2" />
-                                <path d="M8 11V7a4 4 0 0 1 8 0v4" />
-                              </svg>
-                            </span>
-                          ) : (
-                            isCompleted && (
-                              <span
-                                className="absolute top-1.5 end-1.5 text-emerald-400"
-                                aria-hidden="true"
-                              >
-                                <svg
-                                  viewBox="0 0 24 24"
-                                  className="w-3.5 h-3.5"
-                                  fill="none"
-                                  stroke="currentColor"
-                                  strokeWidth="3"
-                                  strokeLinecap="round"
-                                  strokeLinejoin="round"
-                                >
-                                  <polyline points="20 6 9 17 4 12" />
-                                </svg>
-                              </span>
-                            )
-                          )}
-                          <span className="font-num text-base sm:text-lg font-bold">
-                            {cfg.stage}
-                          </span>
-                          <span
-                            className={`font-num text-[11px] whitespace-nowrap ${
-                              unlocked ? 'text-slate-400' : 'text-slate-600'
+                          <svg
+                            viewBox="0 0 24 24"
+                            className="w-3 h-3"
+                            fill="none"
+                            stroke="currentColor"
+                            strokeWidth="2.4"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            aria-hidden="true"
+                          >
+                            <rect x="5" y="11" width="14" height="10" rx="2" />
+                            <path d="M8 11V7a4 4 0 0 1 8 0v4" />
+                          </svg>
+                          {FRUIT_UNLOCK_COST}
+                        </span>
+                      ) : (
+                        <span
+                          className={`font-num text-[11px] ${
+                            stagesModalTab === 'fruit'
+                              ? 'text-slate-900'
+                              : 'text-amber-300/80'
+                          }`}
+                        >
+                          ({TOTAL_FRUIT_STAGES})
+                        </span>
+                      )}
+                    </button>
+                  </div>
+
+                  {stagesModalTab === 'normal' ? (
+                    <>
+                      <p className="text-xs sm:text-sm text-slate-300 mb-3">
+                        {t.stagesModalHint}
+                      </p>
+                      {lives <= 0 && (
+                        <div className="flex flex-wrap items-center justify-between gap-2 mb-3 p-2.5 rounded-lg border border-rose-400/25 bg-rose-500/10">
+                          <p className="text-xs sm:text-sm font-semibold text-rose-300">
+                            {t.noHeartsNotice(formatCountdown(nextHeartInMs))}
+                          </p>
+                          <button
+                            type="button"
+                            disabled={coins < HEART_COST_COINS}
+                            onClick={() => buyLifeForMode('normal')}
+                            className={`px-3 py-1.5 rounded-md text-xs font-bold transition-colors whitespace-nowrap ${
+                              coins >= HEART_COST_COINS
+                                ? 'bg-amber-400 hover:bg-amber-300 text-slate-950 cursor-pointer'
+                                : 'bg-slate-800 text-slate-500 cursor-not-allowed'
                             }`}
                           >
-                            {cfg.pointsNeeded} {t.ptsShort}
+                            {t.buyHeartBtn}
+                          </button>
+                        </div>
+                      )}
+
+                      <div className="grid grid-cols-4 sm:grid-cols-5 gap-2.5">
+                        {STAGES.map((cfg) => {
+                          const isCurrent = !isFruitMode && cfg.stage === stageNum;
+                          const isCompleted = completedStages.includes(cfg.stage);
+                          const unlocked = isStageUnlocked(cfg.stage, completedStages);
+                          const canEnter = unlocked && lives > 0;
+                          return (
+                            <button
+                              key={cfg.stage}
+                              type="button"
+                              disabled={!canEnter}
+                              aria-label={
+                                unlocked
+                                  ? `${t.stageBanner(cfg.stage)} — ${cfg.pointsNeeded} ${t.ptsShort}`
+                                  : t.lockedStageAria(cfg.stage)
+                              }
+                              onClick={() => {
+                                if (canEnter) startAtStage(cfg.stage, 'normal');
+                              }}
+                              className={`relative flex flex-col items-center justify-center py-3 px-2 rounded-lg border transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400 ${
+                                !unlocked
+                                  ? 'border-white/5 bg-slate-950/70 text-slate-500 opacity-65 cursor-not-allowed'
+                                  : isCurrent
+                                  ? 'border-sky-400 bg-sky-500/20 text-white cursor-pointer'
+                                  : isCompleted
+                                  ? 'border-emerald-400/35 bg-emerald-500/10 text-slate-100 hover:bg-emerald-500/20 cursor-pointer'
+                                  : 'border-white/12 bg-slate-900/80 text-slate-200 hover:bg-slate-800 hover:border-white/25 cursor-pointer'
+                              }`}
+                            >
+                              {!unlocked ? (
+                                <span
+                                  className="absolute top-1.5 end-1.5 text-slate-500"
+                                  aria-hidden="true"
+                                >
+                                  <svg
+                                    viewBox="0 0 24 24"
+                                    className="w-3.5 h-3.5"
+                                    fill="none"
+                                    stroke="currentColor"
+                                    strokeWidth="2.2"
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                  >
+                                    <rect x="5" y="11" width="14" height="10" rx="2" />
+                                    <path d="M8 11V7a4 4 0 0 1 8 0v4" />
+                                  </svg>
+                                </span>
+                              ) : (
+                                isCompleted && (
+                                  <span
+                                    className="absolute top-1.5 end-1.5 text-emerald-400"
+                                    aria-hidden="true"
+                                  >
+                                    <svg
+                                      viewBox="0 0 24 24"
+                                      className="w-3.5 h-3.5"
+                                      fill="none"
+                                      stroke="currentColor"
+                                      strokeWidth="3"
+                                      strokeLinecap="round"
+                                      strokeLinejoin="round"
+                                    >
+                                      <polyline points="20 6 9 17 4 12" />
+                                    </svg>
+                                  </span>
+                                )
+                              )}
+                              <span className="font-num text-base sm:text-lg font-bold">
+                                {cfg.stage}
+                              </span>
+                              <span
+                                className={`font-num text-[11px] whitespace-nowrap ${
+                                  unlocked ? 'text-slate-400' : 'text-slate-600'
+                                }`}
+                              >
+                                {cfg.pointsNeeded} {t.ptsShort}
+                              </span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </>
+                  ) : !fruitUnlocked ? (
+                    <div className="rounded-xl border border-amber-400/25 bg-gradient-to-b from-emerald-950/75 via-slate-900/90 to-slate-950/90 p-5 text-center">
+                      <div className="flex items-center justify-center gap-2 mb-3">
+                        <FruitIndexIcon kind="fruit_apple" />
+                        <FruitIndexIcon kind="fruit_orange" />
+                        <FruitIndexIcon kind="fruit_strawberry" />
+                        <FruitIndexIcon kind="fruit_watermelon" />
+                        <CornIcon className="w-8 h-8" />
+                      </div>
+                      <h3 className="text-lg sm:text-xl font-bold text-amber-200 mb-2">
+                        {t.fruitUnlockTitle}
+                      </h3>
+                      <p className="text-xs sm:text-sm text-slate-200 leading-relaxed mb-4">
+                        {t.fruitUnlockDesc}
+                      </p>
+
+                      <button
+                        type="button"
+                        disabled={coins < FRUIT_UNLOCK_COST}
+                        onClick={unlockFruitWorld}
+                        className={`w-full sm:w-auto min-w-[230px] px-6 py-3 rounded-lg font-bold text-sm sm:text-base transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-300 whitespace-nowrap ${
+                          coins >= FRUIT_UNLOCK_COST
+                            ? 'bg-amber-400 hover:bg-amber-300 active:scale-[0.98] text-slate-950 cursor-pointer'
+                            : 'bg-slate-800 text-slate-400 border border-white/10 cursor-not-allowed'
+                        }`}
+                      >
+                        {t.fruitUnlockBtn}
+                      </button>
+
+                      {coins < FRUIT_UNLOCK_COST && (
+                        <p className="text-xs text-amber-300/85 mt-2.5 font-medium">
+                          {t.fruitNeedCoins(FRUIT_UNLOCK_COST - coins)}
+                        </p>
+                      )}
+                    </div>
+                  ) : (
+                    <>
+                      <p className="text-xs sm:text-sm text-amber-100/90 mb-3">
+                        {t.fruitStagesModalHint}
+                      </p>
+
+                      {/* Dedicated Corn Lives Bar inside Fruit Stages */}
+                      <div className="flex flex-wrap items-center justify-between gap-2 mb-3 p-2.5 rounded-lg border border-amber-400/25 bg-emerald-950/55">
+                        <div className="flex items-center gap-1.5">
+                          <CornIcon className="w-5 h-5 shrink-0" />
+                          <span className="text-xs sm:text-sm font-bold text-amber-200">
+                            {t.cornLabel}:{' '}
+                            <span className="font-num">
+                              {corn}/{MAX_CORN}
+                            </span>
                           </span>
-                        </button>
-                      );
-                    })}
-                  </div>
+                          {corn < MAX_CORN && (
+                            <span className="font-num text-[11px] font-semibold text-sky-300 bg-sky-500/15 border border-sky-400/25 rounded px-1.5 py-0.5">
+                              {formatCountdown(nextCornInMs)}
+                            </span>
+                          )}
+                        </div>
+                        {corn < MAX_CORN && (
+                          <button
+                            type="button"
+                            disabled={coins < HEART_COST_COINS}
+                            onClick={() => buyLifeForMode('fruit')}
+                            className={`px-2.5 py-1 rounded-md text-xs font-bold transition-colors whitespace-nowrap ${
+                              coins >= HEART_COST_COINS
+                                ? 'bg-amber-400 hover:bg-amber-300 text-slate-950 cursor-pointer'
+                                : 'bg-slate-800 text-slate-500 cursor-not-allowed'
+                            }`}
+                          >
+                            {t.buyCornBtn}
+                          </button>
+                        )}
+                      </div>
+
+                      {corn <= 0 && (
+                        <p className="text-xs sm:text-sm font-semibold text-rose-300 mb-3">
+                          {t.noCornNotice(formatCountdown(nextCornInMs))}
+                        </p>
+                      )}
+
+                      <div className="grid grid-cols-3 sm:grid-cols-5 gap-2.5">
+                        {FRUIT_STAGES.map((cfg) => {
+                          const isCurrent = isFruitMode && cfg.stage === stageNum;
+                          const isCompleted = completedFruitStages.includes(cfg.stage);
+                          const unlocked = isStageUnlocked(
+                            cfg.stage,
+                            completedFruitStages
+                          );
+                          const canEnter = unlocked && corn > 0;
+                          return (
+                            <button
+                              key={cfg.stage}
+                              type="button"
+                              disabled={!canEnter}
+                              aria-label={
+                                unlocked
+                                  ? `${t.fruitStageBanner(cfg.stage)} — ${cfg.pointsNeeded} ${t.ptsShort}`
+                                  : t.lockedStageAria(cfg.stage)
+                              }
+                              onClick={() => {
+                                if (canEnter) startAtStage(cfg.stage, 'fruit');
+                              }}
+                              className={`relative flex flex-col items-center justify-center py-3 px-2 rounded-lg border transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400 ${
+                                !unlocked
+                                  ? 'border-white/5 bg-slate-950/70 text-slate-500 opacity-65 cursor-not-allowed'
+                                  : isCurrent
+                                  ? 'border-amber-400 bg-amber-500/20 text-white cursor-pointer'
+                                  : isCompleted
+                                  ? 'border-lime-400/35 bg-emerald-500/15 text-slate-100 hover:bg-emerald-500/25 cursor-pointer'
+                                  : 'border-amber-300/18 bg-emerald-950/55 text-amber-100 hover:bg-emerald-900/65 hover:border-amber-300/35 cursor-pointer'
+                              }`}
+                            >
+                              {!unlocked ? (
+                                <span
+                                  className="absolute top-1.5 end-1.5 text-slate-500"
+                                  aria-hidden="true"
+                                >
+                                  <svg
+                                    viewBox="0 0 24 24"
+                                    className="w-3.5 h-3.5"
+                                    fill="none"
+                                    stroke="currentColor"
+                                    strokeWidth="2.2"
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                  >
+                                    <rect x="5" y="11" width="14" height="10" rx="2" />
+                                    <path d="M8 11V7a4 4 0 0 1 8 0v4" />
+                                  </svg>
+                                </span>
+                              ) : (
+                                isCompleted && (
+                                  <span
+                                    className="absolute top-1.5 end-1.5 text-lime-400"
+                                    aria-hidden="true"
+                                  >
+                                    <svg
+                                      viewBox="0 0 24 24"
+                                      className="w-3.5 h-3.5"
+                                      fill="none"
+                                      stroke="currentColor"
+                                      strokeWidth="3"
+                                      strokeLinecap="round"
+                                      strokeLinejoin="round"
+                                    >
+                                      <polyline points="20 6 9 17 4 12" />
+                                    </svg>
+                                  </span>
+                                )
+                              )}
+                              <span className="font-num text-base sm:text-lg font-bold">
+                                {cfg.stage}
+                              </span>
+                              <span
+                                className={`font-num text-[11px] whitespace-nowrap ${
+                                  unlocked ? 'text-amber-200/80' : 'text-slate-600'
+                                }`}
+                              >
+                                {cfg.pointsNeeded} {t.ptsShort}
+                              </span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </>
+                  )}
                 </div>
               </div>
             </div>
           )}
 
-          {/* Index Overlay ("الاندكس") — Plus (+) & Minus (-) tabs with drop-based discovery lock */}
+          {/* Index Overlay ("الاندكس") — Normal Index + Dedicated Fruit Index with catch-based discovery lock */}
           {indexModalOpen && (
             <div className="absolute inset-0 z-20 flex items-center justify-center p-3 sm:p-5 bg-[#060c17]/82 backdrop-blur-[4px]">
               <div className="w-full max-w-md max-h-full flex flex-col rounded-xl border border-white/14 bg-[#0f1a2e]/98 shadow-2xl overflow-hidden">
                 <div className="flex items-center justify-between gap-3 px-5 py-4 border-b border-white/10 shrink-0">
                   <div className="flex items-center gap-2.5 min-w-0">
                     <h2 className="text-lg sm:text-xl font-bold text-white whitespace-nowrap">
-                      {t.indexModalTitle}
+                      {indexModalWorld === 'fruit'
+                        ? t.fruitIndexWorldBtn
+                        : t.indexModalTitle}
                     </h2>
-                    <span className="text-xs sm:text-sm text-sky-300 font-semibold font-num whitespace-nowrap">
-                      · {t.indexDiscoveredCount(discoveredItems.length, INDEX_CATALOG.length)}
+                    <span
+                      className={`text-xs sm:text-sm font-semibold font-num whitespace-nowrap ${
+                        indexModalWorld === 'fruit'
+                          ? 'text-amber-300'
+                          : 'text-sky-300'
+                      }`}
+                    >
+                      ·{' '}
+                      {indexModalWorld === 'fruit'
+                        ? t.indexDiscoveredCount(
+                            discoveredFruitItems.length,
+                            FRUIT_INDEX_CATALOG.length
+                          )
+                        : t.indexDiscoveredCount(
+                            discoveredItems.length,
+                            INDEX_CATALOG.length
+                          )}
                     </span>
                   </div>
                   <button
@@ -4170,8 +5330,63 @@ export default function App() {
                 </div>
 
                 <div className="px-5 pt-3.5 pb-5 overflow-y-auto">
-                  <p className="text-xs sm:text-sm text-slate-300 mb-4 leading-relaxed">
-                    {t.indexModalHint}
+                  {/* World Switcher: Normal Index vs Dedicated Fruit Index */}
+                  <div
+                    role="tablist"
+                    aria-label={t.indexModalTitle}
+                    className="grid grid-cols-2 gap-2 p-1 rounded-lg bg-slate-950/75 border border-white/10 mb-3"
+                  >
+                    <button
+                      type="button"
+                      role="tab"
+                      aria-selected={indexModalWorld === 'normal'}
+                      onClick={() => setIndexModalWorld('normal')}
+                      className={`h-9 px-2.5 rounded-md inline-flex items-center justify-center gap-1.5 text-xs sm:text-sm font-bold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400 whitespace-nowrap cursor-pointer ${
+                        indexModalWorld === 'normal'
+                          ? 'bg-sky-500 text-slate-950'
+                          : 'text-slate-300 hover:text-white hover:bg-slate-800/70'
+                      }`}
+                    >
+                      <span>{t.normalIndexWorldBtn}</span>
+                      <span
+                        className={`font-num text-[11px] ${
+                          indexModalWorld === 'normal'
+                            ? 'text-slate-900'
+                            : 'text-slate-400'
+                        }`}
+                      >
+                        {discoveredItems.length}/{INDEX_CATALOG.length}
+                      </span>
+                    </button>
+
+                    <button
+                      type="button"
+                      role="tab"
+                      aria-selected={indexModalWorld === 'fruit'}
+                      onClick={() => setIndexModalWorld('fruit')}
+                      className={`h-9 px-2.5 rounded-md inline-flex items-center justify-center gap-1.5 text-xs sm:text-sm font-bold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400 whitespace-nowrap cursor-pointer ${
+                        indexModalWorld === 'fruit'
+                          ? 'bg-amber-400 text-slate-950'
+                          : 'text-amber-200 hover:text-white hover:bg-amber-500/15'
+                      }`}
+                    >
+                      <span>{t.fruitIndexWorldBtn}</span>
+                      <span
+                        className={`font-num text-[11px] ${
+                          indexModalWorld === 'fruit'
+                            ? 'text-slate-900'
+                            : 'text-amber-300/80'
+                        }`}
+                      >
+                        {discoveredFruitItems.length}/{FRUIT_INDEX_CATALOG.length}
+                      </span>
+                    </button>
+                  </div>
+
+                  <p className="text-xs sm:text-sm text-slate-300 mb-3.5 leading-relaxed">
+                    {indexModalWorld === 'fruit'
+                      ? t.fruitIndexModalHint
+                      : t.indexModalHint}
                   </p>
 
                   {/* Two Filter Buttons: Plus (+) and Minus (-) */}
@@ -4187,17 +5402,25 @@ export default function App() {
                       onClick={() => setIndexTab('positive')}
                       className={`h-10 px-3 rounded-md inline-flex items-center justify-center gap-2 text-xs sm:text-sm font-bold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400 whitespace-nowrap cursor-pointer ${
                         indexTab === 'positive'
-                          ? 'bg-sky-500 text-slate-950'
+                          ? indexModalWorld === 'fruit'
+                            ? 'bg-emerald-500 text-slate-950'
+                            : 'bg-sky-500 text-slate-950'
                           : 'text-slate-300 hover:text-white hover:bg-slate-800/70'
                       }`}
                     >
-                      <span>{t.indexPlusTab}</span>
+                      <span>
+                        {indexModalWorld === 'fruit'
+                          ? t.fruitIndexPlusTab
+                          : t.indexPlusTab}
+                      </span>
                       <span
                         className={`font-num text-[11px] ${
                           indexTab === 'positive' ? 'text-slate-900' : 'text-slate-400'
                         }`}
                       >
-                        {positiveDiscoveredCount}/{positiveCatalog.length}
+                        {indexModalWorld === 'fruit'
+                          ? `${fruitPositiveDiscoveredCount}/${fruitPositiveCatalog.length}`
+                          : `${positiveDiscoveredCount}/${positiveCatalog.length}`}
                       </span>
                     </button>
 
@@ -4212,245 +5435,334 @@ export default function App() {
                           : 'text-slate-300 hover:text-white hover:bg-slate-800/70'
                       }`}
                     >
-                      <span>{t.indexMinusTab}</span>
+                      <span>
+                        {indexModalWorld === 'fruit'
+                          ? t.fruitIndexMinusTab
+                          : t.indexMinusTab}
+                      </span>
                       <span
                         className={`font-num text-[11px] ${
                           indexTab === 'negative' ? 'text-rose-100' : 'text-slate-400'
                         }`}
                       >
-                        {negativeDiscoveredCount}/{negativeCatalog.length}
+                        {indexModalWorld === 'fruit'
+                          ? `${fruitNegativeDiscoveredCount}/${fruitNegativeCatalog.length}`
+                          : `${negativeDiscoveredCount}/${negativeCatalog.length}`}
                       </span>
                     </button>
                   </div>
 
                   {/* Entries List */}
                   <div className="space-y-3" role="tabpanel">
-                    {activeIndexEntries.map((entry) => {
-                      const discovered = discoveredItems.includes(entry.kind);
-                      const isPositive = entry.category === 'positive';
-                      return (
-                        <div
-                          key={entry.kind}
-                          className={`flex items-center gap-3.5 p-3.5 rounded-lg border transition-colors ${
-                            discovered
-                              ? isPositive
-                                ? 'border-sky-400/25 bg-slate-900/85'
-                                : 'border-rose-400/25 bg-slate-900/85'
-                              : 'border-white/8 bg-slate-950/75 opacity-85'
-                          }`}
-                        >
-                          {/* Item Artwork or Padlock */}
-                          <div
-                            className={`w-12 h-12 rounded-lg border flex items-center justify-center shrink-0 ${
-                              discovered
-                                ? 'border-white/12 bg-[#0a1324]'
-                                : 'border-white/8 bg-slate-900/80 text-slate-500'
-                            }`}
-                            aria-hidden="true"
-                          >
-                            {!discovered ? (
-                              <svg
-                                viewBox="0 0 24 24"
-                                className="w-5 h-5"
-                                fill="none"
-                                stroke="currentColor"
-                                strokeWidth="2.1"
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
+                    {indexModalWorld === 'fruit'
+                      ? activeFruitIndexEntries.map((entry) => {
+                          const discovered = discoveredFruitItems.includes(entry.kind);
+                          const isPositive = entry.category === 'positive';
+                          return (
+                            <div
+                              key={entry.kind}
+                              className={`flex items-center gap-3.5 p-3.5 rounded-lg border transition-colors ${
+                                discovered
+                                  ? isPositive
+                                    ? 'border-emerald-400/25 bg-emerald-950/45'
+                                    : 'border-rose-400/25 bg-slate-900/85'
+                                  : 'border-white/8 bg-slate-950/75 opacity-85'
+                              }`}
+                            >
+                              <div
+                                className={`w-12 h-12 rounded-lg border flex items-center justify-center shrink-0 ${
+                                  discovered
+                                    ? 'border-white/12 bg-[#0a1a12]'
+                                    : 'border-white/8 bg-slate-900/80 text-slate-500'
+                                }`}
+                                aria-hidden="true"
                               >
-                                <rect x="5" y="11" width="14" height="10" rx="2" />
-                                <path d="M8 11V7a4 4 0 0 1 8 0v4" />
-                              </svg>
-                            ) : entry.kind === 'pink_circle' ? (
-                              <svg viewBox="0 0 24 24" className="w-8 h-8">
-                                <circle
-                                  cx="12"
-                                  cy="12"
-                                  r="10"
-                                  fill="#ec4899"
-                                  stroke="#fbcfe8"
-                                  strokeWidth="1.8"
-                                />
-                                <text
-                                  x="12"
-                                  y="16"
-                                  textAnchor="middle"
-                                  fill="#ffffff"
-                                  fontSize="11"
-                                  fontWeight="700"
-                                >
-                                  3
-                                </text>
-                              </svg>
-                            ) : entry.kind === 'blue_triangle' ? (
-                              <svg viewBox="0 0 24 24" className="w-8 h-8">
-                                <polygon
-                                  points="12,2 22,20 2,20"
-                                  fill="#0284c7"
-                                  stroke="#bae6fd"
-                                  strokeWidth="1.8"
-                                  strokeLinejoin="round"
-                                />
-                                <text
-                                  x="12"
-                                  y="17.5"
-                                  textAnchor="middle"
-                                  fill="#ffffff"
-                                  fontSize="10"
-                                  fontWeight="700"
-                                >
-                                  4
-                                </text>
-                              </svg>
-                            ) : entry.kind === 'green_circle' ? (
-                              <svg viewBox="0 0 24 24" className="w-8 h-8">
-                                <circle
-                                  cx="12"
-                                  cy="12"
-                                  r="9.5"
-                                  fill="#059669"
-                                  stroke="#a7f3d0"
-                                  strokeWidth="1.8"
-                                />
-                                <text
-                                  x="12"
-                                  y="16"
-                                  textAnchor="middle"
-                                  fill="#ffffff"
-                                  fontSize="11"
-                                  fontWeight="800"
-                                >
-                                  2
-                                </text>
-                              </svg>
-                            ) : entry.kind === 'hazard_spike' ? (
-                              <svg viewBox="0 0 24 24" className="w-8 h-8">
-                                <polygon
-                                  points="12,1 14.8,6.2 20.5,4.5 18.2,10 23,12 18.2,14 20.5,19.5 14.8,17.8 12,23 9.2,17.8 3.5,19.5 5.8,14 1,12 5.8,10 3.5,4.5 9.2,6.2"
-                                  fill="#dc2626"
-                                />
-                                <text
-                                  x="12"
-                                  y="15.5"
-                                  textAnchor="middle"
-                                  fill="#ffffff"
-                                  fontSize="9"
-                                  fontWeight="800"
-                                >
-                                  -1
-                                </text>
-                              </svg>
-                            ) : entry.kind === 'hazard_star' ? (
-                              <svg viewBox="0 0 24 24" className="w-8 h-8">
-                                <polygon
-                                  points="12,2 14.9,8.6 22,9.3 16.6,14 18.2,21 12,17.3 5.8,21 7.4,14 2,9.3 9.1,8.6"
-                                  fill="#dc2626"
-                                  stroke="#bae6fd"
-                                  strokeWidth="1.5"
-                                  strokeLinejoin="round"
-                                />
-                                <text
-                                  x="12"
-                                  y="15.2"
-                                  textAnchor="middle"
-                                  fill="#e0f2fe"
-                                  fontSize="8.5"
-                                  fontWeight="800"
-                                >
-                                  ❄
-                                </text>
-                              </svg>
-                            ) : entry.kind === 'hazard_arrow' ? (
-                              <svg viewBox="0 0 24 24" className="w-8 h-8">
-                                <polygon
-                                  points="12,22 20,11 15,11 15.5,2 12,4.5 8.5,2 9,11 4,11"
-                                  fill="#dc2626"
-                                  stroke="#fecaca"
-                                  strokeWidth="1.5"
-                                  strokeLinejoin="round"
-                                />
-                                <line
-                                  x1="12"
-                                  y1="4.5"
-                                  x2="12"
-                                  y2="20"
-                                  stroke="#fee2e2"
-                                  strokeWidth="1.2"
-                                />
-                              </svg>
-                            ) : (
-                              <svg viewBox="0 0 24 24" className="w-8 h-8">
-                                <rect
-                                  x="3"
-                                  y="3"
-                                  width="18"
-                                  height="18"
-                                  rx="2.5"
-                                  fill="#b91c1c"
-                                  stroke="#fca5a5"
-                                  strokeWidth="1.8"
-                                />
-                                <text
-                                  x="12"
-                                  y="15.5"
-                                  textAnchor="middle"
-                                  fill="#ffffff"
-                                  fontSize="9.5"
-                                  fontWeight="800"
-                                >
-                                  -2
-                                </text>
-                              </svg>
-                            )}
-                          </div>
-
-                          {/* Entry Text */}
-                          <div className="min-w-0 flex-1">
-                            {discovered ? (
-                              <>
-                                <div className="flex items-baseline justify-between gap-2">
-                                  <span className="text-sm sm:text-base font-bold text-white truncate">
-                                    {lang === 'ar' ? entry.nameAr : entry.nameEn}
-                                  </span>
-                                  <span
-                                    className={`font-num text-xs sm:text-sm font-bold whitespace-nowrap shrink-0 ${
-                                      entry.kind === 'pink_circle'
-                                        ? 'text-pink-300'
-                                        : entry.kind === 'blue_triangle'
-                                        ? 'text-sky-300'
-                                        : entry.kind === 'green_circle'
-                                        ? 'text-emerald-300'
-                                        : 'text-rose-400'
-                                    }`}
+                                {!discovered ? (
+                                  <svg
+                                    viewBox="0 0 24 24"
+                                    className="w-5 h-5"
+                                    fill="none"
+                                    stroke="currentColor"
+                                    strokeWidth="2.1"
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
                                   >
-                                    {lang === 'ar' ? entry.valueAr : entry.valueEn}
-                                  </span>
-                                </div>
-                                <p className="text-xs text-slate-300 mt-1 leading-relaxed">
-                                  {lang === 'ar'
-                                    ? entry.benefitAr
-                                    : entry.benefitEn}
-                                </p>
-                              </>
-                            ) : (
-                              <>
-                                <div className="flex items-baseline justify-between gap-2">
-                                  <span className="text-sm sm:text-base font-bold text-slate-400">
-                                    {t.indexUnknownTitle}
-                                  </span>
-                                  <span className="text-[11px] font-semibold text-slate-500 whitespace-nowrap shrink-0">
-                                    {t.indexLockedBadge}
-                                  </span>
-                                </div>
-                                <p className="text-xs text-slate-500 mt-1 leading-relaxed">
-                                  {t.indexLockedDesc}
-                                </p>
-                              </>
-                            )}
-                          </div>
-                        </div>
-                      );
-                    })}
+                                    <rect x="5" y="11" width="14" height="10" rx="2" />
+                                    <path d="M8 11V7a4 4 0 0 1 8 0v4" />
+                                  </svg>
+                                ) : (
+                                  <FruitIndexIcon kind={entry.kind} />
+                                )}
+                              </div>
+
+                              <div className="min-w-0 flex-1">
+                                {discovered ? (
+                                  <>
+                                    <div className="flex items-baseline justify-between gap-2">
+                                      <span className="text-sm sm:text-base font-bold text-white truncate">
+                                        {lang === 'ar' ? entry.nameAr : entry.nameEn}
+                                      </span>
+                                      <span
+                                        className={`font-num text-xs sm:text-sm font-bold whitespace-nowrap shrink-0 ${
+                                          isPositive
+                                            ? 'text-lime-300'
+                                            : 'text-rose-400'
+                                        }`}
+                                      >
+                                        {lang === 'ar' ? entry.valueAr : entry.valueEn}
+                                      </span>
+                                    </div>
+                                    <p className="text-xs text-slate-300 mt-1 leading-relaxed">
+                                      {lang === 'ar'
+                                        ? entry.benefitAr
+                                        : entry.benefitEn}
+                                    </p>
+                                  </>
+                                ) : (
+                                  <>
+                                    <div className="flex items-baseline justify-between gap-2">
+                                      <span className="text-sm sm:text-base font-bold text-slate-400">
+                                        {t.indexUnknownTitle}
+                                      </span>
+                                      <span className="text-[11px] font-semibold text-slate-500 whitespace-nowrap shrink-0">
+                                        {t.indexLockedBadge}
+                                      </span>
+                                    </div>
+                                    <p className="text-xs text-slate-500 mt-1 leading-relaxed">
+                                      {t.indexLockedDesc}
+                                    </p>
+                                  </>
+                                )}
+                              </div>
+                            </div>
+                          );
+                        })
+                      : activeIndexEntries.map((entry) => {
+                          const discovered = discoveredItems.includes(entry.kind);
+                          const isPositive = entry.category === 'positive';
+                          return (
+                            <div
+                              key={entry.kind}
+                              className={`flex items-center gap-3.5 p-3.5 rounded-lg border transition-colors ${
+                                discovered
+                                  ? isPositive
+                                    ? 'border-sky-400/25 bg-slate-900/85'
+                                    : 'border-rose-400/25 bg-slate-900/85'
+                                  : 'border-white/8 bg-slate-950/75 opacity-85'
+                              }`}
+                            >
+                              {/* Item Artwork or Padlock */}
+                              <div
+                                className={`w-12 h-12 rounded-lg border flex items-center justify-center shrink-0 ${
+                                  discovered
+                                    ? 'border-white/12 bg-[#0a1324]'
+                                    : 'border-white/8 bg-slate-900/80 text-slate-500'
+                                }`}
+                                aria-hidden="true"
+                              >
+                                {!discovered ? (
+                                  <svg
+                                    viewBox="0 0 24 24"
+                                    className="w-5 h-5"
+                                    fill="none"
+                                    stroke="currentColor"
+                                    strokeWidth="2.1"
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                  >
+                                    <rect x="5" y="11" width="14" height="10" rx="2" />
+                                    <path d="M8 11V7a4 4 0 0 1 8 0v4" />
+                                  </svg>
+                                ) : entry.kind === 'pink_circle' ? (
+                                  <svg viewBox="0 0 24 24" className="w-8 h-8">
+                                    <circle
+                                      cx="12"
+                                      cy="12"
+                                      r="10"
+                                      fill="#ec4899"
+                                      stroke="#fbcfe8"
+                                      strokeWidth="1.8"
+                                    />
+                                    <text
+                                      x="12"
+                                      y="16"
+                                      textAnchor="middle"
+                                      fill="#ffffff"
+                                      fontSize="11"
+                                      fontWeight="700"
+                                    >
+                                      3
+                                    </text>
+                                  </svg>
+                                ) : entry.kind === 'blue_triangle' ? (
+                                  <svg viewBox="0 0 24 24" className="w-8 h-8">
+                                    <polygon
+                                      points="12,2 22,20 2,20"
+                                      fill="#0284c7"
+                                      stroke="#bae6fd"
+                                      strokeWidth="1.8"
+                                      strokeLinejoin="round"
+                                    />
+                                    <text
+                                      x="12"
+                                      y="17.5"
+                                      textAnchor="middle"
+                                      fill="#ffffff"
+                                      fontSize="10"
+                                      fontWeight="700"
+                                    >
+                                      4
+                                    </text>
+                                  </svg>
+                                ) : entry.kind === 'green_circle' ? (
+                                  <svg viewBox="0 0 24 24" className="w-8 h-8">
+                                    <circle
+                                      cx="12"
+                                      cy="12"
+                                      r="9.5"
+                                      fill="#059669"
+                                      stroke="#a7f3d0"
+                                      strokeWidth="1.8"
+                                    />
+                                    <text
+                                      x="12"
+                                      y="16"
+                                      textAnchor="middle"
+                                      fill="#ffffff"
+                                      fontSize="11"
+                                      fontWeight="800"
+                                    >
+                                      2
+                                    </text>
+                                  </svg>
+                                ) : entry.kind === 'hazard_spike' ? (
+                                  <svg viewBox="0 0 24 24" className="w-8 h-8">
+                                    <polygon
+                                      points="12,1 14.8,6.2 20.5,4.5 18.2,10 23,12 18.2,14 20.5,19.5 14.8,17.8 12,23 9.2,17.8 3.5,19.5 5.8,14 1,12 5.8,10 3.5,4.5 9.2,6.2"
+                                      fill="#dc2626"
+                                    />
+                                    <text
+                                      x="12"
+                                      y="15.5"
+                                      textAnchor="middle"
+                                      fill="#ffffff"
+                                      fontSize="9"
+                                      fontWeight="800"
+                                    >
+                                      -1
+                                    </text>
+                                  </svg>
+                                ) : entry.kind === 'hazard_star' ? (
+                                  <svg viewBox="0 0 24 24" className="w-8 h-8">
+                                    <polygon
+                                      points="12,2 14.9,8.6 22,9.3 16.6,14 18.2,21 12,17.3 5.8,21 7.4,14 2,9.3 9.1,8.6"
+                                      fill="#dc2626"
+                                      stroke="#bae6fd"
+                                      strokeWidth="1.5"
+                                      strokeLinejoin="round"
+                                    />
+                                    <text
+                                      x="12"
+                                      y="15.2"
+                                      textAnchor="middle"
+                                      fill="#e0f2fe"
+                                      fontSize="8.5"
+                                      fontWeight="800"
+                                    >
+                                      ❄
+                                    </text>
+                                  </svg>
+                                ) : entry.kind === 'hazard_arrow' ? (
+                                  <svg viewBox="0 0 24 24" className="w-8 h-8">
+                                    <polygon
+                                      points="12,22 20,11 15,11 15.5,2 12,4.5 8.5,2 9,11 4,11"
+                                      fill="#dc2626"
+                                      stroke="#fecaca"
+                                      strokeWidth="1.5"
+                                      strokeLinejoin="round"
+                                    />
+                                    <line
+                                      x1="12"
+                                      y1="4.5"
+                                      x2="12"
+                                      y2="20"
+                                      stroke="#fee2e2"
+                                      strokeWidth="1.2"
+                                    />
+                                  </svg>
+                                ) : (
+                                  <svg viewBox="0 0 24 24" className="w-8 h-8">
+                                    <rect
+                                      x="3"
+                                      y="3"
+                                      width="18"
+                                      height="18"
+                                      rx="2.5"
+                                      fill="#b91c1c"
+                                      stroke="#fca5a5"
+                                      strokeWidth="1.8"
+                                    />
+                                    <text
+                                      x="12"
+                                      y="15.5"
+                                      textAnchor="middle"
+                                      fill="#ffffff"
+                                      fontSize="9.5"
+                                      fontWeight="800"
+                                    >
+                                      -2
+                                    </text>
+                                  </svg>
+                                )}
+                              </div>
+
+                              {/* Entry Text */}
+                              <div className="min-w-0 flex-1">
+                                {discovered ? (
+                                  <>
+                                    <div className="flex items-baseline justify-between gap-2">
+                                      <span className="text-sm sm:text-base font-bold text-white truncate">
+                                        {lang === 'ar' ? entry.nameAr : entry.nameEn}
+                                      </span>
+                                      <span
+                                        className={`font-num text-xs sm:text-sm font-bold whitespace-nowrap shrink-0 ${
+                                          entry.kind === 'pink_circle'
+                                            ? 'text-pink-300'
+                                            : entry.kind === 'blue_triangle'
+                                            ? 'text-sky-300'
+                                            : entry.kind === 'green_circle'
+                                            ? 'text-emerald-300'
+                                            : 'text-rose-400'
+                                        }`}
+                                      >
+                                        {lang === 'ar' ? entry.valueAr : entry.valueEn}
+                                      </span>
+                                    </div>
+                                    <p className="text-xs text-slate-300 mt-1 leading-relaxed">
+                                      {lang === 'ar'
+                                        ? entry.benefitAr
+                                        : entry.benefitEn}
+                                    </p>
+                                  </>
+                                ) : (
+                                  <>
+                                    <div className="flex items-baseline justify-between gap-2">
+                                      <span className="text-sm sm:text-base font-bold text-slate-400">
+                                        {t.indexUnknownTitle}
+                                      </span>
+                                      <span className="text-[11px] font-semibold text-slate-500 whitespace-nowrap shrink-0">
+                                        {t.indexLockedBadge}
+                                      </span>
+                                    </div>
+                                    <p className="text-xs text-slate-500 mt-1 leading-relaxed">
+                                      {t.indexLockedDesc}
+                                    </p>
+                                  </>
+                                )}
+                              </div>
+                            </div>
+                          );
+                        })}
                   </div>
                 </div>
               </div>
