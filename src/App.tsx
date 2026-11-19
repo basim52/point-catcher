@@ -13,7 +13,12 @@ type GameStatus =
   | 'STAGE_CLEAR'
   | 'GAME_OVER'
   | 'VICTORY';
-type ItemKind = 'pink_circle' | 'blue_triangle' | 'hazard_spike' | 'hazard_square';
+type ItemKind =
+  | 'pink_circle'
+  | 'blue_triangle'
+  | 'hazard_spike'
+  | 'hazard_square'
+  | 'hazard_star';
 type IndexTab = 'positive' | 'negative';
 
 interface IndexEntry {
@@ -36,6 +41,7 @@ interface StageConfig {
   spawnInterval: number;
   hazardChance: number;
   squareHazardRatio: number;
+  starHazardRatio: number;
   lateralDrift: number;
 }
 
@@ -86,6 +92,8 @@ const MAX_LIVES = 3;
 const TOTAL_STAGES = 25;
 const PINK_CIRCLE_POINTS = 3;
 const BLUE_TRIANGLE_POINTS = 4;
+const FREEZE_STAR_POINTS = 3;
+const FREEZE_DURATION = 4.0;
 const BEST_SCORE_STORAGE_KEY = 'point_catcher_best_score_v1';
 const COINS_STORAGE_KEY = 'point_catcher_coins_v1';
 const COMPLETED_STAGES_STORAGE_KEY = 'point_catcher_completed_stages_v1';
@@ -135,6 +143,16 @@ const INDEX_CATALOG: IndexEntry[] = [
     benefitAr: 'عائق ثقيل ينقص قلبَين دفعة واحدة عند لمسه (يبدأ من المرحلة 6).',
     benefitEn: 'Heavy hazard that removes 2 hearts on impact (starts at Stage 6).',
   },
+  {
+    kind: 'hazard_star',
+    category: 'negative',
+    nameAr: 'النجمة الحمراء المجمّدة',
+    nameEn: 'Red Freeze Star',
+    valueAr: 'تجميد 4ث · +3 نقاط',
+    valueEn: 'Freeze 4s · +3 pts',
+    benefitAr: 'تجمّد حركتك لمدة 4 ثوانٍ عند التقاطها وتعطيك 3 نقاط (تبدأ من المرحلة 10).',
+    benefitEn: 'Freezes your movement for 4 seconds on catch while awarding 3 points (Stage 10+).',
+  },
 ];
 
 const VALID_ITEM_KINDS: ItemKind[] = INDEX_CATALOG.map((item) => item.kind);
@@ -145,8 +163,8 @@ function getStageClearCoins(remainingLives: number): number {
   return 1;
 }
 
-// Build 25 stages (5% easier overall), with NO -2 red square hazards in Stages 1–5:
-// Stages 1–5 only spawn -1 spiky hazards; -2 red squares start from Stage 6.
+// Build 25 stages (5% easier overall):
+// Stages 1–5: only -1 spiky hazards; Stage 6+: -2 red squares; Stage 10+: Red Freeze Star (4s freeze + 3 pts).
 const STAGES: StageConfig[] = (() => {
   const list: StageConfig[] = [];
   let cumulative = 0;
@@ -157,6 +175,8 @@ const STAGES: StageConfig[] = (() => {
     cumulative += pointsNeeded;
     const rawSquareRatio =
       s <= 5 ? 0 : 0.3 + ((s - 6) / (TOTAL_STAGES - 6)) * 0.34;
+    const starHazardRatio =
+      s < 10 ? 0 : 0.18 + ((s - 10) / (TOTAL_STAGES - 10)) * 0.08;
     list.push({
       stage: s,
       startScore,
@@ -166,6 +186,7 @@ const STAGES: StageConfig[] = (() => {
       spawnInterval: Math.max(0.19, (0.68 - t * 0.49) * 1.05),
       hazardChance: (0.34 + t * 0.26) * 0.95,
       squareHazardRatio: rawSquareRatio * 0.95,
+      starHazardRatio,
       lateralDrift: (28 + t * 105) * 0.95,
     });
   }
@@ -581,6 +602,28 @@ class ArcadeAudio {
     });
   }
 
+  public playFreeze(): void {
+    const ctx = this.ensureContext();
+    if (!ctx) return;
+    const now = ctx.currentTime;
+    const notes = [1174.66, 987.77, 783.99, 587.33];
+    notes.forEach((freq, idx) => {
+      const start = now + idx * 0.045;
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(freq, start);
+      osc.frequency.exponentialRampToValueAtTime(freq * 0.92, start + 0.16);
+      gain.gain.setValueAtTime(0.001, start);
+      gain.gain.exponentialRampToValueAtTime(0.075, start + 0.012);
+      gain.gain.exponentialRampToValueAtTime(0.0006, start + 0.19);
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start(start);
+      osc.stop(start + 0.2);
+    });
+  }
+
   public playHazardHit(heavy: boolean): void {
     const ctx = this.ensureContext();
     if (!ctx) return;
@@ -798,6 +841,7 @@ export default function App() {
     playerGlowColor: '#38bdf8',
     playerGlowAlpha: 0,
     invulnTimer: 0,
+    freezeTimer: 0,
     shakeTimer: 0,
     shakeIntensity: 0,
     hitFlashAlpha: 0,
@@ -923,6 +967,7 @@ export default function App() {
     sim.playerBounce = 0;
     sim.playerGlowAlpha = 0;
     sim.invulnTimer = 0;
+    sim.freezeTimer = 0;
     sim.shakeTimer = 0;
     sim.hitFlashAlpha = 0;
     sim.stageBannerTimer = 1.5;
@@ -973,6 +1018,7 @@ export default function App() {
     sim.items = [];
     sim.playerVx = 0;
     sim.invulnTimer = 0;
+    sim.freezeTimer = 0;
     sim.spawnTimer = 0.3;
     sim.lastHazardX = -999;
     sim.input.pointerActive = false;
@@ -1367,10 +1413,17 @@ export default function App() {
       const isHazard = Math.random() < cfg.hazardChance;
       let kind: ItemKind;
       if (isHazard) {
-        kind =
-          Math.random() < cfg.squareHazardRatio
-            ? 'hazard_square'
-            : 'hazard_spike';
+        const roll = Math.random();
+        if (roll < cfg.starHazardRatio) {
+          kind = 'hazard_star';
+        } else if (
+          roll <
+          cfg.starHazardRatio + (1 - cfg.starHazardRatio) * cfg.squareHazardRatio
+        ) {
+          kind = 'hazard_square';
+        } else {
+          kind = 'hazard_spike';
+        }
       } else {
         // Two collectible types only: Pink Circle (+3) and Blue Triangle (+4)
         kind = Math.random() < 0.54 ? 'pink_circle' : 'blue_triangle';
@@ -1400,6 +1453,8 @@ export default function App() {
       const speedVariance =
         kind === 'hazard_square'
           ? 0.96 + Math.random() * 0.3
+          : kind === 'hazard_star'
+          ? 0.88 + Math.random() * 0.28
           : kind === 'hazard_spike'
           ? 0.9 + Math.random() * 0.34
           : kind === 'blue_triangle'
@@ -1410,7 +1465,7 @@ export default function App() {
       const speed = cfg.baseSpeed * speedVariance * heightFactor;
 
       const radius =
-        kind === 'hazard_square'
+        kind === 'hazard_square' || kind === 'hazard_star'
           ? Math.max(16, Math.min(20, sim.width * 0.025))
           : kind === 'hazard_spike'
           ? Math.max(15, Math.min(19, sim.width * 0.024))
@@ -1429,6 +1484,8 @@ export default function App() {
         rotSpeed:
           kind === 'hazard_spike'
             ? (Math.random() > 0.5 ? 1 : -1) * 2.4
+            : kind === 'hazard_star'
+            ? (Math.random() > 0.5 ? 1 : -1) * 1.4
             : 0,
         pulsePhase: Math.random() * Math.PI * 2,
       });
@@ -1480,36 +1537,41 @@ export default function App() {
         return;
       }
 
-      // Smooth player horizontal movement
+      // Smooth player horizontal movement (locked in place while frozen by Red Freeze Star)
       const halfW = sim.playerWidth / 2;
       const minX = halfW + 10;
       const maxX = sim.width - halfW - 10;
       const maxSpeed = Math.max(580, sim.width * 1.02);
 
-      const moveDir =
-        (sim.input.rightKey || sim.input.rightBtn ? 1 : 0) -
-        (sim.input.leftKey || sim.input.leftBtn ? 1 : 0);
-
-      if (moveDir !== 0) {
-        const targetVx = moveDir * maxSpeed;
-        const accel = 1 - Math.exp(-22 * dt);
-        sim.playerVx += (targetVx - sim.playerVx) * accel;
-        sim.playerX += sim.playerVx * dt;
-      } else if (sim.input.pointerActive) {
-        const clampedTarget = Math.max(
-          minX,
-          Math.min(maxX, sim.input.pointerTargetX)
-        );
-        const diffX = clampedTarget - sim.playerX;
-        const follow = 1 - Math.exp(-26 * dt);
-        const step = diffX * follow;
-        sim.playerVx = dt > 0 ? step / dt : 0;
-        sim.playerX += step;
+      if (sim.freezeTimer > 0) {
+        sim.freezeTimer = Math.max(0, sim.freezeTimer - dt);
+        sim.playerVx = 0;
       } else {
-        const decel = Math.exp(-18 * dt);
-        sim.playerVx *= decel;
-        if (Math.abs(sim.playerVx) < 4) sim.playerVx = 0;
-        sim.playerX += sim.playerVx * dt;
+        const moveDir =
+          (sim.input.rightKey || sim.input.rightBtn ? 1 : 0) -
+          (sim.input.leftKey || sim.input.leftBtn ? 1 : 0);
+
+        if (moveDir !== 0) {
+          const targetVx = moveDir * maxSpeed;
+          const accel = 1 - Math.exp(-22 * dt);
+          sim.playerVx += (targetVx - sim.playerVx) * accel;
+          sim.playerX += sim.playerVx * dt;
+        } else if (sim.input.pointerActive) {
+          const clampedTarget = Math.max(
+            minX,
+            Math.min(maxX, sim.input.pointerTargetX)
+          );
+          const diffX = clampedTarget - sim.playerX;
+          const follow = 1 - Math.exp(-26 * dt);
+          const step = diffX * follow;
+          sim.playerVx = dt > 0 ? step / dt : 0;
+          sim.playerX += step;
+        } else {
+          const decel = Math.exp(-18 * dt);
+          sim.playerVx *= decel;
+          if (Math.abs(sim.playerVx) < 4) sim.playerVx = 0;
+          sim.playerX += sim.playerVx * dt;
+        }
       }
 
       if (sim.playerX < minX) {
@@ -1705,6 +1767,111 @@ export default function App() {
             } else {
               audioRef.current.playCatch(streakRef.current, isTriangle);
               streakRef.current = Math.min(streakRef.current + 1, 10);
+            }
+          } else if (item.kind === 'hazard_star') {
+            // Red Freeze Star: freezes player movement for 4 seconds AND awards +3 points
+            const value = FREEZE_STAR_POINTS;
+            const nextScore = scoreRef.current + value;
+            scoreRef.current = nextScore;
+            setScore(nextScore);
+
+            const nextStagePoints = stagePointsRef.current + value;
+            stagePointsRef.current = nextStagePoints;
+            setStagePoints(nextStagePoints);
+
+            if (nextScore > bestScoreRef.current) {
+              bestScoreRef.current = nextScore;
+              setBestScore(nextScore);
+              setIsNewBest(true);
+              try {
+                window.localStorage.setItem(
+                  BEST_SCORE_STORAGE_KEY,
+                  String(nextScore)
+                );
+              } catch {
+                // Ignore storage errors
+              }
+            }
+
+            sim.freezeTimer = FREEZE_DURATION;
+            sim.playerVx = 0;
+            sim.playerBounce = 0.8;
+            sim.playerGlowColor = '#7dd3fc';
+            sim.playerGlowAlpha = 1;
+            sim.shakeTimer = 0.2;
+            sim.shakeIntensity = 6;
+
+            spawnBurst(item.x, item.y, '#ef4444', 14, 1.05);
+            spawnBurst(item.x, item.y, '#7dd3fc', 12, 1.0);
+            sim.floatingTexts.push({
+              x: item.x,
+              y: item.y - 12,
+              vy: -52,
+              text:
+                langRef.current === 'ar'
+                  ? `❄ تجميد 4ث · +${value}`
+                  : `❄ Freeze 4s · +${value}`,
+              color: '#bae6fd',
+              life: 0.95,
+              maxLife: 0.95,
+            });
+
+            const currentStageCfg =
+              STAGES[Math.min(stageNumRef.current - 1, TOTAL_STAGES - 1)];
+
+            if (nextStagePoints >= currentStageCfg.pointsNeeded) {
+              const clearedStage = stageNumRef.current;
+              const earnedCoins = getStageClearCoins(livesRef.current);
+              const nextCoins = coinsRef.current + earnedCoins;
+              coinsRef.current = nextCoins;
+              setLastEarnedCoins(earnedCoins);
+              setCoins(nextCoins);
+              try {
+                window.localStorage.setItem(
+                  COINS_STORAGE_KEY,
+                  String(nextCoins)
+                );
+              } catch {
+                // Ignore storage errors
+              }
+
+              setCompletedStages((prev) => {
+                if (prev.includes(clearedStage)) return prev;
+                const updated = [...prev, clearedStage];
+                completedStagesRef.current = updated;
+                try {
+                  window.localStorage.setItem(
+                    COMPLETED_STAGES_STORAGE_KEY,
+                    JSON.stringify(updated)
+                  );
+                } catch {
+                  // Ignore storage errors
+                }
+                return updated;
+              });
+
+              sim.freezeTimer = 0;
+              sim.input.pointerActive = false;
+              sim.input.pointerId = null;
+              sim.input.leftBtn = false;
+              sim.input.rightBtn = false;
+
+              if (clearedStage >= TOTAL_STAGES) {
+                statusRef.current = 'VICTORY';
+                setStatus('VICTORY');
+                spawnBurst(sim.width * 0.35, sim.height * 0.4, '#f472b6', 20, 1.3);
+                spawnBurst(sim.width * 0.65, sim.height * 0.4, '#38bdf8', 20, 1.3);
+                audioRef.current.playVictory();
+              } else {
+                statusRef.current = 'STAGE_CLEAR';
+                setStatus('STAGE_CLEAR');
+                spawnBurst(sim.width * 0.35, sim.height * 0.42, '#f472b6', 16, 1.15);
+                spawnBurst(sim.width * 0.65, sim.height * 0.42, '#38bdf8', 16, 1.15);
+                audioRef.current.playStageUp();
+              }
+              break;
+            } else {
+              audioRef.current.playFreeze();
             }
           } else {
             // Red hazard hit: spike = -1 life, red square = -2 lives
@@ -2165,6 +2332,102 @@ export default function App() {
       ctx.restore();
     };
 
+    const drawHazardStar = (item: FallingItem) => {
+      const r = item.radius * 1.14;
+      const pulse = 1 + Math.sin(item.pulsePhase * 1.5) * 0.06;
+
+      ctx.save();
+      ctx.translate(item.x, item.y);
+
+      // Crimson + icy aura around the 3D freeze star
+      const aura = ctx.createRadialGradient(0, 0, r * 0.2, 0, 0, r * 2.0);
+      aura.addColorStop(0, 'rgba(239, 68, 68, 0.5)');
+      aura.addColorStop(0.55, 'rgba(125, 211, 252, 0.24)');
+      aura.addColorStop(1, 'rgba(125, 211, 252, 0)');
+      ctx.fillStyle = aura;
+      ctx.beginPath();
+      ctx.arc(0, 0, r * 2.0, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.scale(pulse, pulse);
+
+      // Rotating 3D faceted 5-pointed crimson star
+      ctx.save();
+      ctx.rotate(item.rotation);
+
+      const points = 5;
+      const outerR = r * 1.24;
+      const innerR = r * 0.54;
+      const verts: { x: number; y: number }[] = [];
+      for (let i = 0; i < points * 2; i++) {
+        const rad = i % 2 === 0 ? outerR : innerR;
+        const ang = (i * Math.PI) / points - Math.PI / 2;
+        verts.push({ x: Math.cos(ang) * rad, y: Math.sin(ang) * rad });
+      }
+
+      // Drop shadow beneath star
+      ctx.save();
+      ctx.translate(2.5, 4);
+      ctx.beginPath();
+      verts.forEach((v, idx) => {
+        if (idx === 0) ctx.moveTo(v.x, v.y);
+        else ctx.lineTo(v.x, v.y);
+      });
+      ctx.closePath();
+      ctx.fillStyle = 'rgba(2, 6, 23, 0.52)';
+      ctx.fill();
+      ctx.restore();
+
+      // Draw 10 alternating lit/shaded 3D bevel facets meeting at center apex
+      for (let i = 0; i < verts.length; i++) {
+        const curr = verts[i];
+        const next = verts[(i + 1) % verts.length];
+        const isLitFacet = i % 2 === 0;
+        const facetGrad = ctx.createLinearGradient(0, 0, curr.x, curr.y);
+        if (isLitFacet) {
+          facetGrad.addColorStop(0, '#fca5a5');
+          facetGrad.addColorStop(0.45, '#ef4444');
+          facetGrad.addColorStop(1, '#b91c1c');
+        } else {
+          facetGrad.addColorStop(0, '#dc2626');
+          facetGrad.addColorStop(0.55, '#991b1b');
+          facetGrad.addColorStop(1, '#450a0a');
+        }
+        ctx.beginPath();
+        ctx.moveTo(0, 0);
+        ctx.lineTo(curr.x, curr.y);
+        ctx.lineTo(next.x, next.y);
+        ctx.closePath();
+        ctx.fillStyle = facetGrad;
+        ctx.fill();
+      }
+
+      // Crisp icy-crimson bevel outline
+      ctx.beginPath();
+      verts.forEach((v, idx) => {
+        if (idx === 0) ctx.moveTo(v.x, v.y);
+        else ctx.lineTo(v.x, v.y);
+      });
+      ctx.closePath();
+      ctx.strokeStyle = '#bae6fd';
+      ctx.lineWidth = 1.6;
+      ctx.lineJoin = 'round';
+      ctx.stroke();
+
+      ctx.restore();
+
+      // Upright center frost +3 badge for instant readability
+      ctx.font = `800 ${Math.round(r * 0.66)}px "Segoe UI", system-ui, sans-serif`;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillStyle = 'rgba(69, 10, 10, 0.85)';
+      ctx.fillText('❄', 1, 1.5);
+      ctx.fillStyle = '#e0f2fe';
+      ctx.fillText('❄', 0, 0.5);
+
+      ctx.restore();
+    };
+
     const drawPlayer = () => {
       const sim = simRef.current;
       if (sim.invulnTimer > 0 && Math.floor(sim.invulnTimer * 16) % 2 === 0) {
@@ -2175,12 +2438,19 @@ export default function App() {
       const h = sim.playerHeight;
       const halfW = w / 2;
       const halfH = h / 2;
-      const tilt = Math.max(-0.14, Math.min(0.14, sim.playerVx / 3000));
+      const isFrozen = sim.freezeTimer > 0;
+      const tilt = isFrozen
+        ? 0
+        : Math.max(-0.14, Math.min(0.14, sim.playerVx / 3000));
       const scaleX = 1 + sim.playerBounce * 0.11;
       const scaleY = 1 - sim.playerBounce * 0.13;
       const pulse = 0.5 + 0.5 * Math.sin(performance.now() * 0.008);
       const isCatchFlash = sim.playerGlowAlpha > 0.05;
-      const accentColor = isCatchFlash ? sim.playerGlowColor : '#38bdf8';
+      const accentColor = isFrozen
+        ? '#bae6fd'
+        : isCatchFlash
+        ? sim.playerGlowColor
+        : '#38bdf8';
 
       ctx.save();
       ctx.translate(sim.playerX, sim.playerY);
@@ -2191,11 +2461,19 @@ export default function App() {
       const auraGrad = ctx.createRadialGradient(0, 0, 6, 0, 2, w * 0.92);
       auraGrad.addColorStop(
         0,
-        isCatchFlash ? `${sim.playerGlowColor}99` : 'rgba(56, 189, 248, 0.52)'
+        isFrozen
+          ? 'rgba(186, 230, 253, 0.65)'
+          : isCatchFlash
+          ? `${sim.playerGlowColor}99`
+          : 'rgba(56, 189, 248, 0.52)'
       );
       auraGrad.addColorStop(
         0.55,
-        isCatchFlash ? `${sim.playerGlowColor}33` : 'rgba(14, 165, 233, 0.18)'
+        isFrozen
+          ? 'rgba(56, 189, 248, 0.25)'
+          : isCatchFlash
+          ? `${sim.playerGlowColor}33`
+          : 'rgba(14, 165, 233, 0.18)'
       );
       auraGrad.addColorStop(1, 'rgba(56, 189, 248, 0)');
       ctx.fillStyle = auraGrad;
@@ -2219,25 +2497,28 @@ export default function App() {
       ctx.closePath();
       ctx.fill();
 
-      // Dual animated thruster jets beneath the hull
-      const thrusterLen = 8 + pulse * 5 + Math.min(5, Math.abs(sim.playerVx) / 140);
-      for (const tx of [-halfW * 0.46, halfW * 0.46]) {
-        const flameGrad = ctx.createLinearGradient(
-          tx,
-          halfH - 2,
-          tx,
-          halfH + thrusterLen
-        );
-        flameGrad.addColorStop(0, '#ffffff');
-        flameGrad.addColorStop(0.4, '#38bdf8');
-        flameGrad.addColorStop(1, 'rgba(56, 189, 248, 0)');
-        ctx.fillStyle = flameGrad;
-        ctx.beginPath();
-        ctx.moveTo(tx - 6, halfH - 2);
-        ctx.lineTo(tx + 6, halfH - 2);
-        ctx.lineTo(tx, halfH + thrusterLen);
-        ctx.closePath();
-        ctx.fill();
+      // Dual animated thruster jets beneath the hull (extinguished while frozen)
+      if (!isFrozen) {
+        const thrusterLen =
+          8 + pulse * 5 + Math.min(5, Math.abs(sim.playerVx) / 140);
+        for (const tx of [-halfW * 0.46, halfW * 0.46]) {
+          const flameGrad = ctx.createLinearGradient(
+            tx,
+            halfH - 2,
+            tx,
+            halfH + thrusterLen
+          );
+          flameGrad.addColorStop(0, '#ffffff');
+          flameGrad.addColorStop(0.4, '#38bdf8');
+          flameGrad.addColorStop(1, 'rgba(56, 189, 248, 0)');
+          ctx.fillStyle = flameGrad;
+          ctx.beginPath();
+          ctx.moveTo(tx - 6, halfH - 2);
+          ctx.lineTo(tx + 6, halfH - 2);
+          ctx.lineTo(tx, halfH + thrusterLen);
+          ctx.closePath();
+          ctx.fill();
+        }
       }
 
       // Sculpted winged catcher cradle silhouette (raised left/right bumpers)
@@ -2284,7 +2565,11 @@ export default function App() {
       // Glowing center core jewel
       ctx.beginPath();
       ctx.arc(0, 2, 4.4, 0, Math.PI * 2);
-      ctx.fillStyle = isCatchFlash ? sim.playerGlowColor : '#fde047';
+      ctx.fillStyle = isFrozen
+        ? '#bae6fd'
+        : isCatchFlash
+        ? sim.playerGlowColor
+        : '#fde047';
       ctx.fill();
       ctx.beginPath();
       ctx.arc(0, 2, 2, 0, Math.PI * 2);
@@ -2295,11 +2580,38 @@ export default function App() {
       for (const tipX of [-halfW + 5.5, halfW - 5.5]) {
         ctx.beginPath();
         ctx.arc(tipX, -halfH - 1, 3.2, 0, Math.PI * 2);
-        ctx.fillStyle = '#fbbf24';
+        ctx.fillStyle = isFrozen ? '#bae6fd' : '#fbbf24';
         ctx.fill();
         ctx.strokeStyle = '#ffffff';
         ctx.lineWidth = 1.1;
         ctx.stroke();
+      }
+
+      // Crystalline ice block encasing the catcher while frozen + countdown meter
+      if (isFrozen) {
+        drawRoundedRectPath(ctx, -halfW - 6, -halfH - 9, w + 12, h + 16, 10);
+        ctx.fillStyle = 'rgba(186, 230, 253, 0.32)';
+        ctx.fill();
+        ctx.strokeStyle = 'rgba(224, 242, 254, 0.92)';
+        ctx.lineWidth = 2.2;
+        ctx.stroke();
+
+        // Countdown progress bar & remaining seconds directly above frozen catcher
+        const freezeFrac = Math.max(0, Math.min(1, sim.freezeTimer / FREEZE_DURATION));
+        const meterW = w * 0.9;
+        const meterY = -halfH - 21;
+        drawRoundedRectPath(ctx, -meterW / 2, meterY, meterW, 5, 2.5);
+        ctx.fillStyle = 'rgba(15, 23, 42, 0.8)';
+        ctx.fill();
+        drawRoundedRectPath(ctx, -meterW / 2, meterY, meterW * freezeFrac, 5, 2.5);
+        ctx.fillStyle = '#7dd3fc';
+        ctx.fill();
+
+        ctx.fillStyle = '#e0f2fe';
+        ctx.font = '700 12px "Segoe UI", system-ui, sans-serif';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'bottom';
+        ctx.fillText(`❄ ${sim.freezeTimer.toFixed(1)}s`, 0, meterY - 3);
       }
 
       ctx.restore();
@@ -2379,6 +2691,8 @@ export default function App() {
           drawBlueTriangle(item);
         } else if (item.kind === 'hazard_square') {
           drawHazardSquare(item);
+        } else if (item.kind === 'hazard_star') {
+          drawHazardStar(item);
         } else {
           drawHazardSpike(item);
         }
@@ -3391,6 +3705,26 @@ export default function App() {
                                   fontWeight="800"
                                 >
                                   -1
+                                </text>
+                              </svg>
+                            ) : entry.kind === 'hazard_star' ? (
+                              <svg viewBox="0 0 24 24" className="w-8 h-8">
+                                <polygon
+                                  points="12,2 14.9,8.6 22,9.3 16.6,14 18.2,21 12,17.3 5.8,21 7.4,14 2,9.3 9.1,8.6"
+                                  fill="#dc2626"
+                                  stroke="#bae6fd"
+                                  strokeWidth="1.5"
+                                  strokeLinejoin="round"
+                                />
+                                <text
+                                  x="12"
+                                  y="15.2"
+                                  textAnchor="middle"
+                                  fill="#e0f2fe"
+                                  fontSize="8.5"
+                                  fontWeight="800"
+                                >
+                                  ❄
                                 </text>
                               </svg>
                             ) : (
