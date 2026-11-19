@@ -89,7 +89,7 @@ const BLUE_TRIANGLE_POINTS = 4;
 const BEST_SCORE_STORAGE_KEY = 'point_catcher_best_score_v1';
 const COINS_STORAGE_KEY = 'point_catcher_coins_v1';
 const COMPLETED_STAGES_STORAGE_KEY = 'point_catcher_completed_stages_v1';
-const DISCOVERED_ITEMS_STORAGE_KEY = 'point_catcher_discovered_items_v1';
+const DISCOVERED_ITEMS_STORAGE_KEY = 'point_catcher_discovered_items_v2';
 const SFX_STORAGE_KEY = 'point_catcher_sfx_v1';
 const MUSIC_STORAGE_KEY = 'point_catcher_music_v1';
 const LANG_STORAGE_KEY = 'point_catcher_lang_v1';
@@ -223,13 +223,13 @@ const COPY = {
     lockedStageAria: (n: number) => `المرحلة ${n} مقفلة`,
     indexBtn: 'الاندكس',
     indexModalTitle: 'الاندكس',
-    indexModalHint: 'جميع النقاط والعوائق — كل عنصر يبقى مقفلاً ولا تظهر فائدته إلا بعد نزوله في المرحلة.',
+    indexModalHint: 'جميع النقاط والعوائق — كل عنصر يبقى مقفلاً ولا تظهر فائدته إلا عندما تلتقطه أو تلمسه.',
     indexPlusTab: 'الزائد (+)',
     indexMinusTab: 'السالب (-)',
     indexDiscoveredCount: (found: number, total: number) => `${found}/${total} مكتشف`,
     indexUnknownTitle: '؟؟؟',
     indexLockedBadge: 'مقفول',
-    indexLockedDesc: 'لم يُكتشف بعد — ينفتح وتظهر فائدته عند نزوله في المرحلة.',
+    indexLockedDesc: 'لم يُكتشف بعد — ينفتح وتظهر فائدته عندما تلتقطه أو تلمسه.',
     settingsBtn: 'الإعدادات',
     settingsTitle: 'الإعدادات',
     musicLabel: 'الموسيقى الحماسية',
@@ -290,13 +290,13 @@ const COPY = {
     lockedStageAria: (n: number) => `Stage ${n} locked`,
     indexBtn: 'Index',
     indexModalTitle: 'Index',
-    indexModalHint: 'All points & hazards — each entry stays locked with hidden details until it drops in a stage.',
+    indexModalHint: 'All points & hazards — each entry stays locked with hidden details until you catch or touch it.',
     indexPlusTab: 'Plus (+)',
     indexMinusTab: 'Minus (-)',
     indexDiscoveredCount: (found: number, total: number) => `${found}/${total} Discovered`,
     indexUnknownTitle: '???',
     indexLockedBadge: 'Locked',
-    indexLockedDesc: 'Not discovered yet — unlocks and reveals its effect once it drops in a stage.',
+    indexLockedDesc: 'Not discovered yet — unlocks and reveals its effect once you catch or touch it.',
     settingsBtn: 'Settings',
     settingsTitle: 'Settings',
     musicLabel: 'Energetic Music',
@@ -1376,21 +1376,6 @@ export default function App() {
         kind = Math.random() < 0.54 ? 'pink_circle' : 'blue_triangle';
       }
 
-      // Discover & unlock this item in the Index once it drops in a stage
-      if (!discoveredItemsRef.current.includes(kind)) {
-        const updated = [...discoveredItemsRef.current, kind];
-        discoveredItemsRef.current = updated;
-        setDiscoveredItems(updated);
-        try {
-          window.localStorage.setItem(
-            DISCOVERED_ITEMS_STORAGE_KEY,
-            JSON.stringify(updated)
-          );
-        } catch {
-          // Ignore storage errors
-        }
-      }
-
       const margin = Math.max(30, sim.playerWidth * 0.42);
       const usableW = Math.max(80, sim.width - margin * 2);
 
@@ -1601,6 +1586,21 @@ export default function App() {
         if (dx * dx + dy * dy <= effectiveRadius * effectiveRadius) {
           sim.items.splice(i, 1);
 
+          // Discover & unlock this item in the Index ONLY when caught/touched by the player
+          if (!discoveredItemsRef.current.includes(item.kind)) {
+            const updated = [...discoveredItemsRef.current, item.kind];
+            discoveredItemsRef.current = updated;
+            setDiscoveredItems(updated);
+            try {
+              window.localStorage.setItem(
+                DISCOVERED_ITEMS_STORAGE_KEY,
+                JSON.stringify(updated)
+              );
+            } catch {
+              // Ignore storage errors
+            }
+          }
+
           if (isPoint) {
             const isTriangle = item.kind === 'blue_triangle';
             const value = isTriangle
@@ -1781,108 +1781,236 @@ export default function App() {
     };
 
     const drawPinkCircle = (item: FallingItem) => {
-      const r = item.radius;
-      const pulse = 1 + Math.sin(item.pulsePhase) * 0.05;
+      const r = item.radius * 1.06;
+      const pulse = 1 + Math.sin(item.pulsePhase) * 0.045;
 
       ctx.save();
       ctx.translate(item.x, item.y);
 
-      const glow = ctx.createRadialGradient(0, 0, r * 0.2, 0, 0, r * 1.9);
-      glow.addColorStop(0, 'rgba(244, 114, 182, 0.42)');
+      // Soft pink 3D ambient aura
+      const glow = ctx.createRadialGradient(0, 0, r * 0.25, 0, 0, r * 2.05);
+      glow.addColorStop(0, 'rgba(244, 114, 182, 0.46)');
       glow.addColorStop(1, 'rgba(244, 114, 182, 0)');
       ctx.fillStyle = glow;
       ctx.beginPath();
-      ctx.arc(0, 0, r * 1.9, 0, Math.PI * 2);
+      ctx.arc(0, 0, r * 2.05, 0, Math.PI * 2);
       ctx.fill();
 
       ctx.scale(pulse, pulse);
 
+      // Subtle bottom-right drop shadow for 3D float depth
+      ctx.beginPath();
+      ctx.arc(r * 0.14, r * 0.22, r * 0.96, 0, Math.PI * 2);
+      ctx.fillStyle = 'rgba(2, 6, 23, 0.48)';
+      ctx.fill();
+
+      // 3D glossy pink sphere with off-center key light & deep core shadow
+      const sphereGrad = ctx.createRadialGradient(
+        -r * 0.36,
+        -r * 0.38,
+        r * 0.08,
+        0,
+        0,
+        r * 1.08
+      );
+      sphereGrad.addColorStop(0, '#fdf2f8');
+      sphereGrad.addColorStop(0.24, '#f472b6');
+      sphereGrad.addColorStop(0.62, '#db2777');
+      sphereGrad.addColorStop(0.92, '#831843');
+      sphereGrad.addColorStop(1, '#500724');
+
       ctx.beginPath();
       ctx.arc(0, 0, r, 0, Math.PI * 2);
-      ctx.fillStyle = '#ec4899';
+      ctx.fillStyle = sphereGrad;
       ctx.fill();
-      ctx.strokeStyle = '#fbcfe8';
-      ctx.lineWidth = 2;
+
+      // Reflected bottom-right rim light (gives true spherical volume)
+      const rimGrad = ctx.createRadialGradient(
+        r * 0.45,
+        r * 0.48,
+        r * 0.05,
+        r * 0.35,
+        r * 0.38,
+        r * 0.85
+      );
+      rimGrad.addColorStop(0, 'rgba(251, 207, 232, 0.48)');
+      rimGrad.addColorStop(0.5, 'rgba(244, 114, 182, 0.12)');
+      rimGrad.addColorStop(1, 'rgba(244, 114, 182, 0)');
+      ctx.fillStyle = rimGrad;
+      ctx.beginPath();
+      ctx.arc(0, 0, r, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Crisp specular outer ring
+      ctx.strokeStyle = 'rgba(252, 231, 243, 0.85)';
+      ctx.lineWidth = 1.6;
       ctx.stroke();
 
-      // Subtle glossy top highlight
+      // Angled glossy glass specular highlight (top-left)
+      ctx.save();
+      ctx.translate(-r * 0.34, -r * 0.36);
+      ctx.rotate(-0.65);
       ctx.beginPath();
-      ctx.arc(-r * 0.28, -r * 0.3, r * 0.22, 0, Math.PI * 2);
-      ctx.fillStyle = 'rgba(255, 255, 255, 0.35)';
+      ctx.ellipse(0, 0, r * 0.32, r * 0.16, 0, 0, Math.PI * 2);
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.72)';
       ctx.fill();
+      ctx.restore();
 
-      // Clear +3 value indicator
-      ctx.fillStyle = '#ffffff';
-      ctx.font = `700 ${Math.round(r * 0.92)}px "Segoe UI", system-ui, sans-serif`;
+      // Embossed +3 value indicator with subtle shadow
+      ctx.font = `800 ${Math.round(r * 0.9)}px "Segoe UI", system-ui, sans-serif`;
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
+      ctx.fillStyle = 'rgba(80, 7, 36, 0.65)';
+      ctx.fillText('3', 1, 2.5);
+      ctx.fillStyle = '#ffffff';
       ctx.fillText('3', 0, 1);
 
       ctx.restore();
     };
 
     const drawBlueTriangle = (item: FallingItem) => {
-      const r = item.radius;
-      const pulse = 1 + Math.sin(item.pulsePhase) * 0.05;
+      const r = item.radius * 1.08;
+      const pulse = 1 + Math.sin(item.pulsePhase) * 0.045;
       const sway = Math.sin(item.pulsePhase * 0.6) * 0.08;
+      const shimmerShift = Math.sin(item.pulsePhase * 0.8) * r * 0.08;
 
       ctx.save();
       ctx.translate(item.x, item.y);
 
-      const glow = ctx.createRadialGradient(0, 0, r * 0.2, 0, 0, r * 1.95);
-      glow.addColorStop(0, 'rgba(56, 189, 248, 0.42)');
+      // Luminous sky-blue 3D crystal aura
+      const glow = ctx.createRadialGradient(0, 0, r * 0.25, 0, 0, r * 2.1);
+      glow.addColorStop(0, 'rgba(56, 189, 248, 0.46)');
       glow.addColorStop(1, 'rgba(56, 189, 248, 0)');
       ctx.fillStyle = glow;
       ctx.beginPath();
-      ctx.arc(0, 0, r * 1.95, 0, Math.PI * 2);
+      ctx.arc(0, 0, r * 2.1, 0, Math.PI * 2);
       ctx.fill();
 
       ctx.rotate(sway);
       ctx.scale(pulse, pulse);
 
-      // Crisp upward equilateral triangle
-      const topY = -r * 1.15;
-      const baseY = r * 0.88;
-      const halfBase = r * 1.12;
+      const topX = 0;
+      const topY = -r * 1.18;
+      const rightX = r * 1.14;
+      const rightY = r * 0.88;
+      const leftX = -r * 1.14;
+      const leftY = r * 0.88;
+      // Raised 3D pyramid apex shifted slightly toward light source
+      const apexX = -r * 0.08 + shimmerShift;
+      const apexY = r * 0.14;
 
+      // Drop shadow beneath the 3D pyramid
       ctx.beginPath();
-      ctx.moveTo(0, topY);
-      ctx.lineTo(halfBase, baseY);
-      ctx.lineTo(-halfBase, baseY);
+      ctx.moveTo(topX + r * 0.14, topY + r * 0.2);
+      ctx.lineTo(rightX + r * 0.14, rightY + r * 0.2);
+      ctx.lineTo(leftX + r * 0.14, leftY + r * 0.2);
       ctx.closePath();
-      ctx.fillStyle = '#0284c7';
+      ctx.fillStyle = 'rgba(2, 6, 23, 0.5)';
       ctx.fill();
+
+      // Facet 1 (Left-Top Lit Face — brightest)
+      const leftFacet = ctx.createLinearGradient(leftX, topY, apexX, rightY);
+      leftFacet.addColorStop(0, '#e0f2fe');
+      leftFacet.addColorStop(0.42, '#38bdf8');
+      leftFacet.addColorStop(1, '#0284c7');
+      ctx.beginPath();
+      ctx.moveTo(topX, topY);
+      ctx.lineTo(apexX, apexY);
+      ctx.lineTo(leftX, leftY);
+      ctx.closePath();
+      ctx.fillStyle = leftFacet;
+      ctx.fill();
+
+      // Facet 2 (Right Shaded Face — medium-deep sapphire)
+      const rightFacet = ctx.createLinearGradient(topX, topY, rightX, rightY);
+      rightFacet.addColorStop(0, '#38bdf8');
+      rightFacet.addColorStop(0.45, '#0369a1');
+      rightFacet.addColorStop(1, '#0c4a6e');
+      ctx.beginPath();
+      ctx.moveTo(topX, topY);
+      ctx.lineTo(rightX, rightY);
+      ctx.lineTo(apexX, apexY);
+      ctx.closePath();
+      ctx.fillStyle = rightFacet;
+      ctx.fill();
+
+      // Facet 3 (Bottom Bevel Face — deep shadow with subtle cyan bounce)
+      const bottomFacet = ctx.createLinearGradient(leftX, apexY, rightX, rightY);
+      bottomFacet.addColorStop(0, '#075985');
+      bottomFacet.addColorStop(0.55, '#0c4a6e');
+      bottomFacet.addColorStop(1, '#082f49');
+      ctx.beginPath();
+      ctx.moveTo(leftX, leftY);
+      ctx.lineTo(apexX, apexY);
+      ctx.lineTo(rightX, rightY);
+      ctx.closePath();
+      ctx.fillStyle = bottomFacet;
+      ctx.fill();
+
+      // Crisp luminous internal 3D ridge lines meeting at the apex
+      ctx.strokeStyle = 'rgba(224, 242, 254, 0.65)';
+      ctx.lineWidth = 1.2;
+      ctx.beginPath();
+      ctx.moveTo(topX, topY);
+      ctx.lineTo(apexX, apexY);
+      ctx.lineTo(leftX, leftY);
+      ctx.moveTo(apexX, apexY);
+      ctx.lineTo(rightX, rightY);
+      ctx.stroke();
+
+      // Bright outer crystal bevel stroke
+      ctx.beginPath();
+      ctx.moveTo(topX, topY);
+      ctx.lineTo(rightX, rightY);
+      ctx.lineTo(leftX, leftY);
+      ctx.closePath();
       ctx.strokeStyle = '#bae6fd';
-      ctx.lineWidth = 2;
+      ctx.lineWidth = 1.8;
       ctx.lineJoin = 'round';
       ctx.stroke();
 
-      // Clear +4 value indicator
-      ctx.fillStyle = '#ffffff';
-      ctx.font = `700 ${Math.round(r * 0.86)}px "Segoe UI", system-ui, sans-serif`;
+      // Embossed +4 value indicator with subtle shadow
+      ctx.font = `800 ${Math.round(r * 0.84)}px "Segoe UI", system-ui, sans-serif`;
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
-      ctx.fillText('4', 0, r * 0.24);
+      ctx.fillStyle = 'rgba(8, 47, 73, 0.78)';
+      ctx.fillText('4', 1, r * 0.28 + 1.5);
+      ctx.fillStyle = '#ffffff';
+      ctx.fillText('4', 0, r * 0.28);
 
       ctx.restore();
     };
 
     const drawHazardSpike = (item: FallingItem) => {
-      const r = item.radius;
-      const pulse = 1 + Math.sin(item.pulsePhase * 1.4) * 0.08;
+      const r = item.radius * 1.04;
+      const pulse = 1 + Math.sin(item.pulsePhase * 1.4) * 0.07;
 
       ctx.save();
       ctx.translate(item.x, item.y);
 
-      ctx.strokeStyle = `rgba(239, 68, 68, ${0.28 + Math.sin(item.pulsePhase * 1.4) * 0.14})`;
+      // Pulsing danger halo
+      ctx.strokeStyle = `rgba(239, 68, 68, ${0.3 + Math.sin(item.pulsePhase * 1.4) * 0.15})`;
       ctx.lineWidth = 1.6;
       ctx.beginPath();
       ctx.arc(0, 0, r * 1.38 * pulse, 0, Math.PI * 2);
       ctx.stroke();
 
+      // Subtle 3D drop shadow
+      ctx.beginPath();
+      ctx.arc(r * 0.14, r * 0.22, r * 0.92, 0, Math.PI * 2);
+      ctx.fillStyle = 'rgba(2, 6, 23, 0.5)';
+      ctx.fill();
+
+      // 3D metallic-red rotating spikes
       ctx.save();
       ctx.rotate(item.rotation);
       const spikes = 8;
+      const spikeGrad = ctx.createLinearGradient(-r, -r, r, r);
+      spikeGrad.addColorStop(0, '#fca5a5');
+      spikeGrad.addColorStop(0.35, '#ef4444');
+      spikeGrad.addColorStop(0.75, '#991b1b');
+      spikeGrad.addColorStop(1, '#450a0a');
+
       ctx.beginPath();
       for (let i = 0; i < spikes * 2; i++) {
         const rad = i % 2 === 0 ? r * 1.24 : r * 0.72;
@@ -1893,32 +2021,54 @@ export default function App() {
         else ctx.lineTo(px, py);
       }
       ctx.closePath();
-      ctx.fillStyle = '#dc2626';
+      ctx.fillStyle = spikeGrad;
       ctx.fill();
-      ctx.strokeStyle = '#fca5a5';
-      ctx.lineWidth = 1.5;
+      ctx.strokeStyle = '#fecaca';
+      ctx.lineWidth = 1.3;
       ctx.stroke();
       ctx.restore();
 
+      // 3D spherical crimson core mine
+      const coreGrad = ctx.createRadialGradient(
+        -r * 0.26,
+        -r * 0.28,
+        r * 0.06,
+        0,
+        0,
+        r * 0.76
+      );
+      coreGrad.addColorStop(0, '#f87171');
+      coreGrad.addColorStop(0.35, '#b91c1c');
+      coreGrad.addColorStop(0.8, '#7f1d1d');
+      coreGrad.addColorStop(1, '#450a0a');
       ctx.beginPath();
-      ctx.arc(0, 0, r * 0.68, 0, Math.PI * 2);
-      ctx.fillStyle = '#7f1d1d';
+      ctx.arc(0, 0, r * 0.74, 0, Math.PI * 2);
+      ctx.fillStyle = coreGrad;
       ctx.fill();
 
-      ctx.fillStyle = '#ffffff';
+      // Tiny glossy specular dot on core
+      ctx.beginPath();
+      ctx.arc(-r * 0.26, -r * 0.28, r * 0.14, 0, Math.PI * 2);
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.45)';
+      ctx.fill();
+
       ctx.font = `800 ${Math.round(r * 0.78)}px "Segoe UI", system-ui, sans-serif`;
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
+      ctx.fillStyle = 'rgba(69, 10, 10, 0.8)';
+      ctx.fillText('-1', 1, 2.2);
+      ctx.fillStyle = '#ffffff';
       ctx.fillText('-1', 0, 1);
 
       ctx.restore();
     };
 
     const drawHazardSquare = (item: FallingItem) => {
-      const r = item.radius;
-      const size = r * 1.92;
+      const r = item.radius * 1.04;
+      const size = r * 1.9;
       const half = size / 2;
-      const pulse = 1 + Math.sin(item.pulsePhase * 1.6) * 0.06;
+      const bevel = size * 0.16;
+      const pulse = 1 + Math.sin(item.pulsePhase * 1.6) * 0.055;
 
       ctx.save();
       ctx.translate(item.x, item.y);
@@ -1937,25 +2087,79 @@ export default function App() {
       );
       ctx.stroke();
 
-      // Main bold red square body
-      drawRoundedRectPath(ctx, -half, -half, size, size, 4);
-      ctx.fillStyle = '#b91c1c';
+      // 3D drop shadow behind block
+      drawRoundedRectPath(ctx, -half + 3, -half + 4.5, size, size, 4);
+      ctx.fillStyle = 'rgba(2, 6, 23, 0.56)';
       ctx.fill();
-      ctx.strokeStyle = '#fca5a5';
-      ctx.lineWidth = 2.2;
-      ctx.stroke();
 
-      // Inner dark crimson frame for heavy hazard contrast
-      const inner = size * 0.72;
-      drawRoundedRectPath(ctx, -inner / 2, -inner / 2, inner, inner, 2);
+      // Base 3D beveled red cube faces
+      // Top bevel (brightest)
+      ctx.beginPath();
+      ctx.moveTo(-half, -half);
+      ctx.lineTo(half, -half);
+      ctx.lineTo(half - bevel, -half + bevel);
+      ctx.lineTo(-half + bevel, -half + bevel);
+      ctx.closePath();
+      ctx.fillStyle = '#f87171';
+      ctx.fill();
+
+      // Left bevel (lit)
+      ctx.beginPath();
+      ctx.moveTo(-half, -half);
+      ctx.lineTo(-half + bevel, -half + bevel);
+      ctx.lineTo(-half + bevel, half - bevel);
+      ctx.lineTo(-half, half);
+      ctx.closePath();
+      ctx.fillStyle = '#dc2626';
+      ctx.fill();
+
+      // Right bevel (shaded)
+      ctx.beginPath();
+      ctx.moveTo(half, -half);
+      ctx.lineTo(half, half);
+      ctx.lineTo(half - bevel, half - bevel);
+      ctx.lineTo(half - bevel, -half + bevel);
+      ctx.closePath();
       ctx.fillStyle = '#7f1d1d';
       ctx.fill();
 
-      // Unmistakable -2 label
-      ctx.fillStyle = '#ffffff';
-      ctx.font = `800 ${Math.round(r * 0.88)}px "Segoe UI", system-ui, sans-serif`;
+      // Bottom bevel (deepest shadow)
+      ctx.beginPath();
+      ctx.moveTo(-half, half);
+      ctx.lineTo(-half + bevel, half - bevel);
+      ctx.lineTo(half - bevel, half - bevel);
+      ctx.lineTo(half, half);
+      ctx.closePath();
+      ctx.fillStyle = '#450a0a';
+      ctx.fill();
+
+      // Raised front 3D center face with subtle top-left sheen
+      const innerSize = size - bevel * 2;
+      const faceGrad = ctx.createLinearGradient(
+        -innerSize / 2,
+        -innerSize / 2,
+        innerSize / 2,
+        innerSize / 2
+      );
+      faceGrad.addColorStop(0, '#dc2626');
+      faceGrad.addColorStop(0.55, '#991b1b');
+      faceGrad.addColorStop(1, '#7f1d1d');
+      ctx.fillStyle = faceGrad;
+      ctx.fillRect(-innerSize / 2, -innerSize / 2, innerSize, innerSize);
+
+      // Crisp specular highlight rim
+      drawRoundedRectPath(ctx, -half, -half, size, size, 3);
+      ctx.strokeStyle = 'rgba(254, 202, 202, 0.8)';
+      ctx.lineWidth = 1.6;
+      ctx.stroke();
+
+      // Unmistakable embossed -2 label
+      ctx.font = `800 ${Math.round(r * 0.86)}px "Segoe UI", system-ui, sans-serif`;
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
+      ctx.fillStyle = 'rgba(69, 10, 10, 0.85)';
+      ctx.fillText('-2', 1, 2.2);
+      ctx.fillStyle = '#ffffff';
       ctx.fillText('-2', 0, 1);
 
       ctx.restore();
