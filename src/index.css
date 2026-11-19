@@ -1,0 +1,30 @@
+@import "tailwindcss";
+
+@layer base {
+  html,
+  body,
+  #root {
+    height: 100%;
+    margin: 0;
+    padding: 0;
+    background-color: #070e1a;
+    color: #f8fafc;
+    font-family: 'Segoe UI', 'SF Pro Arabic', 'Geeza Pro', 'Tahoma', system-ui, -apple-system, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    overscroll-behavior: none;
+    user-select: none;
+    -webkit-user-select: none;
+  }
+}
+
+.font-num {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum" 1;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+  }
+}

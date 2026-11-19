@@ -1,0 +1,6 @@
+{
+  "name": "صياد النقاط | Point Catcher",
+  "description": "لعبة أركيد سريعة لالتقاط النقاط الملونة وتجنب العوائق الحمراء — Fast-paced HTML5 Canvas arcade game with Arabic and English UI.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
