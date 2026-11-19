@@ -16,9 +16,11 @@ type GameStatus =
 type ItemKind =
   | 'pink_circle'
   | 'blue_triangle'
+  | 'green_circle'
   | 'hazard_spike'
   | 'hazard_square'
-  | 'hazard_star';
+  | 'hazard_star'
+  | 'hazard_arrow';
 type IndexTab = 'positive' | 'negative';
 
 interface IndexEntry {
@@ -42,6 +44,7 @@ interface StageConfig {
   hazardChance: number;
   squareHazardRatio: number;
   starHazardRatio: number;
+  arrowHazardRatio: number;
   lateralDrift: number;
 }
 
@@ -88,14 +91,21 @@ interface AmbientStar {
   alpha: number;
 }
 
-const MAX_LIVES = 3;
-const TOTAL_STAGES = 25;
+const MAX_LIVES = 10;
+const HEART_REGEN_MS = 5 * 60 * 1000;
+const TOTAL_STAGES = 50;
 const PINK_CIRCLE_POINTS = 3;
 const BLUE_TRIANGLE_POINTS = 4;
+const GREEN_CIRCLE_POINTS = 2;
+const SPEED_BOOST_DURATION = 5.0;
+const SPEED_BOOST_MULTIPLIER = 2.0;
+const SPEED_BOOST_PLAYER_SLOW = 0.5;
+const ARROW_SPEED_MULTIPLIER = 2.5;
 const FREEZE_STAR_POINTS = 3;
 const FREEZE_DURATION = 4.0;
 const BEST_SCORE_STORAGE_KEY = 'point_catcher_best_score_v1';
 const COINS_STORAGE_KEY = 'point_catcher_coins_v1';
+const LIVES_STATE_STORAGE_KEY = 'point_catcher_lives_state_v1';
 const COMPLETED_STAGES_STORAGE_KEY = 'point_catcher_completed_stages_v1';
 const DISCOVERED_ITEMS_STORAGE_KEY = 'point_catcher_discovered_items_v2';
 const SFX_STORAGE_KEY = 'point_catcher_sfx_v1';
@@ -122,6 +132,16 @@ const INDEX_CATALOG: IndexEntry[] = [
     valueEn: '+4 pts',
     benefitAr: 'يعطيك 4 نقاط دفعة واحدة لإكمال هدف المرحلة بسرعة أكبر.',
     benefitEn: 'Grants 4 points at once to reach the stage goal faster.',
+  },
+  {
+    kind: 'green_circle',
+    category: 'positive',
+    nameAr: 'النقطة الخضراء المسرّعة',
+    nameEn: 'Green Turbo Orb',
+    valueAr: '+2 نقاط · سرعة ×2 · مشية -50%',
+    valueEn: '+2 pts · 2x World · -50% Move',
+    benefitAr: 'تزيد نقاطك بمقدار نقطتين وتسرّع كل شيء في اللعبة بنسبة 100% لمدة 5 ثوانٍ، لكنها تبطّئ مشيتك بنسبة 50%.',
+    benefitEn: 'Adds 2 points and speeds up everything by 100% for 5 seconds, while slowing your movement by 50%.',
   },
   {
     kind: 'hazard_spike',
@@ -153,41 +173,54 @@ const INDEX_CATALOG: IndexEntry[] = [
     benefitAr: 'تجمّد حركتك لمدة 4 ثوانٍ عند التقاطها وتعطيك 3 نقاط (تبدأ من المرحلة 10).',
     benefitEn: 'Freezes your movement for 4 seconds on catch while awarding 3 points (Stage 10+).',
   },
+  {
+    kind: 'hazard_arrow',
+    category: 'negative',
+    nameAr: 'السهم الأحمر السريع',
+    nameEn: 'Red Fast Arrow',
+    valueAr: '-1 روح · سرعة +150%',
+    valueEn: '-1 Life · +150% Speed',
+    benefitAr: 'سهم أحمر ينزل بسرعة أكبر من الباقي بنسبة 150% (×2.5) وينقص قلباً واحداً عند لمسه.',
+    benefitEn: 'Blazing red arrow falling 150% faster (2.5x) than normal items; removes 1 heart on impact.',
+  },
 ];
 
 const VALID_ITEM_KINDS: ItemKind[] = INDEX_CATALOG.map((item) => item.kind);
 
 function getStageClearCoins(remainingLives: number): number {
-  if (remainingLives >= 3) return 4;
-  if (remainingLives === 2) return 2;
+  if (remainingLives >= 8) return 4;
+  if (remainingLives >= 4) return 2;
   return 1;
 }
 
-// Build 25 stages (5% easier overall):
-// Stages 1–4: only -1 spiky hazards; Stage 5+: -2 red squares; Stage 10+: Red Freeze Star (4s freeze + 3 pts).
+// Build 50 stages with smooth difficulty progression:
+// Stage 1+: Red Spike (-1) & Red Fast Arrow (-1, +150% speed); Stage 5+: Red Square (-2); Stage 10+: Red Freeze Star (4s freeze + 3 pts).
 const STAGES: StageConfig[] = (() => {
   const list: StageConfig[] = [];
   let cumulative = 0;
   for (let s = 1; s <= TOTAL_STAGES; s++) {
     const t = (s - 1) / (TOTAL_STAGES - 1);
-    const pointsNeeded = Math.round((45 + s * 15) * 0.95);
+    const tCurve = Math.pow(t, 0.85);
+    const pointsNeeded = Math.round((45 + s * 14) * 0.95);
     const startScore = cumulative;
     cumulative += pointsNeeded;
     const rawSquareRatio =
-      s < 5 ? 0 : 0.3 + ((s - 5) / (TOTAL_STAGES - 5)) * 0.34;
+      s < 5 ? 0 : 0.28 + ((s - 5) / (TOTAL_STAGES - 5)) * 0.34;
     const starHazardRatio =
-      s < 10 ? 0 : 0.18 + ((s - 10) / (TOTAL_STAGES - 10)) * 0.08;
+      s < 10 ? 0 : 0.16 + ((s - 10) / (TOTAL_STAGES - 10)) * 0.1;
+    const arrowHazardRatio = 0.16 + tCurve * 0.12;
     list.push({
       stage: s,
       startScore,
       targetScore: cumulative,
       pointsNeeded,
-      baseSpeed: (225 + t * 335) * 0.95,
-      spawnInterval: Math.max(0.19, (0.68 - t * 0.49) * 1.05),
-      hazardChance: (0.34 + t * 0.26) * 0.95,
+      baseSpeed: (220 + tCurve * 365) * 0.95,
+      spawnInterval: Math.max(0.16, (0.68 - tCurve * 0.5) * 1.05),
+      hazardChance: Math.min(0.62, (0.34 + tCurve * 0.28) * 0.95),
       squareHazardRatio: rawSquareRatio * 0.95,
       starHazardRatio,
-      lateralDrift: (28 + t * 105) * 0.95,
+      arrowHazardRatio,
+      lateralDrift: (26 + tCurve * 115) * 0.95,
     });
   }
   return list;
@@ -203,7 +236,7 @@ function isStageUnlocked(stage: number, completed: number[]): boolean {
 const COPY = {
   ar: {
     title: 'صياد النقاط',
-    rule: 'اجتز 25 مرحلة بالتقاط الدوائر الوردية (+3) والمثلثات الزرقاء (+4) وتجنب العوائق الحمراء.',
+    rule: 'اجتز 50 مرحلة بالتقاط النقاط وتجنّب العوائق والسهام الحمراء السريعة (10 قلوب تتجدد كل 5 دقائق).',
     startBtn: 'ابدأ اللعب',
     playAgainBtn: 'العب مرة أخرى',
     resumeBtn: 'استئناف اللعب',
@@ -216,7 +249,7 @@ const COPY = {
     stageReached: 'المرحلة التي وصلت إليها',
     gameOver: 'انتهت اللعبة',
     victoryTitle: 'مبروك! أنهيت جميع المراحل',
-    victorySubtitle: 'أكملت المراحل الـ 25 بنجاح!',
+    victorySubtitle: 'أكملت المراحل الـ 50 بنجاح!',
     finalScore: 'النتيجة النهائية',
     newBest: 'رقم قياسي جديد!',
     paused: 'إيقاف مؤقت',
@@ -240,7 +273,10 @@ const COPY = {
     nextGoalText: (pts: number) => `هدف المرحلة التالية: ${pts} نقطة`,
     stagesBtn: 'المراحل',
     stagesModalTitle: 'المراحل',
-    stagesModalHint: 'فُز بكل مرحلة لفتح التالية — مكافأة أول فوز: 1 قلب = 1، 2 قلب = 2، 3 قلوب = 4 فلوس.',
+    stagesModalHint: 'فُز بكل مرحلة لفتح التالية — مكافأة أول فوز: 1–3 قلوب = 1، 4–7 = 2، 8–10 = 4 فلوس.',
+    noHeartsNotice: (timer: string) => `نفدت القلوب — يتجدد القلب القادم خلال ${timer}`,
+    waitHeartBtn: (timer: string) => `انتظر تجدد القلب (${timer})`,
+    nextHeartShort: (timer: string) => `+1♥ خلال ${timer}`,
     lockedStageAria: (n: number) => `المرحلة ${n} مقفلة`,
     indexBtn: 'الاندكس',
     indexModalTitle: 'الاندكس',
@@ -272,7 +308,7 @@ const COPY = {
   },
   en: {
     title: 'Point Catcher',
-    rule: 'Clear 25 stages by catching pink circles (+3) and blue triangles (+4) while dodging red hazards.',
+    rule: 'Clear 50 stages by catching points while dodging red hazards and fast arrows (10 hearts, +1 every 5 min).',
     startBtn: 'Start Game',
     playAgainBtn: 'Play Again',
     resumeBtn: 'Resume',
@@ -284,8 +320,8 @@ const COPY = {
     stage: 'Stage',
     stageReached: 'Stage Reached',
     gameOver: 'Game Over',
-    victoryTitle: 'Victory! All 25 Stages Cleared',
-    victorySubtitle: 'You mastered every stage!',
+    victoryTitle: 'Victory! All 50 Stages Cleared',
+    victorySubtitle: 'You mastered all 50 stages!',
     finalScore: 'Final Score',
     newBest: 'New Best Score!',
     paused: 'Paused',
@@ -309,7 +345,10 @@ const COPY = {
     nextGoalText: (pts: number) => `Next Stage Goal: ${pts} pts`,
     stagesBtn: 'Stages',
     stagesModalTitle: 'Stages',
-    stagesModalHint: 'Clear each stage to unlock the next — First-clear reward: 1♥ = 1, 2♥ = 2, 3♥ = 4 coins.',
+    stagesModalHint: 'Clear each stage to unlock the next — First-clear reward: 1–3♥ = 1, 4–7♥ = 2, 8–10♥ = 4 coins.',
+    noHeartsNotice: (timer: string) => `Out of hearts — next heart regenerates in ${timer}`,
+    waitHeartBtn: (timer: string) => `Next Heart in ${timer}`,
+    nextHeartShort: (timer: string) => `+1♥ in ${timer}`,
     lockedStageAria: (n: number) => `Stage ${n} locked`,
     indexBtn: 'Index',
     indexModalTitle: 'Index',
@@ -628,6 +667,28 @@ class ArcadeAudio {
     });
   }
 
+  public playSpeedBoost(): void {
+    const ctx = this.ensureContext();
+    if (!ctx) return;
+    const now = ctx.currentTime;
+    const notes = [440, 554.37, 659.25, 880, 1174.66];
+    notes.forEach((freq, idx) => {
+      const start = now + idx * 0.038;
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = 'triangle';
+      osc.frequency.setValueAtTime(freq, start);
+      osc.frequency.exponentialRampToValueAtTime(freq * 1.15, start + 0.11);
+      gain.gain.setValueAtTime(0.001, start);
+      gain.gain.exponentialRampToValueAtTime(0.085, start + 0.01);
+      gain.gain.exponentialRampToValueAtTime(0.0008, start + 0.14);
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start(start);
+      osc.stop(start + 0.15);
+    });
+  }
+
   public playHazardHit(heavy: boolean): void {
     const ctx = this.ensureContext();
     if (!ctx) return;
@@ -781,7 +842,78 @@ function readStoredDiscoveredItems(): ItemKind[] {
   }
 }
 
+interface StoredLivesState {
+  lives: number;
+  lastRegenAt: number;
+}
+
+function computeSyncedLivesState(
+  rawLives: number,
+  rawLastRegenAt: number,
+  now: number
+): StoredLivesState {
+  const clampedLives = Math.max(0, Math.min(MAX_LIVES, Math.floor(rawLives)));
+  if (clampedLives >= MAX_LIVES) {
+    return { lives: MAX_LIVES, lastRegenAt: 0 };
+  }
+  const baseTime =
+    rawLastRegenAt > 0 && rawLastRegenAt <= now ? rawLastRegenAt : now;
+  const elapsed = now - baseTime;
+  const gained = Math.floor(elapsed / HEART_REGEN_MS);
+  const nextLives = Math.min(MAX_LIVES, clampedLives + gained);
+  if (nextLives >= MAX_LIVES) {
+    return { lives: MAX_LIVES, lastRegenAt: 0 };
+  }
+  return {
+    lives: nextLives,
+    lastRegenAt: baseTime + gained * HEART_REGEN_MS,
+  };
+}
+
+function readStoredLivesState(): StoredLivesState {
+  const now = Date.now();
+  try {
+    const raw = window.localStorage.getItem(LIVES_STATE_STORAGE_KEY);
+    if (!raw) return { lives: MAX_LIVES, lastRegenAt: 0 };
+    const parsed = JSON.parse(raw);
+    if (
+      parsed &&
+      typeof parsed.lives === 'number' &&
+      typeof parsed.lastRegenAt === 'number'
+    ) {
+      return computeSyncedLivesState(parsed.lives, parsed.lastRegenAt, now);
+    }
+    return { lives: MAX_LIVES, lastRegenAt: 0 };
+  } catch {
+    return { lives: MAX_LIVES, lastRegenAt: 0 };
+  }
+}
+
+function persistLivesState(lives: number, lastRegenAt: number): void {
+  try {
+    window.localStorage.setItem(
+      LIVES_STATE_STORAGE_KEY,
+      JSON.stringify({ lives, lastRegenAt })
+    );
+  } catch {
+    // Ignore storage errors
+  }
+}
+
+function formatCountdown(ms: number): string {
+  const totalSec = Math.max(0, Math.ceil(ms / 1000));
+  const mins = Math.floor(totalSec / 60);
+  const secs = totalSec % 60;
+  return `${mins}:${secs.toString().padStart(2, '0')}`;
+}
+
 export default function App() {
+  const initialLivesRef = useRef<StoredLivesState | null>(null);
+  if (initialLivesRef.current === null) {
+    initialLivesRef.current = readStoredLivesState();
+  }
+  const initialLivesState = initialLivesRef.current;
+
   const [lang, setLang] = useState<Lang>(() => readStoredLang());
   const [status, setStatus] = useState<GameStatus>('START');
   const [score, setScore] = useState<number>(0);
@@ -799,7 +931,12 @@ export default function App() {
   const [discoveredItems, setDiscoveredItems] = useState<ItemKind[]>(() =>
     readStoredDiscoveredItems()
   );
-  const [lives, setLives] = useState<number>(MAX_LIVES);
+  const [lives, setLives] = useState<number>(initialLivesState.lives);
+  const [nextHeartInMs, setNextHeartInMs] = useState<number>(() =>
+    initialLivesState.lives < MAX_LIVES
+      ? Math.max(0, HEART_REGEN_MS - (Date.now() - initialLivesState.lastRegenAt))
+      : 0
+  );
   const [stageNum, setStageNum] = useState<number>(1);
   const [stagesModalOpen, setStagesModalOpen] = useState<boolean>(false);
   const [indexModalOpen, setIndexModalOpen] = useState<boolean>(false);
@@ -829,7 +966,8 @@ export default function App() {
   const coinsRef = useRef<number>(coins);
   const completedStagesRef = useRef<number[]>(completedStages);
   const discoveredItemsRef = useRef<ItemKind[]>(discoveredItems);
-  const livesRef = useRef<number>(MAX_LIVES);
+  const livesRef = useRef<number>(initialLivesState.lives);
+  const lastHeartRegenAtRef = useRef<number>(initialLivesState.lastRegenAt);
   const stageNumRef = useRef<number>(1);
   const streakRef = useRef<number>(0);
 
@@ -846,6 +984,7 @@ export default function App() {
     playerGlowAlpha: 0,
     invulnTimer: 0,
     freezeTimer: 0,
+    speedBoostTimer: 0,
     shakeTimer: 0,
     shakeIntensity: 0,
     hitFlashAlpha: 0,
@@ -956,9 +1095,48 @@ export default function App() {
     simRef.current.stars = stars;
   }, []);
 
+  // Automatic +1 heart regeneration every 5 minutes when below MAX_LIVES (10)
+  useEffect(() => {
+    const syncHearts = () => {
+      if (livesRef.current >= MAX_LIVES) {
+        if (lastHeartRegenAtRef.current !== 0) {
+          lastHeartRegenAtRef.current = 0;
+          persistLivesState(MAX_LIVES, 0);
+        }
+        setNextHeartInMs(0);
+        return;
+      }
+      const now = Date.now();
+      const synced = computeSyncedLivesState(
+        livesRef.current,
+        lastHeartRegenAtRef.current,
+        now
+      );
+      if (
+        synced.lives !== livesRef.current ||
+        synced.lastRegenAt !== lastHeartRegenAtRef.current
+      ) {
+        livesRef.current = synced.lives;
+        lastHeartRegenAtRef.current = synced.lastRegenAt;
+        setLives(synced.lives);
+        persistLivesState(synced.lives, synced.lastRegenAt);
+      }
+      setNextHeartInMs(
+        synced.lives < MAX_LIVES
+          ? Math.max(0, HEART_REGEN_MS - (now - synced.lastRegenAt))
+          : 0
+      );
+    };
+
+    syncHearts();
+    const timerId = window.setInterval(syncHearts, 1000);
+    return () => window.clearInterval(timerId);
+  }, []);
+
   const startAtStage = useCallback((targetStage: number) => {
     const safeStage = Math.max(1, Math.min(TOTAL_STAGES, targetStage));
     if (!isStageUnlocked(safeStage, completedStagesRef.current)) return;
+    if (livesRef.current <= 0) return;
     const cfg = STAGES[safeStage - 1];
     const sim = simRef.current;
     const activeCopy = COPY[langRef.current];
@@ -972,6 +1150,7 @@ export default function App() {
     sim.playerGlowAlpha = 0;
     sim.invulnTimer = 0;
     sim.freezeTimer = 0;
+    sim.speedBoostTimer = 0;
     sim.shakeTimer = 0;
     sim.hitFlashAlpha = 0;
     sim.stageBannerTimer = 1.5;
@@ -986,7 +1165,6 @@ export default function App() {
 
     scoreRef.current = 0;
     stagePointsRef.current = 0;
-    livesRef.current = MAX_LIVES;
     stageNumRef.current = safeStage;
     streakRef.current = 0;
     stagesModalOpenRef.current = false;
@@ -996,7 +1174,6 @@ export default function App() {
 
     setScore(0);
     setStagePoints(0);
-    setLives(MAX_LIVES);
     setStageNum(safeStage);
     setStagesModalOpen(false);
     setIndexModalOpen(false);
@@ -1018,6 +1195,7 @@ export default function App() {
 
   const proceedToNextStage = useCallback(() => {
     if (statusRef.current !== 'STAGE_CLEAR') return;
+    if (livesRef.current <= 0) return;
     const sim = simRef.current;
     const nextStage = Math.min(TOTAL_STAGES, stageNumRef.current + 1);
     const nextCfg = STAGES[nextStage - 1];
@@ -1027,6 +1205,7 @@ export default function App() {
     sim.playerVx = 0;
     sim.invulnTimer = 0;
     sim.freezeTimer = 0;
+    sim.speedBoostTimer = 0;
     sim.spawnTimer = 0.3;
     sim.lastHazardX = -999;
     sim.input.pointerActive = false;
@@ -1038,11 +1217,9 @@ export default function App() {
     sim.stageBannerTimer = 1.5;
 
     stagePointsRef.current = 0;
-    livesRef.current = MAX_LIVES;
     stageNumRef.current = nextStage;
     statusRef.current = 'PLAYING';
     setStagePoints(0);
-    setLives(MAX_LIVES);
     setStageNum(nextStage);
     setStatus('PLAYING');
 
@@ -1425,19 +1602,34 @@ export default function App() {
       let kind: ItemKind;
       if (isHazard) {
         const roll = Math.random();
-        if (roll < cfg.starHazardRatio) {
-          kind = 'hazard_star';
-        } else if (
-          roll <
-          cfg.starHazardRatio + (1 - cfg.starHazardRatio) * cfg.squareHazardRatio
-        ) {
-          kind = 'hazard_square';
+        if (roll < cfg.arrowHazardRatio) {
+          kind = 'hazard_arrow';
         } else {
-          kind = 'hazard_spike';
+          const remRoll =
+            (roll - cfg.arrowHazardRatio) /
+            Math.max(0.01, 1 - cfg.arrowHazardRatio);
+          if (remRoll < cfg.starHazardRatio) {
+            kind = 'hazard_star';
+          } else if (
+            remRoll <
+            cfg.starHazardRatio +
+              (1 - cfg.starHazardRatio) * cfg.squareHazardRatio
+          ) {
+            kind = 'hazard_square';
+          } else {
+            kind = 'hazard_spike';
+          }
         }
       } else {
-        // Two collectible types only: Pink Circle (+3) and Blue Triangle (+4)
-        kind = Math.random() < 0.54 ? 'pink_circle' : 'blue_triangle';
+        // Collectible types: Green Turbo Orb (+2 & 2x speed), Pink Circle (+3), Blue Triangle (+4)
+        const roll = Math.random();
+        if (roll < 0.17) {
+          kind = 'green_circle';
+        } else if (roll < 0.62) {
+          kind = 'pink_circle';
+        } else {
+          kind = 'blue_triangle';
+        }
       }
 
       const margin = Math.max(30, sim.playerWidth * 0.42);
@@ -1462,12 +1654,16 @@ export default function App() {
       }
 
       const speedVariance =
-        kind === 'hazard_square'
+        kind === 'hazard_arrow'
+          ? ARROW_SPEED_MULTIPLIER
+          : kind === 'hazard_square'
           ? 0.96 + Math.random() * 0.3
           : kind === 'hazard_star'
           ? 0.88 + Math.random() * 0.28
           : kind === 'hazard_spike'
           ? 0.9 + Math.random() * 0.34
+          : kind === 'green_circle'
+          ? 0.9 + Math.random() * 0.3
           : kind === 'blue_triangle'
           ? 0.92 + Math.random() * 0.34
           : 0.84 + Math.random() * 0.36;
@@ -1476,13 +1672,20 @@ export default function App() {
       const speed = cfg.baseSpeed * speedVariance * heightFactor;
 
       const radius =
-        kind === 'hazard_square' || kind === 'hazard_star'
+        kind === 'hazard_arrow'
+          ? Math.max(12, Math.min(15, sim.width * 0.02))
+          : kind === 'hazard_square' || kind === 'hazard_star'
           ? Math.max(16, Math.min(20, sim.width * 0.025))
           : kind === 'hazard_spike'
           ? Math.max(15, Math.min(19, sim.width * 0.024))
           : Math.max(14, Math.min(18, sim.width * 0.023));
 
-      const driftRange = isHazard ? cfg.lateralDrift : cfg.lateralDrift * 0.65;
+      const driftRange =
+        kind === 'hazard_arrow'
+          ? 0
+          : isHazard
+          ? cfg.lateralDrift
+          : cfg.lateralDrift * 0.65;
       sim.items.push({
         id: sim.nextId++,
         kind,
@@ -1490,11 +1693,13 @@ export default function App() {
         y: -radius - 10,
         radius,
         speed,
-        vx: (Math.random() * 2 - 1) * driftRange,
+        vx: driftRange > 0 ? (Math.random() * 2 - 1) * driftRange : 0,
         rotation: 0,
         rotSpeed:
           kind === 'hazard_spike'
             ? (Math.random() > 0.5 ? 1 : -1) * 2.4
+            : kind === 'green_circle'
+            ? (Math.random() > 0.5 ? 1 : -1) * 2.2
             : kind === 'hazard_star'
             ? (Math.random() > 0.5 ? 1 : -1) * 1.4
             : 0,
@@ -1505,7 +1710,10 @@ export default function App() {
     const update = (dt: number) => {
       const sim = simRef.current;
 
-      const starSpeedMul = statusRef.current === 'PLAYING' ? 1 : 0.45;
+      const isSpeedBoostActive =
+        statusRef.current === 'PLAYING' && sim.speedBoostTimer > 0;
+      const starSpeedMul =
+        statusRef.current === 'PLAYING' ? (isSpeedBoostActive ? 2.6 : 1) : 0.45;
       for (const s of sim.stars) {
         s.y += s.speed * starSpeedMul * dt;
         if (s.y > sim.height + 4) {
@@ -1548,11 +1756,21 @@ export default function App() {
         return;
       }
 
+      // Tick 5-second +100% (2x) game speed boost in real time
+      const gameSpeedMul =
+        sim.speedBoostTimer > 0 ? SPEED_BOOST_MULTIPLIER : 1;
+      const simDt = dt * gameSpeedMul;
+      if (sim.speedBoostTimer > 0) {
+        sim.speedBoostTimer = Math.max(0, sim.speedBoostTimer - dt);
+      }
+
       // Smooth player horizontal movement (locked in place while frozen by Red Freeze Star)
       const halfW = sim.playerWidth / 2;
       const minX = halfW + 10;
       const maxX = sim.width - halfW - 10;
-      const maxSpeed = Math.max(580, sim.width * 1.02);
+      const maxSpeed =
+        Math.max(580, sim.width * 1.02) *
+        (gameSpeedMul > 1 ? SPEED_BOOST_PLAYER_SLOW : 1);
 
       if (sim.freezeTimer > 0) {
         sim.freezeTimer = Math.max(0, sim.freezeTimer - dt);
@@ -1574,7 +1792,11 @@ export default function App() {
           );
           const diffX = clampedTarget - sim.playerX;
           const follow = 1 - Math.exp(-26 * dt);
-          const step = diffX * follow;
+          let step = diffX * follow;
+          if (gameSpeedMul > 1) {
+            const maxStep = maxSpeed * dt;
+            step = Math.max(-maxStep, Math.min(maxStep, step));
+          }
           sim.playerVx = dt > 0 ? step / dt : 0;
           sim.playerX += step;
         } else {
@@ -1603,9 +1825,9 @@ export default function App() {
       if (sim.stageBannerTimer > 0)
         sim.stageBannerTimer = Math.max(0, sim.stageBannerTimer - dt);
 
-      // Spawning cadence governed by current stage
+      // Spawning cadence governed by current stage (scales 2x during green orb speed boost)
       const activeCfg = STAGES[Math.min(stageNumRef.current - 1, TOTAL_STAGES - 1)];
-      sim.spawnTimer -= dt;
+      sim.spawnTimer -= simDt;
       if (sim.spawnTimer <= 0) {
         spawnFallingObject();
         sim.spawnTimer = activeCfg.spawnInterval * (0.82 + Math.random() * 0.36);
@@ -1619,10 +1841,10 @@ export default function App() {
 
       for (let i = sim.items.length - 1; i >= 0; i--) {
         const item = sim.items[i];
-        item.y += item.speed * dt;
-        item.x += item.vx * dt;
-        item.rotation += item.rotSpeed * dt;
-        item.pulsePhase += dt * 5.2;
+        item.y += item.speed * simDt;
+        item.x += item.vx * simDt;
+        item.rotation += item.rotSpeed * simDt;
+        item.pulsePhase += simDt * 5.2;
 
         if (item.x < item.radius + 10) {
           item.x = item.radius + 10;
@@ -1633,7 +1855,9 @@ export default function App() {
         }
 
         const isPoint =
-          item.kind === 'pink_circle' || item.kind === 'blue_triangle';
+          item.kind === 'pink_circle' ||
+          item.kind === 'blue_triangle' ||
+          item.kind === 'green_circle';
 
         if (item.y - item.radius > sim.height + 24) {
           if (isPoint) {
@@ -1675,12 +1899,23 @@ export default function App() {
           }
 
           if (isPoint) {
+            const isGreen = item.kind === 'green_circle';
             const isTriangle = item.kind === 'blue_triangle';
-            const value = isTriangle
+            const value = isGreen
+              ? GREEN_CIRCLE_POINTS
+              : isTriangle
               ? BLUE_TRIANGLE_POINTS
               : PINK_CIRCLE_POINTS;
-            const color = isTriangle ? '#38bdf8' : '#f472b6';
-            const textColor = isTriangle ? '#bae6fd' : '#fbcfe8';
+            const color = isGreen
+              ? '#10b981'
+              : isTriangle
+              ? '#38bdf8'
+              : '#f472b6';
+            const textColor = isGreen
+              ? '#a7f3d0'
+              : isTriangle
+              ? '#bae6fd'
+              : '#fbcfe8';
 
             const nextScore = scoreRef.current + value;
             scoreRef.current = nextScore;
@@ -1704,20 +1939,28 @@ export default function App() {
               }
             }
 
+            if (isGreen) {
+              sim.speedBoostTimer = SPEED_BOOST_DURATION;
+            }
+
             sim.playerBounce = 1;
             sim.playerGlowColor = color;
             sim.playerGlowAlpha = 1;
 
-            spawnBurst(item.x, item.y, color, 14, 1);
+            spawnBurst(item.x, item.y, color, isGreen ? 18 : 14, isGreen ? 1.2 : 1);
             spawnBurst(item.x, item.y, '#ffffff', 5, 0.7);
             sim.floatingTexts.push({
               x: item.x,
               y: item.y - 10,
               vy: -56,
-              text: `+${value}`,
+              text: isGreen
+                ? langRef.current === 'ar'
+                  ? `⚡ سرعة ×2 · مشية -50% · +${value}`
+                  : `⚡ 2x World · -50% Move · +${value}`
+                : `+${value}`,
               color: textColor,
-              life: 0.65,
-              maxLife: 0.65,
+              life: isGreen ? 0.95 : 0.65,
+              maxLife: isGreen ? 0.95 : 0.65,
             });
 
             // Check stage completion (1 heart = +1 coin, 2 hearts = +2 coins, 3 hearts = +4 coins)
@@ -1760,6 +2003,7 @@ export default function App() {
                 }
               }
 
+              sim.speedBoostTimer = 0;
               sim.input.pointerActive = false;
               sim.input.pointerId = null;
               sim.input.leftBtn = false;
@@ -1781,7 +2025,11 @@ export default function App() {
               streakRef.current = Math.min(streakRef.current + 1, 10);
               break;
             } else {
-              audioRef.current.playCatch(streakRef.current, isTriangle);
+              if (isGreen) {
+                audioRef.current.playSpeedBoost();
+              } else {
+                audioRef.current.playCatch(streakRef.current, isTriangle);
+              }
               streakRef.current = Math.min(streakRef.current + 1, 10);
             }
           } else if (item.kind === 'hazard_star') {
@@ -1872,6 +2120,7 @@ export default function App() {
               }
 
               sim.freezeTimer = 0;
+              sim.speedBoostTimer = 0;
               sim.input.pointerActive = false;
               sim.input.pointerId = null;
               sim.input.leftBtn = false;
@@ -1900,10 +2149,16 @@ export default function App() {
             const damage = isHeavySquare ? 2 : 1;
 
             if (sim.invulnTimer <= 0) {
-              const nextLives = Math.max(0, livesRef.current - damage);
+              const prevLives = livesRef.current;
+              const nextLives = Math.max(0, prevLives - damage);
               livesRef.current = nextLives;
               streakRef.current = 0;
               setLives(nextLives);
+              if (prevLives >= MAX_LIVES && nextLives < MAX_LIVES) {
+                lastHeartRegenAtRef.current = Date.now();
+                setNextHeartInMs(HEART_REGEN_MS);
+              }
+              persistLivesState(nextLives, lastHeartRegenAtRef.current);
 
               sim.shakeTimer = isHeavySquare ? 0.32 : 0.24;
               sim.shakeIntensity = isHeavySquare ? 10 : 7;
@@ -1929,6 +2184,7 @@ export default function App() {
               });
 
               if (nextLives <= 0) {
+                sim.speedBoostTimer = 0;
                 statusRef.current = 'GAME_OVER';
                 setStatus('GAME_OVER');
                 audioRef.current.playGameOver();
@@ -1941,18 +2197,18 @@ export default function App() {
         }
       }
 
-      // Particles
+      // Particles (accelerated with world speed during boost)
       for (let i = sim.particles.length - 1; i >= 0; i--) {
         const p = sim.particles[i];
-        p.life -= dt;
+        p.life -= simDt;
         if (p.life <= 0) {
           sim.particles.splice(i, 1);
           continue;
         }
-        p.x += p.vx * dt;
-        p.y += p.vy * dt;
-        p.vy += 280 * dt;
-        p.vx *= Math.exp(-2.5 * dt);
+        p.x += p.vx * simDt;
+        p.y += p.vy * simDt;
+        p.vy += 280 * simDt;
+        p.vx *= Math.exp(-2.5 * simDt);
         p.alpha = p.life / p.maxLife;
       }
 
@@ -1964,7 +2220,7 @@ export default function App() {
           sim.floatingTexts.splice(i, 1);
           continue;
         }
-        ft.y += ft.vy * dt;
+        ft.y += ft.vy * simDt;
       }
     };
 
@@ -2052,6 +2308,108 @@ export default function App() {
       ctx.fillText('3', 1, 2.5);
       ctx.fillStyle = '#ffffff';
       ctx.fillText('3', 0, 1);
+
+      ctx.restore();
+    };
+
+    const drawGreenCircle = (item: FallingItem) => {
+      const r = item.radius * 1.08;
+      const pulse = 1 + Math.sin(item.pulsePhase * 1.35) * 0.055;
+
+      ctx.save();
+      ctx.translate(item.x, item.y);
+
+      // Vibrant emerald 3D turbo aura
+      const glow = ctx.createRadialGradient(0, 0, r * 0.22, 0, 0, r * 2.2);
+      glow.addColorStop(0, 'rgba(16, 185, 129, 0.56)');
+      glow.addColorStop(0.55, 'rgba(52, 211, 153, 0.22)');
+      glow.addColorStop(1, 'rgba(16, 185, 129, 0)');
+      ctx.fillStyle = glow;
+      ctx.beginPath();
+      ctx.arc(0, 0, r * 2.2, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.scale(pulse, pulse);
+
+      // Rotating luminous speed ring orbiting the emerald 3D sphere
+      ctx.save();
+      ctx.rotate(item.rotation);
+      ctx.strokeStyle = 'rgba(110, 231, 183, 0.85)';
+      ctx.lineWidth = 1.8;
+      ctx.beginPath();
+      ctx.arc(0, 0, r * 1.28, 0, Math.PI * 0.65);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.arc(0, 0, r * 1.28, Math.PI, Math.PI * 1.65);
+      ctx.stroke();
+      ctx.restore();
+
+      // Drop shadow for 3D float depth
+      ctx.beginPath();
+      ctx.arc(r * 0.14, r * 0.22, r * 0.96, 0, Math.PI * 2);
+      ctx.fillStyle = 'rgba(2, 6, 23, 0.48)';
+      ctx.fill();
+
+      // 3D glossy emerald sphere
+      const sphereGrad = ctx.createRadialGradient(
+        -r * 0.36,
+        -r * 0.38,
+        r * 0.08,
+        0,
+        0,
+        r * 1.08
+      );
+      sphereGrad.addColorStop(0, '#ecfdf5');
+      sphereGrad.addColorStop(0.24, '#34d399');
+      sphereGrad.addColorStop(0.62, '#059669');
+      sphereGrad.addColorStop(0.92, '#065f46');
+      sphereGrad.addColorStop(1, '#022c22');
+
+      ctx.beginPath();
+      ctx.arc(0, 0, r, 0, Math.PI * 2);
+      ctx.fillStyle = sphereGrad;
+      ctx.fill();
+
+      // Reflected bottom-right rim light
+      const rimGrad = ctx.createRadialGradient(
+        r * 0.45,
+        r * 0.48,
+        r * 0.05,
+        r * 0.35,
+        r * 0.38,
+        r * 0.85
+      );
+      rimGrad.addColorStop(0, 'rgba(167, 243, 208, 0.52)');
+      rimGrad.addColorStop(0.5, 'rgba(16, 185, 129, 0.14)');
+      rimGrad.addColorStop(1, 'rgba(16, 185, 129, 0)');
+      ctx.fillStyle = rimGrad;
+      ctx.beginPath();
+      ctx.arc(0, 0, r, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Specular outer ring
+      ctx.strokeStyle = 'rgba(209, 250, 229, 0.9)';
+      ctx.lineWidth = 1.6;
+      ctx.stroke();
+
+      // Glossy top-left highlight
+      ctx.save();
+      ctx.translate(-r * 0.34, -r * 0.36);
+      ctx.rotate(-0.65);
+      ctx.beginPath();
+      ctx.ellipse(0, 0, r * 0.32, r * 0.16, 0, 0, Math.PI * 2);
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.76)';
+      ctx.fill();
+      ctx.restore();
+
+      // Embossed +2 value indicator
+      ctx.font = `800 ${Math.round(r * 0.88)}px "Segoe UI", system-ui, sans-serif`;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillStyle = 'rgba(2, 44, 34, 0.72)';
+      ctx.fillText('2', 1, 2.5);
+      ctx.fillStyle = '#ffffff';
+      ctx.fillText('2', 0, 1);
 
       ctx.restore();
     };
@@ -2449,6 +2807,108 @@ export default function App() {
       ctx.restore();
     };
 
+    const drawHazardArrow = (item: FallingItem) => {
+      const r = item.radius * 1.1;
+
+      ctx.save();
+      ctx.translate(item.x, item.y);
+
+      // Fiery crimson slipstream trail streaking upward behind the blazing arrow
+      const trailGrad = ctx.createLinearGradient(0, -r * 4.5, 0, r * 0.4);
+      trailGrad.addColorStop(0, 'rgba(239, 68, 68, 0)');
+      trailGrad.addColorStop(0.55, 'rgba(239, 68, 68, 0.38)');
+      trailGrad.addColorStop(1, 'rgba(252, 165, 165, 0.72)');
+      ctx.fillStyle = trailGrad;
+      ctx.beginPath();
+      ctx.moveTo(-r * 0.42, -r * 0.4);
+      ctx.lineTo(r * 0.42, -r * 0.4);
+      ctx.lineTo(0, -r * 4.5);
+      ctx.closePath();
+      ctx.fill();
+
+      // Intense crimson glow around arrowhead
+      const glow = ctx.createRadialGradient(0, r * 0.35, r * 0.15, 0, r * 0.2, r * 1.9);
+      glow.addColorStop(0, 'rgba(239, 68, 68, 0.62)');
+      glow.addColorStop(1, 'rgba(239, 68, 68, 0)');
+      ctx.fillStyle = glow;
+      ctx.beginPath();
+      ctx.arc(0, r * 0.25, r * 1.9, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Subtle 3D drop shadow
+      ctx.save();
+      ctx.translate(2.5, 3.5);
+      ctx.beginPath();
+      ctx.moveTo(0, r * 1.45);
+      ctx.lineTo(r * 1.05, r * 0.1);
+      ctx.lineTo(r * 0.38, r * 0.1);
+      ctx.lineTo(r * 0.45, -r * 1.35);
+      ctx.lineTo(0, -r * 0.98);
+      ctx.lineTo(-r * 0.45, -r * 1.35);
+      ctx.lineTo(-r * 0.38, r * 0.1);
+      ctx.lineTo(-r * 1.05, r * 0.1);
+      ctx.closePath();
+      ctx.fillStyle = 'rgba(2, 6, 23, 0.54)';
+      ctx.fill();
+      ctx.restore();
+
+      // Left lit 3D half of the crimson downward arrow
+      const leftGrad = ctx.createLinearGradient(-r, -r * 1.3, 0, r * 1.45);
+      leftGrad.addColorStop(0, '#fecaca');
+      leftGrad.addColorStop(0.4, '#ef4444');
+      leftGrad.addColorStop(1, '#dc2626');
+      ctx.beginPath();
+      ctx.moveTo(0, r * 1.45);
+      ctx.lineTo(-r * 1.05, r * 0.1);
+      ctx.lineTo(-r * 0.38, r * 0.1);
+      ctx.lineTo(-r * 0.45, -r * 1.35);
+      ctx.lineTo(0, -r * 0.98);
+      ctx.closePath();
+      ctx.fillStyle = leftGrad;
+      ctx.fill();
+
+      // Right shaded 3D half of the crimson downward arrow
+      const rightGrad = ctx.createLinearGradient(0, -r * 1.3, r, r * 1.45);
+      rightGrad.addColorStop(0, '#dc2626');
+      rightGrad.addColorStop(0.55, '#991b1b');
+      rightGrad.addColorStop(1, '#450a0a');
+      ctx.beginPath();
+      ctx.moveTo(0, r * 1.45);
+      ctx.lineTo(r * 1.05, r * 0.1);
+      ctx.lineTo(r * 0.38, r * 0.1);
+      ctx.lineTo(r * 0.45, -r * 1.35);
+      ctx.lineTo(0, -r * 0.98);
+      ctx.closePath();
+      ctx.fillStyle = rightGrad;
+      ctx.fill();
+
+      // Bright center 3D spine ridge
+      ctx.strokeStyle = 'rgba(254, 226, 226, 0.9)';
+      ctx.lineWidth = 1.4;
+      ctx.beginPath();
+      ctx.moveTo(0, -r * 0.95);
+      ctx.lineTo(0, r * 1.4);
+      ctx.stroke();
+
+      // Sharp glowing outline
+      ctx.beginPath();
+      ctx.moveTo(0, r * 1.45);
+      ctx.lineTo(r * 1.05, r * 0.1);
+      ctx.lineTo(r * 0.38, r * 0.1);
+      ctx.lineTo(r * 0.45, -r * 1.35);
+      ctx.lineTo(0, -r * 0.98);
+      ctx.lineTo(-r * 0.45, -r * 1.35);
+      ctx.lineTo(-r * 0.38, r * 0.1);
+      ctx.lineTo(-r * 1.05, r * 0.1);
+      ctx.closePath();
+      ctx.strokeStyle = '#fecaca';
+      ctx.lineWidth = 1.4;
+      ctx.lineJoin = 'round';
+      ctx.stroke();
+
+      ctx.restore();
+    };
+
     const drawPlayer = () => {
       const sim = simRef.current;
       if (sim.invulnTimer > 0 && Math.floor(sim.invulnTimer * 16) % 2 === 0) {
@@ -2460,17 +2920,20 @@ export default function App() {
       const halfW = w / 2;
       const halfH = h / 2;
       const isFrozen = sim.freezeTimer > 0;
+      const isTurbo = sim.speedBoostTimer > 0 && !isFrozen;
       const tilt = isFrozen
         ? 0
         : Math.max(-0.14, Math.min(0.14, sim.playerVx / 3000));
       const scaleX = 1 + sim.playerBounce * 0.11;
       const scaleY = 1 - sim.playerBounce * 0.13;
-      const pulse = 0.5 + 0.5 * Math.sin(performance.now() * 0.008);
+      const pulse = 0.5 + 0.5 * Math.sin(performance.now() * (isTurbo ? 0.018 : 0.008));
       const isCatchFlash = sim.playerGlowAlpha > 0.05;
       const accentColor = isFrozen
         ? '#bae6fd'
         : isCatchFlash
         ? sim.playerGlowColor
+        : isTurbo
+        ? '#34d399'
         : '#38bdf8';
 
       ctx.save();
@@ -2486,6 +2949,8 @@ export default function App() {
           ? 'rgba(186, 230, 253, 0.65)'
           : isCatchFlash
           ? `${sim.playerGlowColor}99`
+          : isTurbo
+          ? 'rgba(16, 185, 129, 0.62)'
           : 'rgba(56, 189, 248, 0.52)'
       );
       auraGrad.addColorStop(
@@ -2494,6 +2959,8 @@ export default function App() {
           ? 'rgba(56, 189, 248, 0.25)'
           : isCatchFlash
           ? `${sim.playerGlowColor}33`
+          : isTurbo
+          ? 'rgba(16, 185, 129, 0.24)'
           : 'rgba(14, 165, 233, 0.18)'
       );
       auraGrad.addColorStop(1, 'rgba(56, 189, 248, 0)');
@@ -2507,7 +2974,11 @@ export default function App() {
       beamGrad.addColorStop(0, 'rgba(56, 189, 248, 0)');
       beamGrad.addColorStop(
         1,
-        isCatchFlash ? `${sim.playerGlowColor}88` : 'rgba(125, 211, 252, 0.42)'
+        isCatchFlash
+          ? `${sim.playerGlowColor}88`
+          : isTurbo
+          ? 'rgba(52, 211, 153, 0.55)'
+          : 'rgba(125, 211, 252, 0.42)'
       );
       ctx.fillStyle = beamGrad;
       ctx.beginPath();
@@ -2518,10 +2989,10 @@ export default function App() {
       ctx.closePath();
       ctx.fill();
 
-      // Dual animated thruster jets beneath the hull (extinguished while frozen)
+      // Dual animated thruster jets beneath the hull (extinguished while frozen; supercharged in 2x turbo)
       if (!isFrozen) {
         const thrusterLen =
-          8 + pulse * 5 + Math.min(5, Math.abs(sim.playerVx) / 140);
+          (isTurbo ? 15 : 8) + pulse * (isTurbo ? 9 : 5) + Math.min(5, Math.abs(sim.playerVx) / 140);
         for (const tx of [-halfW * 0.46, halfW * 0.46]) {
           const flameGrad = ctx.createLinearGradient(
             tx,
@@ -2530,8 +3001,8 @@ export default function App() {
             halfH + thrusterLen
           );
           flameGrad.addColorStop(0, '#ffffff');
-          flameGrad.addColorStop(0.4, '#38bdf8');
-          flameGrad.addColorStop(1, 'rgba(56, 189, 248, 0)');
+          flameGrad.addColorStop(0.4, isTurbo ? '#34d399' : '#38bdf8');
+          flameGrad.addColorStop(1, isTurbo ? 'rgba(16, 185, 129, 0)' : 'rgba(56, 189, 248, 0)');
           ctx.fillStyle = flameGrad;
           ctx.beginPath();
           ctx.moveTo(tx - 6, halfH - 2);
@@ -2673,11 +3144,37 @@ export default function App() {
       }
       ctx.stroke();
 
+      const isSpeedBoost =
+        sim.speedBoostTimer > 0 && statusRef.current === 'PLAYING';
+
       for (const s of sim.stars) {
-        ctx.fillStyle = `rgba(226, 232, 240, ${s.alpha})`;
+        ctx.fillStyle = isSpeedBoost
+          ? `rgba(167, 243, 208, ${Math.min(0.85, s.alpha * 1.6)})`
+          : `rgba(226, 232, 240, ${s.alpha})`;
         ctx.beginPath();
-        ctx.arc(s.x, s.y, s.r, 0, Math.PI * 2);
-        ctx.fill();
+        if (isSpeedBoost) {
+          ctx.fillRect(s.x - s.r * 0.5, s.y - s.r * 5, s.r, s.r * 9);
+        } else {
+          ctx.arc(s.x, s.y, s.r, 0, Math.PI * 2);
+          ctx.fill();
+        }
+      }
+
+      // Subtle emerald turbo edge streaks during +100% (2x) speed boost
+      if (isSpeedBoost) {
+        const boostFade = Math.min(1, sim.speedBoostTimer / 0.4);
+        const turboVignette = ctx.createRadialGradient(
+          width / 2,
+          height / 2,
+          Math.min(width, height) * 0.32,
+          width / 2,
+          height / 2,
+          Math.max(width, height) * 0.72
+        );
+        turboVignette.addColorStop(0, 'rgba(16, 185, 129, 0)');
+        turboVignette.addColorStop(1, `rgba(16, 185, 129, ${0.18 * boostFade})`);
+        ctx.fillStyle = turboVignette;
+        ctx.fillRect(0, 0, width, height);
       }
 
       const railY = sim.playerY + sim.playerHeight / 2 + 10;
@@ -2695,9 +3192,9 @@ export default function App() {
         sim.playerX + sim.playerWidth * 0.9,
         railY
       );
-      railGlow.addColorStop(0, 'rgba(56, 189, 248, 0)');
-      railGlow.addColorStop(0.5, 'rgba(125, 211, 252, 0.95)');
-      railGlow.addColorStop(1, 'rgba(56, 189, 248, 0)');
+      railGlow.addColorStop(0, isSpeedBoost ? 'rgba(16, 185, 129, 0)' : 'rgba(56, 189, 248, 0)');
+      railGlow.addColorStop(0.5, isSpeedBoost ? 'rgba(52, 211, 153, 0.95)' : 'rgba(125, 211, 252, 0.95)');
+      railGlow.addColorStop(1, isSpeedBoost ? 'rgba(16, 185, 129, 0)' : 'rgba(56, 189, 248, 0)');
       ctx.strokeStyle = railGlow;
       ctx.lineWidth = 3;
       ctx.beginPath();
@@ -2708,12 +3205,16 @@ export default function App() {
       for (const item of sim.items) {
         if (item.kind === 'pink_circle') {
           drawPinkCircle(item);
+        } else if (item.kind === 'green_circle') {
+          drawGreenCircle(item);
         } else if (item.kind === 'blue_triangle') {
           drawBlueTriangle(item);
         } else if (item.kind === 'hazard_square') {
           drawHazardSquare(item);
         } else if (item.kind === 'hazard_star') {
           drawHazardStar(item);
+        } else if (item.kind === 'hazard_arrow') {
+          drawHazardArrow(item);
         } else {
           drawHazardSpike(item);
         }
@@ -2767,6 +3268,45 @@ export default function App() {
         ctx.fillStyle = '#94a3b8';
         ctx.font = '600 12px "Segoe UI", system-ui, sans-serif';
         ctx.fillText(sim.stageBannerSub, width / 2, by + 39);
+        ctx.restore();
+      }
+
+      // Non-blocking 2x Speed Boost + 50% Slow Move Countdown Bar at top-center
+      if (isSpeedBoost) {
+        ctx.save();
+        const barW = Math.min(256, width - 32);
+        const barH = 30;
+        const bx = (width - barW) / 2;
+        const by = 14;
+        const frac = Math.max(0, Math.min(1, sim.speedBoostTimer / SPEED_BOOST_DURATION));
+
+        drawRoundedRectPath(ctx, bx, by, barW, barH, 8);
+        ctx.fillStyle = 'rgba(6, 44, 34, 0.88)';
+        ctx.fill();
+        ctx.strokeStyle = 'rgba(52, 211, 153, 0.65)';
+        ctx.lineWidth = 1.4;
+        ctx.stroke();
+
+        // Progress fill track at bottom of badge
+        const trackX = bx + 10;
+        const trackY = by + barH - 6.5;
+        const trackW = barW - 20;
+        drawRoundedRectPath(ctx, trackX, trackY, trackW, 3.5, 1.75);
+        ctx.fillStyle = 'rgba(15, 23, 42, 0.75)';
+        ctx.fill();
+        drawRoundedRectPath(ctx, trackX, trackY, trackW * frac, 3.5, 1.75);
+        ctx.fillStyle = '#34d399';
+        ctx.fill();
+
+        ctx.fillStyle = '#d1fae5';
+        ctx.font = '700 11.5px "Segoe UI", system-ui, sans-serif';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        const label =
+          langRef.current === 'ar'
+            ? `⚡ سرعة ×2 · مشية -50% · ${sim.speedBoostTimer.toFixed(1)}ث`
+            : `⚡ 2x WORLD · -50% MOVE · ${sim.speedBoostTimer.toFixed(1)}s`;
+        ctx.fillText(label, width / 2, by + 12.5);
         ctx.restore();
       }
 
@@ -3072,33 +3612,33 @@ export default function App() {
 
             <div className="h-3.5 sm:h-4 w-px bg-white/10 shrink-0" aria-hidden="true" />
 
-            {/* Lives */}
+            {/* Lives (10-heart pool + live 5-min regen countdown) */}
             <div
-              className="flex items-center gap-1 whitespace-nowrap"
+              className="flex items-center gap-1.5 whitespace-nowrap"
               aria-label={`${t.lives}: ${lives}/${MAX_LIVES}`}
             >
-              <div className="flex items-center gap-0.5 sm:gap-1" aria-hidden="true">
-                {Array.from({ length: MAX_LIVES }).map((_, idx) => {
-                  const active = idx < lives;
-                  return (
-                    <svg
-                      key={idx}
-                      viewBox="0 0 24 24"
-                      className={`w-3.5 h-3.5 sm:w-4 sm:h-4 lg:w-5 lg:h-5 transition-transform duration-150 ${
-                        active
-                          ? 'text-rose-500 scale-100'
-                          : 'text-slate-700 scale-90'
-                      }`}
-                      fill="currentColor"
-                    >
-                      <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z" />
-                    </svg>
-                  );
-                })}
-              </div>
-              <span className="font-num text-[11px] sm:text-xs font-semibold text-slate-300 md:hidden lg:inline">
+              <svg
+                viewBox="0 0 24 24"
+                className={`w-4 h-4 sm:w-4.5 sm:h-4.5 shrink-0 ${
+                  lives > 0 ? 'text-rose-500' : 'text-slate-600'
+                }`}
+                fill="currentColor"
+                aria-hidden="true"
+              >
+                <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z" />
+              </svg>
+              <span
+                className={`font-num text-xs sm:text-sm lg:text-base font-bold ${
+                  lives > 0 ? 'text-rose-300' : 'text-slate-400'
+                }`}
+              >
                 {lives}/{MAX_LIVES}
               </span>
+              {lives < MAX_LIVES && (
+                <span className="font-num text-[10px] sm:text-xs font-semibold text-sky-300 bg-sky-500/15 border border-sky-400/25 rounded px-1.5 py-0.5">
+                  {formatCountdown(nextHeartInMs)}
+                </span>
+              )}
             </div>
           </div>
         </div>
@@ -3257,12 +3797,25 @@ export default function App() {
                   </div>
                 </div>
 
+                {lives <= 0 && (
+                  <p className="text-xs sm:text-sm font-semibold text-rose-300 mb-3">
+                    {t.noHeartsNotice(formatCountdown(nextHeartInMs))}
+                  </p>
+                )}
+
                 <button
                   type="button"
+                  disabled={lives <= 0}
                   onClick={resetAndStartGame}
-                  className="w-full sm:w-auto min-w-[200px] px-8 py-3.5 rounded-lg bg-sky-500 hover:bg-sky-400 active:scale-[0.98] text-slate-950 font-bold text-base transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-300 focus-visible:ring-offset-2 focus-visible:ring-offset-[#0f1a2e] whitespace-nowrap cursor-pointer"
+                  className={`w-full sm:w-auto min-w-[200px] px-8 py-3.5 rounded-lg font-bold text-base transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-300 focus-visible:ring-offset-2 focus-visible:ring-offset-[#0f1a2e] whitespace-nowrap ${
+                    lives <= 0
+                      ? 'bg-slate-700 text-slate-300 cursor-not-allowed'
+                      : 'bg-sky-500 hover:bg-sky-400 active:scale-[0.98] text-slate-950 cursor-pointer'
+                  }`}
                 >
-                  {t.startBtn}
+                  {lives <= 0
+                    ? t.waitHeartBtn(formatCountdown(nextHeartInMs))
+                    : t.startBtn}
                 </button>
               </div>
             </div>
@@ -3342,10 +3895,17 @@ export default function App() {
 
                 <button
                   type="button"
+                  disabled={lives <= 0}
                   onClick={proceedToNextStage}
-                  className="w-full sm:w-auto min-w-[220px] px-8 py-3.5 rounded-lg bg-sky-500 hover:bg-sky-400 active:scale-[0.98] text-slate-950 font-bold text-base transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-300 focus-visible:ring-offset-2 focus-visible:ring-offset-[#0f1a2e] whitespace-nowrap cursor-pointer"
+                  className={`w-full sm:w-auto min-w-[220px] px-8 py-3.5 rounded-lg font-bold text-base transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-300 focus-visible:ring-offset-2 focus-visible:ring-offset-[#0f1a2e] whitespace-nowrap ${
+                    lives <= 0
+                      ? 'bg-slate-700 text-slate-300 cursor-not-allowed'
+                      : 'bg-sky-500 hover:bg-sky-400 active:scale-[0.98] text-slate-950 cursor-pointer'
+                  }`}
                 >
-                  {t.nextStageBtn(stageNum + 1)}
+                  {lives <= 0
+                    ? t.waitHeartBtn(formatCountdown(nextHeartInMs))
+                    : t.nextStageBtn(stageNum + 1)}
                 </button>
               </div>
             </div>
@@ -3415,16 +3975,29 @@ export default function App() {
                     </span>
                   </div>
 
+                  {lives <= 0 && (
+                    <p className="text-xs sm:text-sm font-semibold text-rose-300 mb-3">
+                      {t.noHeartsNotice(formatCountdown(nextHeartInMs))}
+                    </p>
+                  )}
+
                   <button
                     type="button"
+                    disabled={lives <= 0}
                     onClick={
                       status === 'GAME_OVER'
                         ? retryCurrentStage
                         : resetAndStartGame
                     }
-                    className="w-full sm:w-auto min-w-[200px] px-8 py-3.5 rounded-lg bg-sky-500 hover:bg-sky-400 active:scale-[0.98] text-slate-950 font-bold text-base transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-300 focus-visible:ring-offset-2 focus-visible:ring-offset-[#0f1a2e] whitespace-nowrap cursor-pointer"
+                    className={`w-full sm:w-auto min-w-[200px] px-8 py-3.5 rounded-lg font-bold text-base transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-300 focus-visible:ring-offset-2 focus-visible:ring-offset-[#0f1a2e] whitespace-nowrap ${
+                      lives <= 0
+                        ? 'bg-slate-700 text-slate-300 cursor-not-allowed'
+                        : 'bg-sky-500 hover:bg-sky-400 active:scale-[0.98] text-slate-950 cursor-pointer'
+                    }`}
                   >
-                    {t.playAgainBtn}
+                    {lives <= 0
+                      ? t.waitHeartBtn(formatCountdown(nextHeartInMs))
+                      : t.playAgainBtn}
                   </button>
                 </div>
               </div>
@@ -3466,27 +4039,33 @@ export default function App() {
                 </div>
 
                 <div className="px-5 pt-3 pb-5 overflow-y-auto">
-                  <p className="text-xs sm:text-sm text-slate-300 mb-4">
+                  <p className="text-xs sm:text-sm text-slate-300 mb-3">
                     {t.stagesModalHint}
                   </p>
+                  {lives <= 0 && (
+                    <p className="text-xs sm:text-sm font-semibold text-rose-300 mb-3">
+                      {t.noHeartsNotice(formatCountdown(nextHeartInMs))}
+                    </p>
+                  )}
 
                   <div className="grid grid-cols-4 sm:grid-cols-5 gap-2.5">
                     {STAGES.map((cfg) => {
                       const isCurrent = cfg.stage === stageNum;
                       const isCompleted = completedStages.includes(cfg.stage);
                       const unlocked = isStageUnlocked(cfg.stage, completedStages);
+                      const canEnter = unlocked && lives > 0;
                       return (
                         <button
                           key={cfg.stage}
                           type="button"
-                          disabled={!unlocked}
+                          disabled={!canEnter}
                           aria-label={
                             unlocked
                               ? `${t.stageBanner(cfg.stage)} — ${cfg.pointsNeeded} ${t.ptsShort}`
                               : t.lockedStageAria(cfg.stage)
                           }
                           onClick={() => {
-                            if (unlocked) startAtStage(cfg.stage);
+                            if (canEnter) startAtStage(cfg.stage);
                           }}
                           className={`relative flex flex-col items-center justify-center py-3 px-2 rounded-lg border transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400 ${
                             !unlocked
@@ -3723,6 +4302,27 @@ export default function App() {
                                   4
                                 </text>
                               </svg>
+                            ) : entry.kind === 'green_circle' ? (
+                              <svg viewBox="0 0 24 24" className="w-8 h-8">
+                                <circle
+                                  cx="12"
+                                  cy="12"
+                                  r="9.5"
+                                  fill="#059669"
+                                  stroke="#a7f3d0"
+                                  strokeWidth="1.8"
+                                />
+                                <text
+                                  x="12"
+                                  y="16"
+                                  textAnchor="middle"
+                                  fill="#ffffff"
+                                  fontSize="11"
+                                  fontWeight="800"
+                                >
+                                  2
+                                </text>
+                              </svg>
                             ) : entry.kind === 'hazard_spike' ? (
                               <svg viewBox="0 0 24 24" className="w-8 h-8">
                                 <polygon
@@ -3759,6 +4359,24 @@ export default function App() {
                                 >
                                   ❄
                                 </text>
+                              </svg>
+                            ) : entry.kind === 'hazard_arrow' ? (
+                              <svg viewBox="0 0 24 24" className="w-8 h-8">
+                                <polygon
+                                  points="12,22 20,11 15,11 15.5,2 12,4.5 8.5,2 9,11 4,11"
+                                  fill="#dc2626"
+                                  stroke="#fecaca"
+                                  strokeWidth="1.5"
+                                  strokeLinejoin="round"
+                                />
+                                <line
+                                  x1="12"
+                                  y1="4.5"
+                                  x2="12"
+                                  y2="20"
+                                  stroke="#fee2e2"
+                                  strokeWidth="1.2"
+                                />
                               </svg>
                             ) : (
                               <svg viewBox="0 0 24 24" className="w-8 h-8">
@@ -3800,6 +4418,8 @@ export default function App() {
                                         ? 'text-pink-300'
                                         : entry.kind === 'blue_triangle'
                                         ? 'text-sky-300'
+                                        : entry.kind === 'green_circle'
+                                        ? 'text-emerald-300'
                                         : 'text-rose-400'
                                     }`}
                                   >
