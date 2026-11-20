@@ -1,5 +1,6 @@
 import React from 'react';
 import { CornIcon } from './fruitWorld';
+import { DIAMOND_COST_COINS, DiamondIcon } from './goldWorld';
 
 export type CatcherSkinId = 'classic' | 'gold' | 'emerald' | 'royal' | 'ufo';
 export type PlusPointSkinId = 'classic' | 'gems' | 'stars' | 'hearts' | 'coins';
@@ -13,8 +14,10 @@ export type SupplyId =
   | 'shield'
   | 'full_hearts'
   | 'full_corn'
+  | 'full_diamonds'
   | 'one_heart'
-  | 'one_corn';
+  | 'one_corn'
+  | 'one_diamond';
 export type ShopTab = 'skins' | 'points' | 'supplies';
 export type PointsSubTab = 'plus' | 'minus';
 
@@ -113,19 +116,27 @@ export const SUPPLY_CATALOG: SupplyDefinition[] = [
   },
   {
     id: 'one_heart',
-    price: 13,
-    nameAr: '+1 قلب فوري',
-    nameEn: '+1 Instant Heart',
-    descAr: 'يضيف قلباً واحداً فوراً إلى رصيد القلوب في المراحل العادية.',
-    descEn: 'Instantly adds 1 heart to your Normal Stages lives pool.',
+    price: 5,
+    nameAr: '+1 قلب',
+    nameEn: '+1 Heart',
+    descAr: 'يضيف قلباً واحداً فوراً مقابل 5 فلوس (وإذا امتلأت القلوب يُخزَّن في الحقيبة).',
+    descEn: 'Adds 1 heart for 5 coins (stores in your Bag if hearts are already full).',
   },
   {
     id: 'one_corn',
-    price: 13,
-    nameAr: '+1 ذرة فورية',
-    nameEn: '+1 Instant Corn',
-    descAr: 'يضيف ذرة واحدة فوراً إلى رصيد الذرة في عالم الفواكه.',
-    descEn: 'Instantly adds 1 corn life to your Fruit World pool.',
+    price: 5,
+    nameAr: '+1 ذرة',
+    nameEn: '+1 Corn',
+    descAr: 'يضيف ذرة واحدة فوراً مقابل 5 فلوس (وإذا امتلأت الذرة تُخزَّن في الحقيبة).',
+    descEn: 'Adds 1 corn for 5 coins (stores in your Bag if corn is already full).',
+  },
+  {
+    id: 'one_diamond',
+    price: DIAMOND_COST_COINS,
+    nameAr: '+1 ألماسة',
+    nameEn: '+1 Diamond',
+    descAr: 'يضيف ألماسة (قلب) واحدة فوراً مقابل 5 فلوس (وإذا امتلأ الألماس يُخزَّن في الحقيبة).',
+    descEn: 'Adds 1 diamond for 5 coins (stores in your Bag if diamonds are already full).',
   },
   {
     id: 'full_hearts',
@@ -142,6 +153,14 @@ export const SUPPLY_CATALOG: SupplyDefinition[] = [
     nameEn: 'Full Corn Refill',
     descAr: 'يعبّئ رصيد الذرة في عالم الفواكه بالكامل إلى 10/10 دفعة واحدة.',
     descEn: 'Refills your entire Fruit World corn pool back to 10/10.',
+  },
+  {
+    id: 'full_diamonds',
+    price: 100,
+    nameAr: 'تعبئة الألماس (10/10)',
+    nameEn: 'Full Diamonds Refill',
+    descAr: 'يعبّئ رصيد الألماس في مراحل الذهب بالكامل إلى 10/10 دفعة واحدة.',
+    descEn: 'Refills your entire Gold Stages diamond pool back to 10/10.',
   },
 ];
 
@@ -626,14 +645,52 @@ export function drawCustomPlusPoint(
 ): void {
   const isGreen = item.kind === 'green_circle';
   const isBlue = item.kind === 'blue_triangle';
-  const label = isBlue ? '+3' : isGreen ? '+2' : '+1';
+  const isPurple = item.kind === 'purple_diamond';
+  const isGold = item.kind === 'gold_star';
+  const label = isGold
+    ? '+7'
+    : isPurple
+    ? '+5'
+    : isBlue
+    ? '+4'
+    : isGreen
+    ? '+2'
+    : '+3';
   const r = item.radius;
   const pulse = 1 + Math.sin(item.pulsePhase) * 0.06;
 
-  const light = isBlue ? '#e0f2fe' : isGreen ? '#d1fae5' : '#fce7f3';
-  const mid = isBlue ? '#38bdf8' : isGreen ? '#10b981' : '#f472b6';
-  const deep = isBlue ? '#0369a1' : isGreen ? '#047857' : '#be185d';
-  const glow = isBlue
+  const light = isGold
+    ? '#fef9c3'
+    : isPurple
+    ? '#f3e8ff'
+    : isBlue
+    ? '#e0f2fe'
+    : isGreen
+    ? '#d1fae5'
+    : '#fce7f3';
+  const mid = isGold
+    ? '#fbbf24'
+    : isPurple
+    ? '#c084fc'
+    : isBlue
+    ? '#38bdf8'
+    : isGreen
+    ? '#10b981'
+    : '#f472b6';
+  const deep = isGold
+    ? '#b45309'
+    : isPurple
+    ? '#6b21a8'
+    : isBlue
+    ? '#0369a1'
+    : isGreen
+    ? '#047857'
+    : '#be185d';
+  const glow = isGold
+    ? 'rgba(251, 191, 36, 0.58)'
+    : isPurple
+    ? 'rgba(192, 132, 252, 0.54)'
+    : isBlue
     ? 'rgba(56, 189, 248, 0.5)'
     : isGreen
     ? 'rgba(16, 185, 129, 0.52)'
@@ -776,13 +833,28 @@ export function drawCustomMinusPoint(
 ): void {
   const isHeavy = item.kind === 'hazard_square';
   const isFreeze = item.kind === 'hazard_star';
-  const isArrow = item.kind === 'hazard_arrow';
+  const isAmberArrow = item.kind === 'hazard_arrow_amber';
+  const isVioletArrow = item.kind === 'hazard_arrow_violet';
+  const isArrow =
+    item.kind === 'hazard_arrow' || isAmberArrow || isVioletArrow;
   const r = item.radius;
   const pulse = 1 + Math.sin(item.pulsePhase * 1.2) * 0.05;
 
-  const rimColor = isFreeze ? '#7dd3fc' : isHeavy ? '#fca5a5' : '#fecaca';
+  const rimColor = isFreeze
+    ? '#7dd3fc'
+    : isAmberArrow
+    ? '#fde68a'
+    : isVioletArrow
+    ? '#e9d5ff'
+    : isHeavy
+    ? '#fca5a5'
+    : '#fecaca';
   const glowColor = isFreeze
     ? 'rgba(56, 189, 248, 0.45)'
+    : isAmberArrow
+    ? 'rgba(245, 158, 11, 0.52)'
+    : isVioletArrow
+    ? 'rgba(168, 85, 247, 0.52)'
     : isHeavy
     ? 'rgba(220, 38, 38, 0.58)'
     : 'rgba(239, 68, 68, 0.48)';
@@ -791,11 +863,25 @@ export function drawCustomMinusPoint(
   ctx.translate(item.x, item.y);
   ctx.scale(pulse, pulse);
 
-  // Speed trail for fast hazard_arrow
+  // Speed trail for arrow hazards
   if (isArrow) {
     const trailGrad = ctx.createLinearGradient(0, -r * 2.4, 0, -r * 0.4);
-    trailGrad.addColorStop(0, 'rgba(239, 68, 68, 0)');
-    trailGrad.addColorStop(1, 'rgba(248, 113, 113, 0.55)');
+    trailGrad.addColorStop(
+      0,
+      isAmberArrow
+        ? 'rgba(245, 158, 11, 0)'
+        : isVioletArrow
+        ? 'rgba(168, 85, 247, 0)'
+        : 'rgba(239, 68, 68, 0)'
+    );
+    trailGrad.addColorStop(
+      1,
+      isAmberArrow
+        ? 'rgba(251, 191, 36, 0.55)'
+        : isVioletArrow
+        ? 'rgba(192, 132, 252, 0.55)'
+        : 'rgba(248, 113, 113, 0.55)'
+    );
     ctx.fillStyle = trailGrad;
     ctx.beginPath();
     ctx.moveTo(-r * 0.45, -r * 0.3);
@@ -975,6 +1061,22 @@ export function drawCustomMinusPoint(
     ctx.shadowColor = 'rgba(2, 132, 199, 0.9)';
     ctx.shadowBlur = 5;
     ctx.fillText('❄', 0, 1);
+  } else if (isAmberArrow) {
+    ctx.fillStyle = '#fef3c7';
+    ctx.font = `900 ${Math.max(9.5, Math.round(r * 0.58))}px "Segoe UI", system-ui, sans-serif`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.shadowColor = 'rgba(120, 53, 15, 0.9)';
+    ctx.shadowBlur = 4;
+    ctx.fillText('-2', 0, 1);
+  } else if (isVioletArrow) {
+    ctx.fillStyle = '#f3e8ff';
+    ctx.font = `900 ${Math.max(10, Math.round(r * 0.62))}px "Segoe UI", system-ui, sans-serif`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.shadowColor = 'rgba(88, 28, 135, 0.9)';
+    ctx.shadowBlur = 4;
+    ctx.fillText('▼', 0, 1);
   } else if (skin === 'bombs') {
     ctx.fillStyle = '#fecaca';
     ctx.font = `900 ${Math.max(10, Math.round(r * 0.56))}px "Segoe UI", system-ui, sans-serif`;
@@ -1043,6 +1145,9 @@ function SupplyArt({ id }: { id: SupplyId }) {
   }
   if (id === 'one_corn' || id === 'full_corn') {
     return <CornIcon className="w-7 h-7" />;
+  }
+  if (id === 'one_diamond' || id === 'full_diamonds') {
+    return <DiamondIcon className="w-7 h-7" />;
   }
   return (
     <svg viewBox="0 0 24 24" className="w-7 h-7 text-rose-500" fill="currentColor">
@@ -1181,6 +1286,8 @@ interface ShopModalProps {
   maxLives: number;
   corn: number;
   maxCorn: number;
+  diamonds: number;
+  maxDiamonds: number;
   shop: ShopState;
   activeTab: ShopTab;
   pointsSubTab: PointsSubTab;
@@ -1200,6 +1307,8 @@ export function ShopModal({
   maxLives,
   corn,
   maxCorn,
+  diamonds,
+  maxDiamonds,
   shop,
   activeTab,
   pointsSubTab,
@@ -1542,10 +1651,9 @@ export function ShopModal({
               {SUPPLY_CATALOG.map((sup) => {
                 const isFull =
                   (sup.id === 'shield' && shop.shields >= MAX_SHIELDS) ||
-                  ((sup.id === 'one_heart' || sup.id === 'full_hearts') &&
-                    lives >= maxLives) ||
-                  ((sup.id === 'one_corn' || sup.id === 'full_corn') &&
-                    corn >= maxCorn);
+                  (sup.id === 'full_hearts' && lives >= maxLives) ||
+                  (sup.id === 'full_corn' && corn >= maxCorn) ||
+                  (sup.id === 'full_diamonds' && diamonds >= maxDiamonds);
                 const canAfford = !isFull && coins >= sup.price;
                 const stockText =
                   sup.id === 'shield'
@@ -1556,9 +1664,13 @@ export function ShopModal({
                     ? isAr
                       ? `القلوب ${lives}/${maxLives}`
                       : `Hearts ${lives}/${maxLives}`
+                    : sup.id === 'one_corn' || sup.id === 'full_corn'
+                    ? isAr
+                      ? `الذرة ${corn}/${maxCorn}`
+                      : `Corn ${corn}/${maxCorn}`
                     : isAr
-                    ? `الذرة ${corn}/${maxCorn}`
-                    : `Corn ${corn}/${maxCorn}`;
+                    ? `الألماس ${diamonds}/${maxDiamonds}`
+                    : `Diamonds ${diamonds}/${maxDiamonds}`;
 
                 return (
                   <div

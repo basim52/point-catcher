@@ -18,11 +18,32 @@ import {
   FruitItemKind,
   FruitRenderItem,
   GameMode,
+  getFruitStageClearCoins,
   initFruitBgMotifs,
   MAX_CORN,
   TOTAL_FRUIT_STAGES,
   VALID_FRUIT_KINDS,
 } from './fruitWorld';
+import {
+  DIAMOND_COST_COINS,
+  DiamondIcon,
+  drawGoldBackground,
+  drawGoldCanvasItem,
+  drawGoldTreasureCatcher,
+  getGoldStageClearCoins,
+  GOLD_INDEX_CATALOG,
+  GOLD_ITEM_STATS,
+  GOLD_STAGES,
+  GOLD_UNLOCK_COST,
+  GoldBgMotif,
+  GoldIndexIcon,
+  GoldItemKind,
+  GoldRenderItem,
+  initGoldBgMotifs,
+  MAX_DIAMONDS,
+  TOTAL_GOLD_STAGES,
+  VALID_GOLD_KINDS,
+} from './goldWorld';
 import {
   CatcherSkinId,
   drawCatcherShieldBubble,
@@ -59,11 +80,15 @@ type ItemKind =
   | 'pink_circle'
   | 'blue_triangle'
   | 'green_circle'
+  | 'purple_diamond'
+  | 'gold_star'
   | 'hazard_spike'
   | 'hazard_square'
   | 'hazard_star'
-  | 'hazard_arrow';
-type AnyItemKind = ItemKind | FruitItemKind;
+  | 'hazard_arrow'
+  | 'hazard_arrow_amber'
+  | 'hazard_arrow_violet';
+type AnyItemKind = ItemKind | FruitItemKind | GoldItemKind;
 type IndexTab = 'positive' | 'negative';
 
 interface IndexEntry {
@@ -136,15 +161,23 @@ interface AmbientStar {
 
 const MAX_LIVES = 10;
 const HEART_REGEN_MS = 5 * 60 * 1000;
-const HEART_COST_COINS = 13;
+const HEART_COST_COINS = 5;
 const TOTAL_STAGES = 50;
 const PINK_CIRCLE_POINTS = 3;
 const BLUE_TRIANGLE_POINTS = 4;
 const GREEN_CIRCLE_POINTS = 2;
+const PURPLE_DIAMOND_POINTS = 5;
+const GOLD_STAR_POINTS = 7;
 const SPEED_BOOST_DURATION = 5.0;
 const SPEED_BOOST_MULTIPLIER = 2.0;
 const SPEED_BOOST_PLAYER_SLOW = 0.5;
 const ARROW_SPEED_MULTIPLIER = 2.5;
+const AMBER_ARROW_SPEED_MULTIPLIER = 1.22;
+const AMBER_ARROW_POINT_PENALTY = 2;
+const VIOLET_ARROW_SPEED_MULTIPLIER = 1.3;
+const VIOLET_ARROW_POINT_PENALTY = 1;
+const VIOLET_ARROW_SLOW_DURATION = 2.5;
+const VIOLET_ARROW_SLOW_FACTOR = 0.7;
 const FREEZE_STAR_POINTS = 3;
 const FREEZE_DURATION = 4.0;
 const BEST_SCORE_STORAGE_KEY = 'point_catcher_best_score_v1';
@@ -156,9 +189,20 @@ const FRUIT_UNLOCKED_STORAGE_KEY = 'point_catcher_fruit_unlocked_v1';
 const COMPLETED_FRUIT_STAGES_STORAGE_KEY = 'point_catcher_completed_fruit_stages_v1';
 const DISCOVERED_FRUIT_ITEMS_STORAGE_KEY = 'point_catcher_discovered_fruit_items_v1';
 const CORN_STATE_STORAGE_KEY = 'point_catcher_corn_state_v1';
+const GOLD_UNLOCKED_STORAGE_KEY = 'point_catcher_gold_unlocked_v1';
+const COMPLETED_GOLD_STAGES_STORAGE_KEY = 'point_catcher_completed_gold_stages_v1';
+const DISCOVERED_GOLD_ITEMS_STORAGE_KEY = 'point_catcher_discovered_gold_items_v1';
+const DIAMONDS_STATE_STORAGE_KEY = 'point_catcher_diamonds_state_v1';
+const BAG_STORAGE_KEY = 'point_catcher_bag_v1';
 const SFX_STORAGE_KEY = 'point_catcher_sfx_v1';
 const MUSIC_STORAGE_KEY = 'point_catcher_music_v1';
 const LANG_STORAGE_KEY = 'point_catcher_lang_v1';
+
+interface BagState {
+  hearts: number;
+  corn: number;
+  diamonds: number;
+}
 
 const INDEX_CATALOG: IndexEntry[] = [
   {
@@ -190,6 +234,26 @@ const INDEX_CATALOG: IndexEntry[] = [
     valueEn: '+2 pts · 2x World · -50% Move',
     benefitAr: 'تزيد نقاطك بمقدار نقطتين وتسرّع كل شيء في اللعبة بنسبة 100% لمدة 5 ثوانٍ، لكنها تبطّئ مشيتك بنسبة 50%.',
     benefitEn: 'Adds 2 points and speeds up everything by 100% for 5 seconds, while slowing your movement by 50%.',
+  },
+  {
+    kind: 'purple_diamond',
+    category: 'positive',
+    nameAr: 'المعيّن البنفسجي',
+    nameEn: 'Purple Diamond',
+    valueAr: '+5 نقاط · مرحلة 20+ · 5%',
+    valueEn: '+5 pts · Stage 20+ · 5%',
+    benefitAr: 'نقطة كريستالية نادرة تبدأ بالظهور من المرحلة 20 بنسبة ظهور 5% وتمنحك 5 نقاط دفعة واحدة.',
+    benefitEn: 'Rare crystal point starting at Stage 20 with a 5% spawn rate that grants 5 points at once.',
+  },
+  {
+    kind: 'gold_star',
+    category: 'positive',
+    nameAr: 'النجمة الذهبية',
+    nameEn: 'Golden Star',
+    valueAr: '+7 نقاط · مرحلة 20+ · 5%',
+    valueEn: '+7 pts · Stage 20+ · 5%',
+    benefitAr: 'أقوى نقطة في المراحل العادية — تبدأ بالظهور من المرحلة 20 بنسبة ظهور 5% وتزيد نقاطك بمقدار 7 نقاط!',
+    benefitEn: 'Highest-value Normal point — starts at Stage 20 with a 5% spawn rate and awards 7 points on catch!',
   },
   {
     kind: 'hazard_spike',
@@ -230,6 +294,26 @@ const INDEX_CATALOG: IndexEntry[] = [
     valueEn: '-1 Life · +150% Speed',
     benefitAr: 'سهم أحمر ينزل بسرعة أكبر من الباقي بنسبة 150% (×2.5) وينقص قلباً واحداً عند لمسه.',
     benefitEn: 'Blazing red arrow falling 150% faster (2.5x) than normal items; removes 1 heart on impact.',
+  },
+  {
+    kind: 'hazard_arrow_amber',
+    category: 'negative',
+    nameAr: 'السهم البرتقالي المائل',
+    nameEn: 'Amber Slant Arrow',
+    valueAr: '-2 نقاط · مرحلة 3+',
+    valueEn: '-2 pts · Stage 3+',
+    benefitAr: 'سهم خفيف ينزل بزاوية مائلة وبسرعة معتدلة؛ لا ينقص القلوب بل يخصم نقطتين فقط من رصيد المرحلة (من المرحلة 3).',
+    benefitEn: 'Mild slanted arrow at moderate speed; spares your hearts and only deducts 2 stage points (Stage 3+).',
+  },
+  {
+    kind: 'hazard_arrow_violet',
+    category: 'negative',
+    nameAr: 'السهم البنفسجي المبطّئ',
+    nameEn: 'Violet Slow Arrow',
+    valueAr: 'تبطيء 2.5ث · -1 نقطة · مرحلة 6+',
+    valueEn: 'Slow 2.5s · -1 pt · Stage 6+',
+    benefitAr: 'سهم معتدل السرعة لا ينقص القلوب؛ يخصم نقطة واحدة ويبطّئ حركتك قليلاً (-30%) لمدة 2.5 ثانية (من المرحلة 6).',
+    benefitEn: 'Moderate-speed arrow that spares your hearts; deducts 1 point and gently slows movement (-30%) for 2.5s (Stage 6+).',
   },
 ];
 
@@ -325,10 +409,10 @@ const COPY = {
     noHeartsNotice: (timer: string) => `نفدت القلوب — يتجدد القلب القادم خلال ${timer}`,
     waitHeartBtn: (timer: string) => `انتظر تجدد القلب (${timer})`,
     nextHeartShort: (timer: string) => `+1♥ خلال ${timer}`,
-    buyHeartBtn: '+1 قلب (13 فلوس)',
-    buyHeartAria: 'شراء قلب واحد مقابل 13 فلوس',
+    buyHeartBtn: `+1 قلب (${HEART_COST_COINS} فلوس)`,
+    buyHeartAria: `شراء قلب واحد مقابل ${HEART_COST_COINS} فلوس`,
     heartsFullTip: 'القلوب ممتلئة (10/10)',
-    needCoinsTip: 'تحتاج 13 فلوس لشراء قلب',
+    needCoinsTip: `تحتاج ${HEART_COST_COINS} فلوس لشراء قلب`,
     lockedStageAria: (n: number) => `المرحلة ${n} مقفلة`,
     indexBtn: 'الاندكس',
     indexModalTitle: 'الاندكس',
@@ -340,6 +424,22 @@ const COPY = {
     indexLockedBadge: 'مقفول',
     indexLockedDesc: 'لم يُكتشف بعد — ينفتح وتظهر فائدته عندما تلتقطه أو تلمسه.',
     shopBtn: 'المتجر',
+    bagBtn: 'الحقيبة',
+    bagTitle: 'الحقيبة',
+    bagDesc: 'خزّن القلوب والذرة والألماس في حقيبتك، واضغط «استخدام» في أي وقت لزيادة رصيدك بـ +1.',
+    bagInBagLabel: 'في الحقيبة',
+    bagActiveLabel: 'الحالي',
+    bagUseBtn: 'استخدام (+1)',
+    bagStoreBtn: 'تخزين +1',
+    bagBuyBtn: `شراء للحقيبة (${HEART_COST_COINS} فلوس)`,
+    bagFullBadge: 'ممتلئ 10/10',
+    bagEmptyHint: 'فارغ',
+    bagHeartsTitle: 'القلوب المخزّنة',
+    bagHeartsSub: 'للمراحل العادية',
+    bagCornTitle: 'الذرة المخزّنة',
+    bagCornSub: 'لمراحل الفواكه',
+    bagDiamondsTitle: 'الألماس المخزّن',
+    bagDiamondsSub: 'لمراحل الذهب',
     settingsBtn: 'الإعدادات',
     settingsTitle: 'الإعدادات',
     musicLabel: 'الموسيقى الحماسية',
@@ -372,13 +472,13 @@ const COPY = {
     fruitUnlockBtn: `فتح مراحل الفواكه (${FRUIT_UNLOCK_COST} فلوس)`,
     fruitNeedCoins: (need: number) => `تحتاج ${need} فلوس إضافية لفتح مراحل الفواكه`,
     fruitStagesModalHint:
-      '15 مرحلة للفواكه — الخضار تنقص النقاط والذرة (10 ذرة تتجدد كل 5 دقائق). مكافأة أول فوز: 1–3 ذرة = 1، 4–7 = 2، 8–10 = 4 فلوس.',
+      '15 مرحلة للفواكه — الخضار تنقص النقاط والذرة (10 ذرة تتجدد كل 5 دقائق). مكافأة أول فوز: ذرة واحدة = 3 · ذرتان = 6 · 3+ ذرات = 9 فلوس.',
     noCornNotice: (timer: string) => `نفدت الذرة — تتجدد الذرة القادمة خلال ${timer}`,
     waitCornBtn: (timer: string) => `انتظر تجدد الذرة (${timer})`,
-    buyCornBtn: '+1 ذرة (13 فلوس)',
-    buyCornAria: 'شراء ذرة واحدة مقابل 13 فلوس',
+    buyCornBtn: `+1 ذرة (${HEART_COST_COINS} فلوس)`,
+    buyCornAria: `شراء ذرة واحدة مقابل ${HEART_COST_COINS} فلوس`,
     cornFullTip: 'الذرة ممتلئة (10/10)',
-    needCoinsCornTip: 'تحتاج 13 فلوس لشراء ذرة',
+    needCoinsCornTip: `تحتاج ${HEART_COST_COINS} فلوس لشراء ذرة`,
     fruitIndexWorldBtn: 'اندكس الفواكه',
     normalIndexWorldBtn: 'الاندكس العادي',
     fruitIndexModalHint:
@@ -389,6 +489,35 @@ const COPY = {
       earned <= 0
         ? 'تم استلام مكافأة هذه المرحلة مسبقاً (بدون فلوس إضافية)'
         : `+${earned} فلوس مكافأة إنهاء المرحلة (${remainingCorn} ذرة)!`,
+    goldWorldLabel: 'مراحل الذهب',
+    diamondsLabel: 'الألماس',
+    goldVictoryTitle: 'مبروك! أنهيت مراحل الذهب',
+    goldVictorySubtitle: 'أكملت مراحل الذهب الـ 15 وجمعت كنوز الخزنة بنجاح!',
+    goldStageBanner: (n: number) => `الذهب · المرحلة ${n}`,
+    goldStageCompleteTitle: (n: number) => `أكملت مرحلة الذهب ${n}!`,
+    goldNextStageBtn: (n: number) => `الانتقال إلى مرحلة الذهب ${n}`,
+    goldUnlockTitle: 'عالم الذهب والألماس (15 مرحلة)',
+    goldUnlockDesc:
+      `افتح 15 مرحلة بخلفية ذهب وألماس لامعة، كنوز ذهبية وألماس نادر (+2 إلى +6 نقاط)، نظام الألماس الخاص (${DIAMOND_COST_COINS} فلوس لكل ألماسة)، واندكس ذهب مستقل!`,
+    goldUnlockBtn: `فتح مراحل الذهب (${GOLD_UNLOCK_COST} فلوس)`,
+    goldNeedCoins: (need: number) => `تحتاج ${need} فلوس إضافية لفتح مراحل الذهب`,
+    goldStagesModalHint:
+      `15 مرحلة ذهب وألماس — سعر الألماسة ${DIAMOND_COST_COINS} فلوس · مكافأة أول فوز: ألماسة = 10 · ألماستان = 20 · 3+ ألماسات = 30 فلوس.`,
+    noDiamondsNotice: (timer: string) => `نفد الألماس — تتجدد الألماسة القادمة خلال ${timer}`,
+    waitDiamondBtn: (timer: string) => `انتظر تجدد الألماسة (${timer})`,
+    buyDiamondBtn: `+1 ألماسة (${DIAMOND_COST_COINS} فلوس)`,
+    buyDiamondAria: `شراء ألماسة واحدة مقابل ${DIAMOND_COST_COINS} فلوس`,
+    diamondsFullTip: 'الألماس ممتلئ (10/10)',
+    needCoinsDiamondTip: `تحتاج ${DIAMOND_COST_COINS} فلوس لشراء ألماسة`,
+    goldIndexWorldBtn: 'اندكس الذهب',
+    goldIndexModalHint:
+      'جميع كنوز الذهب والألماس وعوائق الخزنة — كل عنصر يبقى مقفلاً حتى تلتقطه أو تلمسه في مراحل الذهب.',
+    goldIndexPlusTab: 'الكنوز (+)',
+    goldIndexMinusTab: 'العوائق (-)',
+    goldCoinsEarned: (earned: number, remainingDiamonds: number) =>
+      earned <= 0
+        ? 'تم استلام مكافأة هذه المرحلة مسبقاً (بدون فلوس إضافية)'
+        : `+${earned} فلوس مكافأة إنهاء المرحلة (${remainingDiamonds} ألماسة)!`,
   },
   en: {
     title: 'Point Catcher',
@@ -433,10 +562,10 @@ const COPY = {
     noHeartsNotice: (timer: string) => `Out of hearts — next heart regenerates in ${timer}`,
     waitHeartBtn: (timer: string) => `Next Heart in ${timer}`,
     nextHeartShort: (timer: string) => `+1♥ in ${timer}`,
-    buyHeartBtn: 'Buy +1 Heart (13 Coins)',
-    buyHeartAria: 'Buy 1 heart for 13 coins',
+    buyHeartBtn: `Buy +1 Heart (${HEART_COST_COINS} Coins)`,
+    buyHeartAria: `Buy 1 heart for ${HEART_COST_COINS} coins`,
     heartsFullTip: 'Hearts full (10/10)',
-    needCoinsTip: 'Need 13 coins to buy a heart',
+    needCoinsTip: `Need ${HEART_COST_COINS} coins to buy a heart`,
     lockedStageAria: (n: number) => `Stage ${n} locked`,
     indexBtn: 'Index',
     indexModalTitle: 'Index',
@@ -448,6 +577,22 @@ const COPY = {
     indexLockedBadge: 'Locked',
     indexLockedDesc: 'Not discovered yet — unlocks and reveals its effect once you catch or touch it.',
     shopBtn: 'Shop',
+    bagBtn: 'Bag',
+    bagTitle: 'Item Bag',
+    bagDesc: 'Store hearts, corn, and diamonds in your bag and press Use anytime to increase your lives by +1.',
+    bagInBagLabel: 'In Bag',
+    bagActiveLabel: 'Active',
+    bagUseBtn: 'Use (+1)',
+    bagStoreBtn: 'Store +1',
+    bagBuyBtn: `Buy to Bag (${HEART_COST_COINS} Coins)`,
+    bagFullBadge: 'Full 10/10',
+    bagEmptyHint: 'Empty',
+    bagHeartsTitle: 'Stored Hearts',
+    bagHeartsSub: 'For Normal Stages',
+    bagCornTitle: 'Stored Corn',
+    bagCornSub: 'For Fruit Stages',
+    bagDiamondsTitle: 'Stored Diamonds',
+    bagDiamondsSub: 'For Gold Stages',
     settingsBtn: 'Settings',
     settingsTitle: 'Settings',
     musicLabel: 'Energetic Music',
@@ -480,13 +625,13 @@ const COPY = {
     fruitUnlockBtn: `Unlock Fruit Stages (${FRUIT_UNLOCK_COST} Coins)`,
     fruitNeedCoins: (need: number) => `Need ${need} more coins to unlock Fruit Stages`,
     fruitStagesModalHint:
-      '15 Fruit stages — vegetables subtract points and corn (10 corn, +1 every 5 min). First-clear reward: 1–3 = 1, 4–7 = 2, 8–10 = 4 coins.',
+      '15 Fruit stages — vegetables subtract points and corn (10 corn, +1 every 5 min). First-clear reward: 1 corn = 3, 2 corn = 6, 3+ corn = 9 coins.',
     noCornNotice: (timer: string) => `Out of corn — next corn regenerates in ${timer}`,
     waitCornBtn: (timer: string) => `Next Corn in ${timer}`,
-    buyCornBtn: 'Buy +1 Corn (13 Coins)',
-    buyCornAria: 'Buy 1 corn for 13 coins',
+    buyCornBtn: `Buy +1 Corn (${HEART_COST_COINS} Coins)`,
+    buyCornAria: `Buy 1 corn for ${HEART_COST_COINS} coins`,
     cornFullTip: 'Corn full (10/10)',
-    needCoinsCornTip: 'Need 13 coins to buy corn',
+    needCoinsCornTip: `Need ${HEART_COST_COINS} coins to buy corn`,
     fruitIndexWorldBtn: 'Fruit Index',
     normalIndexWorldBtn: 'Normal Index',
     fruitIndexModalHint:
@@ -497,6 +642,37 @@ const COPY = {
       earned <= 0
         ? 'Stage coin reward already claimed (no extra coins)'
         : `+${earned} ${earned === 1 ? 'Coin' : 'Coins'} Reward (${remainingCorn} Corn)!`,
+    goldWorldLabel: 'Gold Stages',
+    diamondsLabel: 'Diamonds',
+    goldVictoryTitle: 'Victory! All 15 Gold Stages Cleared',
+    goldVictorySubtitle: 'You mastered all 15 gold & diamond vault stages!',
+    goldStageBanner: (n: number) => `Gold · Stage ${n}`,
+    goldStageCompleteTitle: (n: number) => `Gold Stage ${n} Complete!`,
+    goldNextStageBtn: (n: number) => `Continue to Gold Stage ${n}`,
+    goldUnlockTitle: 'Gold & Diamond Vault (15 Stages)',
+    goldUnlockDesc:
+      `Unlock 15 gleaming gold & diamond stages with royal treasures (+2 to +6 pts), dedicated diamond lives (${DIAMOND_COST_COINS} coins per diamond, 10/20/30 clear rewards), and a dedicated Gold Index!`,
+    goldUnlockBtn: `Unlock Gold Stages (${GOLD_UNLOCK_COST} Coins)`,
+    goldNeedCoins: (need: number) => `Need ${need} more coins to unlock Gold Stages`,
+    goldStagesModalHint:
+      `15 Gold & Diamond stages — each diamond life costs ${DIAMOND_COST_COINS} coins · First-clear reward: 1 = 10, 2 = 20, 3+ = 30 coins.`,
+    noDiamondsNotice: (timer: string) => `Out of diamonds — next diamond regenerates in ${timer}`,
+    waitDiamondBtn: (timer: string) => `Next Diamond in ${timer}`,
+    buyDiamondBtn: `Buy +1 Diamond (${DIAMOND_COST_COINS} Coins)`,
+    buyDiamondAria: `Buy 1 diamond for ${DIAMOND_COST_COINS} coins`,
+    diamondsFullTip: 'Diamonds full (10/10)',
+    needCoinsDiamondTip: `Need ${DIAMOND_COST_COINS} coins to buy a diamond`,
+    goldIndexWorldBtn: 'Gold Index',
+    goldIndexModalHint:
+      'All gold treasures, diamonds & vault hazards — each entry stays locked until you catch or touch it in Gold Stages.',
+    goldIndexPlusTab: 'Treasures (+)',
+    goldIndexMinusTab: 'Hazards (-)',
+    goldCoinsEarned: (earned: number, remainingDiamonds: number) =>
+      earned <= 0
+        ? 'Stage coin reward already claimed (no extra coins)'
+        : `+${earned} ${earned === 1 ? 'Coin' : 'Coins'} Reward (${remainingDiamonds} ${
+            remainingDiamonds === 1 ? 'Diamond' : 'Diamonds'
+          })!`,
   },
 } as const;
 
@@ -1104,6 +1280,101 @@ function persistCornState(corn: number, lastRegenAt: number): void {
   }
 }
 
+function readStoredCompletedGoldStages(): number[] {
+  try {
+    const raw = window.localStorage.getItem(COMPLETED_GOLD_STAGES_STORAGE_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return [];
+    return parsed.filter(
+      (n): n is number =>
+        typeof n === 'number' &&
+        Number.isInteger(n) &&
+        n >= 1 &&
+        n <= TOTAL_GOLD_STAGES
+    );
+  } catch {
+    return [];
+  }
+}
+
+function readStoredDiscoveredGoldItems(): GoldItemKind[] {
+  try {
+    const raw = window.localStorage.getItem(DISCOVERED_GOLD_ITEMS_STORAGE_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return [];
+    return parsed.filter(
+      (k): k is GoldItemKind =>
+        typeof k === 'string' && VALID_GOLD_KINDS.includes(k as GoldItemKind)
+    );
+  } catch {
+    return [];
+  }
+}
+
+function readStoredDiamondsState(): StoredLivesState {
+  const now = Date.now();
+  try {
+    const raw = window.localStorage.getItem(DIAMONDS_STATE_STORAGE_KEY);
+    if (!raw) return { lives: MAX_DIAMONDS, lastRegenAt: 0 };
+    const parsed = JSON.parse(raw);
+    if (
+      parsed &&
+      typeof parsed.lives === 'number' &&
+      typeof parsed.lastRegenAt === 'number'
+    ) {
+      return computeSyncedLivesState(parsed.lives, parsed.lastRegenAt, now);
+    }
+    return { lives: MAX_DIAMONDS, lastRegenAt: 0 };
+  } catch {
+    return { lives: MAX_DIAMONDS, lastRegenAt: 0 };
+  }
+}
+
+function persistDiamondsState(diamonds: number, lastRegenAt: number): void {
+  try {
+    window.localStorage.setItem(
+      DIAMONDS_STATE_STORAGE_KEY,
+      JSON.stringify({ lives: diamonds, lastRegenAt })
+    );
+  } catch {
+    // Ignore storage errors
+  }
+}
+
+function readStoredBagState(): BagState {
+  try {
+    const raw = window.localStorage.getItem(BAG_STORAGE_KEY);
+    if (!raw) return { hearts: 0, corn: 0, diamonds: 0 };
+    const parsed = JSON.parse(raw);
+    return {
+      hearts:
+        typeof parsed?.hearts === 'number' && Number.isFinite(parsed.hearts)
+          ? Math.max(0, Math.floor(parsed.hearts))
+          : 0,
+      corn:
+        typeof parsed?.corn === 'number' && Number.isFinite(parsed.corn)
+          ? Math.max(0, Math.floor(parsed.corn))
+          : 0,
+      diamonds:
+        typeof parsed?.diamonds === 'number' && Number.isFinite(parsed.diamonds)
+          ? Math.max(0, Math.floor(parsed.diamonds))
+          : 0,
+    };
+  } catch {
+    return { hearts: 0, corn: 0, diamonds: 0 };
+  }
+}
+
+function persistBagState(bag: BagState): void {
+  try {
+    window.localStorage.setItem(BAG_STORAGE_KEY, JSON.stringify(bag));
+  } catch {
+    // Ignore storage errors
+  }
+}
+
 function formatCountdown(ms: number): string {
   const totalSec = Math.max(0, Math.ceil(ms / 1000));
   const mins = Math.floor(totalSec / 60);
@@ -1123,6 +1394,12 @@ export default function App() {
     initialCornRef.current = readStoredCornState();
   }
   const initialCornState = initialCornRef.current;
+
+  const initialDiamondsRef = useRef<StoredLivesState | null>(null);
+  if (initialDiamondsRef.current === null) {
+    initialDiamondsRef.current = readStoredDiamondsState();
+  }
+  const initialDiamondsState = initialDiamondsRef.current;
 
   const [lang, setLang] = useState<Lang>(() => readStoredLang());
   const [gameMode, setGameMode] = useState<GameMode>('normal');
@@ -1151,6 +1428,17 @@ export default function App() {
   const [discoveredFruitItems, setDiscoveredFruitItems] = useState<FruitItemKind[]>(
     () => readStoredDiscoveredFruitItems()
   );
+  const [goldUnlocked, setGoldUnlocked] = useState<boolean>(() =>
+    GOLD_UNLOCK_COST <= 0
+      ? true
+      : readStoredBoolean(GOLD_UNLOCKED_STORAGE_KEY, false)
+  );
+  const [completedGoldStages, setCompletedGoldStages] = useState<number[]>(() =>
+    readStoredCompletedGoldStages()
+  );
+  const [discoveredGoldItems, setDiscoveredGoldItems] = useState<GoldItemKind[]>(
+    () => readStoredDiscoveredGoldItems()
+  );
   const [lives, setLives] = useState<number>(initialLivesState.lives);
   const [nextHeartInMs, setNextHeartInMs] = useState<number>(() =>
     initialLivesState.lives < MAX_LIVES
@@ -1163,6 +1451,15 @@ export default function App() {
       ? Math.max(0, HEART_REGEN_MS - (Date.now() - initialCornState.lastRegenAt))
       : 0
   );
+  const [diamonds, setDiamonds] = useState<number>(initialDiamondsState.lives);
+  const [nextDiamondInMs, setNextDiamondInMs] = useState<number>(() =>
+    initialDiamondsState.lives < MAX_DIAMONDS
+      ? Math.max(
+          0,
+          HEART_REGEN_MS - (Date.now() - initialDiamondsState.lastRegenAt)
+        )
+      : 0
+  );
   const [stageNum, setStageNum] = useState<number>(1);
   const [stagesModalOpen, setStagesModalOpen] = useState<boolean>(false);
   const [stagesModalTab, setStagesModalTab] = useState<GameMode>('normal');
@@ -1170,6 +1467,8 @@ export default function App() {
   const [indexModalWorld, setIndexModalWorld] = useState<GameMode>('normal');
   const [indexTab, setIndexTab] = useState<IndexTab>('positive');
   const [shopModalOpen, setShopModalOpen] = useState<boolean>(false);
+  const [bagModalOpen, setBagModalOpen] = useState<boolean>(false);
+  const [bag, setBag] = useState<BagState>(() => readStoredBagState());
   const [shopTab, setShopTab] = useState<ShopTab>('skins');
   const [shopPointsSubTab, setShopPointsSubTab] = useState<PointsSubTab>('plus');
   const [shop, setShop] = useState<ShopState>(() => readStoredShopState());
@@ -1193,6 +1492,8 @@ export default function App() {
   const stagesModalOpenRef = useRef<boolean>(false);
   const indexModalOpenRef = useRef<boolean>(false);
   const shopModalOpenRef = useRef<boolean>(false);
+  const bagModalOpenRef = useRef<boolean>(false);
+  const bagRef = useRef<BagState>(bag);
   const settingsModalOpenRef = useRef<boolean>(false);
   const shopRef = useRef<ShopState>(shop);
   const scoreRef = useRef<number>(0);
@@ -1204,10 +1505,15 @@ export default function App() {
   const fruitUnlockedRef = useRef<boolean>(fruitUnlocked);
   const completedFruitStagesRef = useRef<number[]>(completedFruitStages);
   const discoveredFruitItemsRef = useRef<FruitItemKind[]>(discoveredFruitItems);
+  const goldUnlockedRef = useRef<boolean>(goldUnlocked);
+  const completedGoldStagesRef = useRef<number[]>(completedGoldStages);
+  const discoveredGoldItemsRef = useRef<GoldItemKind[]>(discoveredGoldItems);
   const livesRef = useRef<number>(initialLivesState.lives);
   const lastHeartRegenAtRef = useRef<number>(initialLivesState.lastRegenAt);
   const cornRef = useRef<number>(initialCornState.lives);
   const lastCornRegenAtRef = useRef<number>(initialCornState.lastRegenAt);
+  const diamondsRef = useRef<number>(initialDiamondsState.lives);
+  const lastDiamondRegenAtRef = useRef<number>(initialDiamondsState.lastRegenAt);
   const stageNumRef = useRef<number>(1);
   const streakRef = useRef<number>(0);
 
@@ -1225,6 +1531,7 @@ export default function App() {
     invulnTimer: 0,
     shieldTimer: 0,
     freezeTimer: 0,
+    slowTimer: 0,
     speedBoostTimer: 0,
     shakeTimer: 0,
     shakeIntensity: 0,
@@ -1240,6 +1547,7 @@ export default function App() {
     floatingTexts: [] as FloatingText[],
     stars: [] as AmbientStar[],
     fruitMotifs: [] as FruitBgMotif[],
+    goldMotifs: [] as GoldBgMotif[],
     input: {
       leftKey: false,
       rightKey: false,
@@ -1253,16 +1561,36 @@ export default function App() {
 
   const t = COPY[lang];
   const isFruitMode = gameMode === 'fruit';
-  const activeTotalStages = isFruitMode ? TOTAL_FRUIT_STAGES : TOTAL_STAGES;
-  const activeLives = isFruitMode ? corn : lives;
-  const activeMaxLives = isFruitMode ? MAX_CORN : MAX_LIVES;
-  const activeNextRegenMs = isFruitMode ? nextCornInMs : nextHeartInMs;
+  const isGoldMode = gameMode === 'gold';
+  const activeTotalStages = isFruitMode
+    ? TOTAL_FRUIT_STAGES
+    : isGoldMode
+    ? TOTAL_GOLD_STAGES
+    : TOTAL_STAGES;
+  const activeLives = isFruitMode ? corn : isGoldMode ? diamonds : lives;
+  const activeMaxLives = isFruitMode
+    ? MAX_CORN
+    : isGoldMode
+    ? MAX_DIAMONDS
+    : MAX_LIVES;
+  const activeNextRegenMs = isFruitMode
+    ? nextCornInMs
+    : isGoldMode
+    ? nextDiamondInMs
+    : nextHeartInMs;
+  const activeLifeBuyCost = isGoldMode ? DIAMOND_COST_COINS : HEART_COST_COINS;
   const currentStageConfig = isFruitMode
     ? FRUIT_STAGES[Math.min(stageNum - 1, TOTAL_FRUIT_STAGES - 1)]
+    : isGoldMode
+    ? GOLD_STAGES[Math.min(stageNum - 1, TOTAL_GOLD_STAGES - 1)]
     : STAGES[Math.min(stageNum - 1, TOTAL_STAGES - 1)];
   const nextStageConfig = isFruitMode
     ? stageNum < TOTAL_FRUIT_STAGES
       ? FRUIT_STAGES[stageNum]
+      : currentStageConfig
+    : isGoldMode
+    ? stageNum < TOTAL_GOLD_STAGES
+      ? GOLD_STAGES[stageNum]
       : currentStageConfig
     : stageNum < TOTAL_STAGES
     ? STAGES[stageNum]
@@ -1312,6 +1640,7 @@ export default function App() {
       !stagesModalOpen &&
       !indexModalOpen &&
       !shopModalOpen &&
+      !bagModalOpen &&
       !settingsModalOpen;
 
     if (shouldPlayMusic) {
@@ -1325,6 +1654,7 @@ export default function App() {
     stagesModalOpen,
     indexModalOpen,
     shopModalOpen,
+    bagModalOpen,
     settingsModalOpen,
     stageNum,
   ]);
@@ -1350,9 +1680,10 @@ export default function App() {
     }
     simRef.current.stars = stars;
     simRef.current.fruitMotifs = initFruitBgMotifs(width, height);
+    simRef.current.goldMotifs = initGoldBgMotifs(width, height);
   }, []);
 
-  // Automatic +1 heart & +1 corn regeneration every 5 minutes when below 10
+  // Automatic +1 heart, +1 corn, & +1 diamond regeneration every 5 minutes when below 10
   useEffect(() => {
     const syncPools = () => {
       const now = Date.now();
@@ -1414,6 +1745,35 @@ export default function App() {
             : 0
         );
       }
+
+      // Gold mode diamonds lives pool
+      if (diamondsRef.current >= MAX_DIAMONDS) {
+        if (lastDiamondRegenAtRef.current !== 0) {
+          lastDiamondRegenAtRef.current = 0;
+          persistDiamondsState(MAX_DIAMONDS, 0);
+        }
+        setNextDiamondInMs(0);
+      } else {
+        const syncedDiamonds = computeSyncedLivesState(
+          diamondsRef.current,
+          lastDiamondRegenAtRef.current,
+          now
+        );
+        if (
+          syncedDiamonds.lives !== diamondsRef.current ||
+          syncedDiamonds.lastRegenAt !== lastDiamondRegenAtRef.current
+        ) {
+          diamondsRef.current = syncedDiamonds.lives;
+          lastDiamondRegenAtRef.current = syncedDiamonds.lastRegenAt;
+          setDiamonds(syncedDiamonds.lives);
+          persistDiamondsState(syncedDiamonds.lives, syncedDiamonds.lastRegenAt);
+        }
+        setNextDiamondInMs(
+          syncedDiamonds.lives < MAX_DIAMONDS
+            ? Math.max(0, HEART_REGEN_MS - (now - syncedDiamonds.lastRegenAt))
+            : 0
+        );
+      }
     };
 
     syncPools();
@@ -1423,6 +1783,30 @@ export default function App() {
 
   const buyLifeForMode = useCallback((targetMode?: GameMode) => {
     const mode = targetMode ?? gameModeRef.current;
+
+    if (mode === 'gold') {
+      if (coinsRef.current < DIAMOND_COST_COINS) return;
+      if (diamondsRef.current >= MAX_DIAMONDS) return;
+      const nextCoins = coinsRef.current - DIAMOND_COST_COINS;
+      coinsRef.current = nextCoins;
+      setCoins(nextCoins);
+      try {
+        window.localStorage.setItem(COINS_STORAGE_KEY, String(nextCoins));
+      } catch {
+        // Ignore storage errors
+      }
+      const nextDiamonds = Math.min(MAX_DIAMONDS, diamondsRef.current + 1);
+      diamondsRef.current = nextDiamonds;
+      setDiamonds(nextDiamonds);
+      if (nextDiamonds >= MAX_DIAMONDS) {
+        lastDiamondRegenAtRef.current = 0;
+        setNextDiamondInMs(0);
+      }
+      persistDiamondsState(nextDiamonds, lastDiamondRegenAtRef.current);
+      audioRef.current.playBuyHeart();
+      return;
+    }
+
     if (coinsRef.current < HEART_COST_COINS) return;
 
     if (mode === 'fruit') {
@@ -1472,6 +1856,162 @@ export default function App() {
     buyLifeForMode();
   }, [buyLifeForMode]);
 
+  const storeLifeInBag = useCallback((mode: GameMode) => {
+    const now = Date.now();
+    if (mode === 'gold') {
+      if (diamondsRef.current <= 1) return;
+      const wasFull = diamondsRef.current >= MAX_DIAMONDS;
+      const nextDiamonds = diamondsRef.current - 1;
+      diamondsRef.current = nextDiamonds;
+      setDiamonds(nextDiamonds);
+      if (wasFull) {
+        lastDiamondRegenAtRef.current = now;
+        setNextDiamondInMs(HEART_REGEN_MS);
+      }
+      persistDiamondsState(nextDiamonds, lastDiamondRegenAtRef.current);
+      const nextBag: BagState = {
+        ...bagRef.current,
+        diamonds: bagRef.current.diamonds + 1,
+      };
+      bagRef.current = nextBag;
+      setBag(nextBag);
+      persistBagState(nextBag);
+      audioRef.current.playBuyHeart();
+      return;
+    }
+
+    if (mode === 'fruit') {
+      if (cornRef.current <= 1) return;
+      const wasFull = cornRef.current >= MAX_CORN;
+      const nextCorn = cornRef.current - 1;
+      cornRef.current = nextCorn;
+      setCorn(nextCorn);
+      if (wasFull) {
+        lastCornRegenAtRef.current = now;
+        setNextCornInMs(HEART_REGEN_MS);
+      }
+      persistCornState(nextCorn, lastCornRegenAtRef.current);
+      const nextBag: BagState = {
+        ...bagRef.current,
+        corn: bagRef.current.corn + 1,
+      };
+      bagRef.current = nextBag;
+      setBag(nextBag);
+      persistBagState(nextBag);
+      audioRef.current.playBuyHeart();
+      return;
+    }
+
+    if (livesRef.current <= 1) return;
+    const wasFull = livesRef.current >= MAX_LIVES;
+    const nextLives = livesRef.current - 1;
+    livesRef.current = nextLives;
+    setLives(nextLives);
+    if (wasFull) {
+      lastHeartRegenAtRef.current = now;
+      setNextHeartInMs(HEART_REGEN_MS);
+    }
+    persistLivesState(nextLives, lastHeartRegenAtRef.current);
+    const nextBag: BagState = {
+      ...bagRef.current,
+      hearts: bagRef.current.hearts + 1,
+    };
+    bagRef.current = nextBag;
+    setBag(nextBag);
+    persistBagState(nextBag);
+    audioRef.current.playBuyHeart();
+  }, []);
+
+  const buyLifeToBag = useCallback((mode: GameMode) => {
+    const cost = mode === 'gold' ? DIAMOND_COST_COINS : HEART_COST_COINS;
+    if (coinsRef.current < cost) return;
+    const nextCoins = coinsRef.current - cost;
+    coinsRef.current = nextCoins;
+    setCoins(nextCoins);
+    try {
+      window.localStorage.setItem(COINS_STORAGE_KEY, String(nextCoins));
+    } catch {
+      // Ignore storage errors
+    }
+    const nextBag: BagState =
+      mode === 'gold'
+        ? { ...bagRef.current, diamonds: bagRef.current.diamonds + 1 }
+        : mode === 'fruit'
+        ? { ...bagRef.current, corn: bagRef.current.corn + 1 }
+        : { ...bagRef.current, hearts: bagRef.current.hearts + 1 };
+    bagRef.current = nextBag;
+    setBag(nextBag);
+    persistBagState(nextBag);
+    audioRef.current.playBuyHeart();
+  }, []);
+
+  const useLifeFromBag = useCallback((mode: GameMode) => {
+    if (mode === 'gold') {
+      if (bagRef.current.diamonds <= 0 || diamondsRef.current >= MAX_DIAMONDS) {
+        return;
+      }
+      const nextBag: BagState = {
+        ...bagRef.current,
+        diamonds: bagRef.current.diamonds - 1,
+      };
+      bagRef.current = nextBag;
+      setBag(nextBag);
+      persistBagState(nextBag);
+
+      const nextDiamonds = Math.min(MAX_DIAMONDS, diamondsRef.current + 1);
+      diamondsRef.current = nextDiamonds;
+      setDiamonds(nextDiamonds);
+      if (nextDiamonds >= MAX_DIAMONDS) {
+        lastDiamondRegenAtRef.current = 0;
+        setNextDiamondInMs(0);
+      }
+      persistDiamondsState(nextDiamonds, lastDiamondRegenAtRef.current);
+      audioRef.current.playStageUp();
+      return;
+    }
+
+    if (mode === 'fruit') {
+      if (bagRef.current.corn <= 0 || cornRef.current >= MAX_CORN) return;
+      const nextBag: BagState = {
+        ...bagRef.current,
+        corn: bagRef.current.corn - 1,
+      };
+      bagRef.current = nextBag;
+      setBag(nextBag);
+      persistBagState(nextBag);
+
+      const nextCorn = Math.min(MAX_CORN, cornRef.current + 1);
+      cornRef.current = nextCorn;
+      setCorn(nextCorn);
+      if (nextCorn >= MAX_CORN) {
+        lastCornRegenAtRef.current = 0;
+        setNextCornInMs(0);
+      }
+      persistCornState(nextCorn, lastCornRegenAtRef.current);
+      audioRef.current.playStageUp();
+      return;
+    }
+
+    if (bagRef.current.hearts <= 0 || livesRef.current >= MAX_LIVES) return;
+    const nextBag: BagState = {
+      ...bagRef.current,
+      hearts: bagRef.current.hearts - 1,
+    };
+    bagRef.current = nextBag;
+    setBag(nextBag);
+    persistBagState(nextBag);
+
+    const nextLives = Math.min(MAX_LIVES, livesRef.current + 1);
+    livesRef.current = nextLives;
+    setLives(nextLives);
+    if (nextLives >= MAX_LIVES) {
+      lastHeartRegenAtRef.current = 0;
+      setNextHeartInMs(0);
+    }
+    persistLivesState(nextLives, lastHeartRegenAtRef.current);
+    audioRef.current.playStageUp();
+  }, []);
+
   const unlockFruitWorld = useCallback(() => {
     if (fruitUnlockedRef.current || coinsRef.current < FRUIT_UNLOCK_COST) {
       return;
@@ -1490,8 +2030,90 @@ export default function App() {
     audioRef.current.playStageUp();
   }, []);
 
+  const unlockGoldWorld = useCallback(() => {
+    if (goldUnlockedRef.current || coinsRef.current < GOLD_UNLOCK_COST) {
+      return;
+    }
+    const nextCoins = coinsRef.current - GOLD_UNLOCK_COST;
+    coinsRef.current = nextCoins;
+    setCoins(nextCoins);
+    goldUnlockedRef.current = true;
+    setGoldUnlocked(true);
+    try {
+      window.localStorage.setItem(COINS_STORAGE_KEY, String(nextCoins));
+      window.localStorage.setItem(GOLD_UNLOCKED_STORAGE_KEY, 'true');
+    } catch {
+      // Ignore storage errors
+    }
+    audioRef.current.playStageUp();
+  }, []);
+
   const startAtStage = useCallback((targetStage: number, targetMode?: GameMode) => {
     const mode = targetMode ?? gameModeRef.current;
+    if (mode === 'gold') {
+      if (!goldUnlockedRef.current) return;
+      const safeStage = Math.max(1, Math.min(TOTAL_GOLD_STAGES, targetStage));
+      if (!isStageUnlocked(safeStage, completedGoldStagesRef.current)) return;
+      if (diamondsRef.current <= 0) return;
+
+      const cfg = GOLD_STAGES[safeStage - 1];
+      const sim = simRef.current;
+      const activeCopy = COPY[langRef.current];
+
+      gameModeRef.current = 'gold';
+      setGameMode('gold');
+
+      sim.items = [];
+      sim.particles = [];
+      sim.floatingTexts = [];
+      sim.playerX = sim.width / 2;
+      sim.playerVx = 0;
+      sim.playerBounce = 0;
+      sim.playerGlowAlpha = 0;
+      sim.invulnTimer = 0;
+      sim.shieldTimer = 0;
+      sim.freezeTimer = 0;
+      sim.slowTimer = 0;
+      sim.speedBoostTimer = 0;
+      sim.shakeTimer = 0;
+      sim.hitFlashAlpha = 0;
+      sim.stageBannerTimer = 1.5;
+      sim.stageBannerText = activeCopy.goldStageBanner(safeStage);
+      sim.stageBannerSub = activeCopy.stageGoalLabel(cfg.pointsNeeded);
+      sim.spawnTimer = 0.28;
+      sim.lastHazardX = -999;
+      sim.input.pointerActive = false;
+      sim.input.pointerId = null;
+      sim.input.leftBtn = false;
+      sim.input.rightBtn = false;
+
+      scoreRef.current = 0;
+      stagePointsRef.current = 0;
+      stageNumRef.current = safeStage;
+      streakRef.current = 0;
+      stagesModalOpenRef.current = false;
+      indexModalOpenRef.current = false;
+      shopModalOpenRef.current = false;
+      bagModalOpenRef.current = false;
+      settingsModalOpenRef.current = false;
+      statusRef.current = 'PLAYING';
+
+      setScore(0);
+      setStagePoints(0);
+      setStageNum(safeStage);
+      setStagesModalOpen(false);
+      setIndexModalOpen(false);
+      setShopModalOpen(false);
+      setBagModalOpen(false);
+      setSettingsModalOpen(false);
+      setIsNewBest(false);
+      setStatus('PLAYING');
+
+      audioRef.current.playStart();
+      audioRef.current.startMusic(safeStage * 2);
+      return;
+    }
+
     if (mode === 'fruit') {
       if (!fruitUnlockedRef.current) return;
       const safeStage = Math.max(1, Math.min(TOTAL_FRUIT_STAGES, targetStage));
@@ -1515,6 +2137,7 @@ export default function App() {
       sim.invulnTimer = 0;
       sim.shieldTimer = 0;
       sim.freezeTimer = 0;
+      sim.slowTimer = 0;
       sim.speedBoostTimer = 0;
       sim.shakeTimer = 0;
       sim.hitFlashAlpha = 0;
@@ -1535,6 +2158,7 @@ export default function App() {
       stagesModalOpenRef.current = false;
       indexModalOpenRef.current = false;
       shopModalOpenRef.current = false;
+      bagModalOpenRef.current = false;
       settingsModalOpenRef.current = false;
       statusRef.current = 'PLAYING';
 
@@ -1544,6 +2168,7 @@ export default function App() {
       setStagesModalOpen(false);
       setIndexModalOpen(false);
       setShopModalOpen(false);
+      setBagModalOpen(false);
       setSettingsModalOpen(false);
       setIsNewBest(false);
       setStatus('PLAYING');
@@ -1556,6 +2181,7 @@ export default function App() {
     const safeStage = Math.max(1, Math.min(TOTAL_STAGES, targetStage));
     if (!isStageUnlocked(safeStage, completedStagesRef.current)) return;
     if (livesRef.current <= 0) return;
+
     const cfg = STAGES[safeStage - 1];
     const sim = simRef.current;
     const activeCopy = COPY[langRef.current];
@@ -1573,6 +2199,7 @@ export default function App() {
     sim.invulnTimer = 0;
     sim.shieldTimer = 0;
     sim.freezeTimer = 0;
+    sim.slowTimer = 0;
     sim.speedBoostTimer = 0;
     sim.shakeTimer = 0;
     sim.hitFlashAlpha = 0;
@@ -1593,6 +2220,7 @@ export default function App() {
     stagesModalOpenRef.current = false;
     indexModalOpenRef.current = false;
     shopModalOpenRef.current = false;
+    bagModalOpenRef.current = false;
     settingsModalOpenRef.current = false;
     statusRef.current = 'PLAYING';
 
@@ -1602,6 +2230,7 @@ export default function App() {
     setStagesModalOpen(false);
     setIndexModalOpen(false);
     setShopModalOpen(false);
+    setBagModalOpen(false);
     setSettingsModalOpen(false);
     setIsNewBest(false);
     setStatus('PLAYING');
@@ -1621,13 +2250,28 @@ export default function App() {
   const proceedToNextStage = useCallback(() => {
     if (statusRef.current !== 'STAGE_CLEAR') return;
     const isFruit = gameModeRef.current === 'fruit';
-    if (isFruit ? cornRef.current <= 0 : livesRef.current <= 0) return;
+    const isGold = gameModeRef.current === 'gold';
+    if (
+      isFruit
+        ? cornRef.current <= 0
+        : isGold
+        ? diamondsRef.current <= 0
+        : livesRef.current <= 0
+    ) {
+      return;
+    }
 
     const sim = simRef.current;
-    const maxStages = isFruit ? TOTAL_FRUIT_STAGES : TOTAL_STAGES;
+    const maxStages = isFruit
+      ? TOTAL_FRUIT_STAGES
+      : isGold
+      ? TOTAL_GOLD_STAGES
+      : TOTAL_STAGES;
     const nextStage = Math.min(maxStages, stageNumRef.current + 1);
     const nextCfg = isFruit
       ? FRUIT_STAGES[nextStage - 1]
+      : isGold
+      ? GOLD_STAGES[nextStage - 1]
       : STAGES[nextStage - 1];
     const activeCopy = COPY[langRef.current];
 
@@ -1636,6 +2280,7 @@ export default function App() {
     sim.invulnTimer = 0;
     sim.shieldTimer = 0;
     sim.freezeTimer = 0;
+    sim.slowTimer = 0;
     sim.speedBoostTimer = 0;
     sim.spawnTimer = 0.3;
     sim.lastHazardX = -999;
@@ -1645,6 +2290,8 @@ export default function App() {
     sim.input.rightBtn = false;
     sim.stageBannerText = isFruit
       ? activeCopy.fruitStageBanner(nextStage)
+      : isGold
+      ? activeCopy.goldStageBanner(nextStage)
       : activeCopy.stageBanner(nextStage);
     sim.stageBannerSub = activeCopy.stageGoalLabel(nextCfg.pointsNeeded);
     sim.stageBannerTimer = 1.5;
@@ -1657,7 +2304,7 @@ export default function App() {
     setStatus('PLAYING');
 
     audioRef.current.playStart();
-    audioRef.current.startMusic(isFruit ? nextStage * 2 : nextStage);
+    audioRef.current.startMusic(isFruit || isGold ? nextStage * 2 : nextStage);
   }, []);
 
   const selectOrBuySkin = useCallback((id: CatcherSkinId) => {
@@ -1777,11 +2424,27 @@ export default function App() {
       if (!def) return;
 
       if (id === 'one_heart') {
-        buyLifeForMode('normal');
+        if (livesRef.current < MAX_LIVES) {
+          buyLifeForMode('normal');
+        } else {
+          buyLifeToBag('normal');
+        }
         return;
       }
       if (id === 'one_corn') {
-        buyLifeForMode('fruit');
+        if (cornRef.current < MAX_CORN) {
+          buyLifeForMode('fruit');
+        } else {
+          buyLifeToBag('fruit');
+        }
+        return;
+      }
+      if (id === 'one_diamond') {
+        if (diamondsRef.current < MAX_DIAMONDS) {
+          buyLifeForMode('gold');
+        } else {
+          buyLifeToBag('gold');
+        }
         return;
       }
 
@@ -1844,6 +2507,25 @@ export default function App() {
         setNextCornInMs(0);
         persistCornState(MAX_CORN, 0);
         audioRef.current.playStageUp();
+        return;
+      }
+
+      if (id === 'full_diamonds') {
+        if (diamondsRef.current >= MAX_DIAMONDS) return;
+        const nextCoins = coinsRef.current - def.price;
+        coinsRef.current = nextCoins;
+        setCoins(nextCoins);
+        try {
+          window.localStorage.setItem(COINS_STORAGE_KEY, String(nextCoins));
+        } catch {
+          // Ignore storage errors
+        }
+        diamondsRef.current = MAX_DIAMONDS;
+        lastDiamondRegenAtRef.current = 0;
+        setDiamonds(MAX_DIAMONDS);
+        setNextDiamondInMs(0);
+        persistDiamondsState(MAX_DIAMONDS, 0);
+        audioRef.current.playStageUp();
       }
     },
     [buyLifeForMode]
@@ -1863,7 +2545,8 @@ export default function App() {
     const hadModalOpen =
       settingsModalOpenRef.current ||
       indexModalOpenRef.current ||
-      shopModalOpenRef.current;
+      shopModalOpenRef.current ||
+      bagModalOpenRef.current;
     if (settingsModalOpenRef.current) {
       settingsModalOpenRef.current = false;
       setSettingsModalOpen(false);
@@ -1875,6 +2558,10 @@ export default function App() {
     if (shopModalOpenRef.current) {
       shopModalOpenRef.current = false;
       setShopModalOpen(false);
+    }
+    if (bagModalOpenRef.current) {
+      bagModalOpenRef.current = false;
+      setBagModalOpen(false);
     }
     if (!hadModalOpen) {
       statusBeforeModalRef.current = statusRef.current;
@@ -1916,6 +2603,7 @@ export default function App() {
     const hadModalOpen =
       stagesModalOpenRef.current ||
       indexModalOpenRef.current ||
+      bagModalOpenRef.current ||
       settingsModalOpenRef.current;
     if (stagesModalOpenRef.current) {
       stagesModalOpenRef.current = false;
@@ -1924,6 +2612,10 @@ export default function App() {
     if (indexModalOpenRef.current) {
       indexModalOpenRef.current = false;
       setIndexModalOpen(false);
+    }
+    if (bagModalOpenRef.current) {
+      bagModalOpenRef.current = false;
+      setBagModalOpen(false);
     }
     if (settingsModalOpenRef.current) {
       settingsModalOpenRef.current = false;
@@ -1954,6 +2646,63 @@ export default function App() {
     }
   }, []);
 
+  const openBagModal = useCallback(() => {
+    if (bagModalOpenRef.current) {
+      bagModalOpenRef.current = false;
+      setBagModalOpen(false);
+      if (statusBeforeModalRef.current === 'PLAYING') {
+        statusRef.current = 'PLAYING';
+        setStatus('PLAYING');
+      }
+      return;
+    }
+
+    const hadModalOpen =
+      stagesModalOpenRef.current ||
+      indexModalOpenRef.current ||
+      shopModalOpenRef.current ||
+      settingsModalOpenRef.current;
+    if (stagesModalOpenRef.current) {
+      stagesModalOpenRef.current = false;
+      setStagesModalOpen(false);
+    }
+    if (indexModalOpenRef.current) {
+      indexModalOpenRef.current = false;
+      setIndexModalOpen(false);
+    }
+    if (shopModalOpenRef.current) {
+      shopModalOpenRef.current = false;
+      setShopModalOpen(false);
+    }
+    if (settingsModalOpenRef.current) {
+      settingsModalOpenRef.current = false;
+      setSettingsModalOpen(false);
+    }
+    if (!hadModalOpen) {
+      statusBeforeModalRef.current = statusRef.current;
+      if (statusRef.current === 'PLAYING') {
+        statusRef.current = 'PAUSED';
+        setStatus('PAUSED');
+      }
+    }
+
+    simRef.current.input.pointerActive = false;
+    simRef.current.input.leftBtn = false;
+    simRef.current.input.rightBtn = false;
+    bagModalOpenRef.current = true;
+    setBagModalOpen(true);
+  }, []);
+
+  const closeBagModal = useCallback(() => {
+    if (!bagModalOpenRef.current) return;
+    bagModalOpenRef.current = false;
+    setBagModalOpen(false);
+    if (statusBeforeModalRef.current === 'PLAYING') {
+      statusRef.current = 'PLAYING';
+      setStatus('PLAYING');
+    }
+  }, []);
+
   const openIndexModal = useCallback(() => {
     if (indexModalOpenRef.current) {
       indexModalOpenRef.current = false;
@@ -1968,7 +2717,8 @@ export default function App() {
     const hadModalOpen =
       stagesModalOpenRef.current ||
       settingsModalOpenRef.current ||
-      shopModalOpenRef.current;
+      shopModalOpenRef.current ||
+      bagModalOpenRef.current;
     if (stagesModalOpenRef.current) {
       stagesModalOpenRef.current = false;
       setStagesModalOpen(false);
@@ -1980,6 +2730,10 @@ export default function App() {
     if (shopModalOpenRef.current) {
       shopModalOpenRef.current = false;
       setShopModalOpen(false);
+    }
+    if (bagModalOpenRef.current) {
+      bagModalOpenRef.current = false;
+      setBagModalOpen(false);
     }
     if (!hadModalOpen) {
       statusBeforeModalRef.current = statusRef.current;
@@ -2021,7 +2775,8 @@ export default function App() {
     const hadModalOpen =
       stagesModalOpenRef.current ||
       indexModalOpenRef.current ||
-      shopModalOpenRef.current;
+      shopModalOpenRef.current ||
+      bagModalOpenRef.current;
     if (stagesModalOpenRef.current) {
       stagesModalOpenRef.current = false;
       setStagesModalOpen(false);
@@ -2033,6 +2788,10 @@ export default function App() {
     if (shopModalOpenRef.current) {
       shopModalOpenRef.current = false;
       setShopModalOpen(false);
+    }
+    if (bagModalOpenRef.current) {
+      bagModalOpenRef.current = false;
+      setBagModalOpen(false);
     }
     if (!hadModalOpen) {
       statusBeforeModalRef.current = statusRef.current;
@@ -2064,6 +2823,7 @@ export default function App() {
       stagesModalOpenRef.current ||
       indexModalOpenRef.current ||
       shopModalOpenRef.current ||
+      bagModalOpenRef.current ||
       settingsModalOpenRef.current
     ) {
       return;
@@ -2110,6 +2870,14 @@ export default function App() {
         if (code === 'Escape') {
           e.preventDefault();
           closeShopModal();
+        }
+        return;
+      }
+
+      if (bagModalOpenRef.current) {
+        if (code === 'Escape') {
+          e.preventDefault();
+          closeBagModal();
         }
         return;
       }
@@ -2261,6 +3029,14 @@ export default function App() {
             m.y = Math.min(h, m.y);
           }
         }
+        if (sim.goldMotifs.length === 0) {
+          sim.goldMotifs = initGoldBgMotifs(w, h);
+        } else {
+          for (const m of sim.goldMotifs) {
+            m.x = Math.min(w, m.x);
+            m.y = Math.min(h, m.y);
+          }
+        }
       }
     };
 
@@ -2308,6 +3084,85 @@ export default function App() {
 
     const spawnFallingObject = () => {
       const sim = simRef.current;
+
+      if (gameModeRef.current === 'gold') {
+        const gCfg =
+          GOLD_STAGES[Math.min(stageNumRef.current - 1, TOTAL_GOLD_STAGES - 1)];
+        const isHazard = Math.random() < gCfg.hazardChance;
+        let gKind: GoldItemKind;
+        if (isHazard) {
+          const roll = Math.random();
+          if (roll < gCfg.bombRatio) {
+            gKind = 'mimic_bomb';
+          } else if (roll < gCfg.bombRatio + (1 - gCfg.bombRatio) * 0.54) {
+            gKind = 'rust_anvil';
+          } else {
+            gKind = 'cursed_rock';
+          }
+        } else {
+          const roll = Math.random();
+          if (roll < 0.36) {
+            gKind = 'gold_coin';
+          } else if (roll < 0.66) {
+            gKind = 'gold_bar';
+          } else if (roll < 0.87) {
+            gKind = 'gold_crown';
+          } else {
+            gKind = 'blue_diamond';
+          }
+        }
+
+        const margin = Math.max(30, sim.playerWidth * 0.42);
+        const usableW = Math.max(80, sim.width - margin * 2);
+        let spawnX = margin + Math.random() * usableW;
+        for (let attempt = 0; attempt < 6; attempt++) {
+          const candidate = margin + Math.random() * usableW;
+          const tooCloseToRecentTop = sim.items.some(
+            (item) => item.y < 105 && Math.abs(item.x - candidate) < 62
+          );
+          const tooCloseToHazard =
+            isHazard && Math.abs(candidate - sim.lastHazardX) < 58;
+          if (!tooCloseToRecentTop && !tooCloseToHazard) {
+            spawnX = candidate;
+            break;
+          }
+        }
+        if (isHazard) {
+          sim.lastHazardX = spawnX;
+        }
+
+        const speedVariance =
+          gKind === 'mimic_bomb'
+            ? 1.12 + Math.random() * 0.24
+            : isHazard
+            ? 0.92 + Math.random() * 0.3
+            : gKind === 'blue_diamond'
+            ? 1.0 + Math.random() * 0.28
+            : 0.86 + Math.random() * 0.32;
+        const heightFactor = Math.max(0.82, Math.min(1.22, sim.height / 540));
+        const speed = gCfg.baseSpeed * speedVariance * heightFactor;
+        const radius =
+          gKind === 'blue_diamond' || gKind === 'gold_crown'
+            ? Math.max(16, Math.min(20, sim.width * 0.025))
+            : isHazard
+            ? Math.max(16, Math.min(20, sim.width * 0.025))
+            : Math.max(15, Math.min(19, sim.width * 0.024));
+        const driftRange = isHazard ? gCfg.lateralDrift : gCfg.lateralDrift * 0.7;
+
+        sim.items.push({
+          id: sim.nextId++,
+          kind: gKind,
+          x: spawnX,
+          y: -radius - 10,
+          radius,
+          speed,
+          vx: driftRange > 0 ? (Math.random() * 2 - 1) * driftRange : 0,
+          rotation: 0,
+          rotSpeed: gKind === 'cursed_rock' ? (Math.random() > 0.5 ? 1 : -1) * 1.4 : 0,
+          pulsePhase: Math.random() * Math.PI * 2,
+        });
+        return;
+      }
 
       if (gameModeRef.current === 'fruit') {
         const fCfg =
@@ -2394,12 +3249,32 @@ export default function App() {
       let kind: ItemKind;
       if (isHazard) {
         const roll = Math.random();
-        if (roll < cfg.arrowHazardRatio) {
-          kind = 'hazard_arrow';
+        const stage = stageNumRef.current;
+        const arrowPoolRatio =
+          stage >= 6
+            ? Math.min(0.42, cfg.arrowHazardRatio + 0.1)
+            : stage >= 3
+            ? Math.min(0.36, cfg.arrowHazardRatio + 0.06)
+            : cfg.arrowHazardRatio;
+        if (roll < arrowPoolRatio) {
+          if (stage >= 6) {
+            const subRoll = Math.random();
+            if (subRoll < 0.46) {
+              kind = 'hazard_arrow';
+            } else if (subRoll < 0.73) {
+              kind = 'hazard_arrow_amber';
+            } else {
+              kind = 'hazard_arrow_violet';
+            }
+          } else if (stage >= 3) {
+            kind = Math.random() < 0.6 ? 'hazard_arrow' : 'hazard_arrow_amber';
+          } else {
+            kind = 'hazard_arrow';
+          }
         } else {
           const remRoll =
-            (roll - cfg.arrowHazardRatio) /
-            Math.max(0.01, 1 - cfg.arrowHazardRatio);
+            (roll - arrowPoolRatio) /
+            Math.max(0.01, 1 - arrowPoolRatio);
           if (remRoll < cfg.starHazardRatio) {
             kind = 'hazard_star';
           } else if (
@@ -2413,9 +3288,21 @@ export default function App() {
           }
         }
       } else {
-        // Collectible types: Green Turbo Orb (+2 & 2x speed), Pink Circle (+3), Blue Triangle (+4)
+        // Collectible types: Stage 1–19 (Green +2, Pink +3, Blue +4); Stage 20+ adds Purple Diamond (+5, 5%) & Golden Star (+7, 5%)
         const roll = Math.random();
-        if (roll < 0.17) {
+        if (stageNumRef.current >= 20) {
+          if (roll < 0.15) {
+            kind = 'green_circle';
+          } else if (roll < 0.56) {
+            kind = 'pink_circle';
+          } else if (roll < 0.9) {
+            kind = 'blue_triangle';
+          } else if (roll < 0.95) {
+            kind = 'purple_diamond';
+          } else {
+            kind = 'gold_star';
+          }
+        } else if (roll < 0.17) {
           kind = 'green_circle';
         } else if (roll < 0.62) {
           kind = 'pink_circle';
@@ -2448,12 +3335,20 @@ export default function App() {
       const speedVariance =
         kind === 'hazard_arrow'
           ? ARROW_SPEED_MULTIPLIER
+          : kind === 'hazard_arrow_amber'
+          ? AMBER_ARROW_SPEED_MULTIPLIER
+          : kind === 'hazard_arrow_violet'
+          ? VIOLET_ARROW_SPEED_MULTIPLIER
           : kind === 'hazard_square'
           ? 0.96 + Math.random() * 0.3
           : kind === 'hazard_star'
           ? 0.88 + Math.random() * 0.28
           : kind === 'hazard_spike'
           ? 0.9 + Math.random() * 0.34
+          : kind === 'gold_star'
+          ? 1.04 + Math.random() * 0.3
+          : kind === 'purple_diamond'
+          ? 0.96 + Math.random() * 0.32
           : kind === 'green_circle'
           ? 0.9 + Math.random() * 0.3
           : kind === 'blue_triangle'
@@ -2464,7 +3359,9 @@ export default function App() {
       const speed = cfg.baseSpeed * speedVariance * heightFactor;
 
       const radius =
-        kind === 'hazard_arrow'
+        kind === 'hazard_arrow' ||
+        kind === 'hazard_arrow_amber' ||
+        kind === 'hazard_arrow_violet'
           ? Math.max(12, Math.min(15, sim.width * 0.02))
           : kind === 'hazard_square' || kind === 'hazard_star'
           ? Math.max(16, Math.min(20, sim.width * 0.025))
@@ -2475,9 +3372,18 @@ export default function App() {
       const driftRange =
         kind === 'hazard_arrow'
           ? 0
+          : kind === 'hazard_arrow_violet'
+          ? cfg.lateralDrift * 0.35
           : isHazard
           ? cfg.lateralDrift
           : cfg.lateralDrift * 0.65;
+      const amberSlantVx =
+        kind === 'hazard_arrow_amber'
+          ? (Math.random() > 0.5 ? 1 : -1) *
+            (Math.max(46, cfg.lateralDrift * 0.95) + Math.random() * 24)
+          : driftRange > 0
+          ? (Math.random() * 2 - 1) * driftRange
+          : 0;
       sim.items.push({
         id: sim.nextId++,
         kind,
@@ -2485,13 +3391,15 @@ export default function App() {
         y: -radius - 10,
         radius,
         speed,
-        vx: driftRange > 0 ? (Math.random() * 2 - 1) * driftRange : 0,
+        vx: amberSlantVx,
         rotation: 0,
         rotSpeed:
           kind === 'hazard_spike'
             ? (Math.random() > 0.5 ? 1 : -1) * 2.4
             : kind === 'green_circle'
             ? (Math.random() > 0.5 ? 1 : -1) * 2.2
+            : kind === 'gold_star'
+            ? (Math.random() > 0.5 ? 1 : -1) * 1.9
             : kind === 'hazard_star'
             ? (Math.random() > 0.5 ? 1 : -1) * 1.4
             : 0,
@@ -2514,6 +3422,14 @@ export default function App() {
         }
       }
       for (const m of sim.fruitMotifs) {
+        m.y += m.speed * starSpeedMul * dt;
+        m.rotation += m.rotSpeed * dt;
+        if (m.y > sim.height + m.size + 24) {
+          m.y = -m.size - 24;
+          m.x = Math.random() * sim.width;
+        }
+      }
+      for (const m of sim.goldMotifs) {
         m.y += m.speed * starSpeedMul * dt;
         m.rotation += m.rotSpeed * dt;
         if (m.y > sim.height + m.size + 24) {
@@ -2564,13 +3480,19 @@ export default function App() {
         sim.speedBoostTimer = Math.max(0, sim.speedBoostTimer - dt);
       }
 
+      if (sim.slowTimer > 0) {
+        sim.slowTimer = Math.max(0, sim.slowTimer - dt);
+      }
+
       // Smooth player horizontal movement (locked in place while frozen by Red Freeze Star)
       const halfW = sim.playerWidth / 2;
       const minX = halfW + 10;
       const maxX = sim.width - halfW - 10;
+      const slowMul = sim.slowTimer > 0 ? VIOLET_ARROW_SLOW_FACTOR : 1;
       const maxSpeed =
         Math.max(580, sim.width * 1.02) *
-        (gameSpeedMul > 1 ? SPEED_BOOST_PLAYER_SLOW : 1);
+        (gameSpeedMul > 1 ? SPEED_BOOST_PLAYER_SLOW : 1) *
+        slowMul;
 
       if (sim.freezeTimer > 0) {
         sim.freezeTimer = Math.max(0, sim.freezeTimer - dt);
@@ -2593,7 +3515,7 @@ export default function App() {
           const diffX = clampedTarget - sim.playerX;
           const follow = 1 - Math.exp(-26 * dt);
           let step = diffX * follow;
-          if (gameSpeedMul > 1) {
+          if (gameSpeedMul > 1 || slowMul < 1) {
             const maxStep = maxSpeed * dt;
             step = Math.max(-maxStep, Math.min(maxStep, step));
           }
@@ -2631,6 +3553,9 @@ export default function App() {
         gameModeRef.current === 'fruit'
           ? FRUIT_STAGES[Math.min(stageNumRef.current - 1, TOTAL_FRUIT_STAGES - 1)]
               .spawnInterval
+          : gameModeRef.current === 'gold'
+          ? GOLD_STAGES[Math.min(stageNumRef.current - 1, TOTAL_GOLD_STAGES - 1)]
+              .spawnInterval
           : STAGES[Math.min(stageNumRef.current - 1, TOTAL_STAGES - 1)]
               .spawnInterval;
       sim.spawnTimer -= simDt;
@@ -2661,11 +3586,16 @@ export default function App() {
         }
 
         const isFruitWorld = gameModeRef.current === 'fruit';
+        const isGoldWorld = gameModeRef.current === 'gold';
         const isPoint = isFruitWorld
           ? FRUIT_ITEM_STATS[item.kind as FruitItemKind]?.isFruit ?? false
+          : isGoldWorld
+          ? GOLD_ITEM_STATS[item.kind as GoldItemKind]?.isTreasure ?? false
           : item.kind === 'pink_circle' ||
             item.kind === 'blue_triangle' ||
-            item.kind === 'green_circle';
+            item.kind === 'green_circle' ||
+            item.kind === 'purple_diamond' ||
+            item.kind === 'gold_star';
 
         if (item.y - item.radius > sim.height + 24) {
           if (isPoint) {
@@ -2690,6 +3620,246 @@ export default function App() {
 
         if (dx * dx + dy * dy <= effectiveRadius * effectiveRadius) {
           sim.items.splice(i, 1);
+
+          if (isGoldWorld) {
+            const gKind = item.kind as GoldItemKind;
+            const gStats = GOLD_ITEM_STATS[gKind];
+
+            // Discover & unlock this item in the dedicated Gold Index on catch/touch
+            if (!discoveredGoldItemsRef.current.includes(gKind)) {
+              const updated = [...discoveredGoldItemsRef.current, gKind];
+              discoveredGoldItemsRef.current = updated;
+              setDiscoveredGoldItems(updated);
+              try {
+                window.localStorage.setItem(
+                  DISCOVERED_GOLD_ITEMS_STORAGE_KEY,
+                  JSON.stringify(updated)
+                );
+              } catch {
+                // Ignore storage errors
+              }
+            }
+
+            if (gStats.isTreasure) {
+              const value = gStats.pointsDelta;
+              const nextScore = scoreRef.current + value;
+              scoreRef.current = nextScore;
+              setScore(nextScore);
+
+              const nextStagePoints = stagePointsRef.current + value;
+              stagePointsRef.current = nextStagePoints;
+              setStagePoints(nextStagePoints);
+
+              if (nextScore > bestScoreRef.current) {
+                bestScoreRef.current = nextScore;
+                setBestScore(nextScore);
+                setIsNewBest(true);
+                try {
+                  window.localStorage.setItem(
+                    BEST_SCORE_STORAGE_KEY,
+                    String(nextScore)
+                  );
+                } catch {
+                  // Ignore storage errors
+                }
+              }
+
+              sim.playerBounce = 1;
+              sim.playerGlowColor = gStats.color;
+              sim.playerGlowAlpha = 1;
+
+              spawnBurst(item.x, item.y, gStats.color, 16, 1.08);
+              spawnBurst(item.x, item.y, '#fef9c3', 6, 0.78);
+              sim.floatingTexts.push({
+                x: item.x,
+                y: item.y - 10,
+                vy: -56,
+                text: `+${value}`,
+                color: gStats.textColor,
+                life: 0.7,
+                maxLife: 0.7,
+              });
+
+              const currentGoldCfg =
+                GOLD_STAGES[
+                  Math.min(stageNumRef.current - 1, TOTAL_GOLD_STAGES - 1)
+                ];
+
+              if (nextStagePoints >= currentGoldCfg.pointsNeeded) {
+                const clearedStage = stageNumRef.current;
+                const alreadyCompleted =
+                  completedGoldStagesRef.current.includes(clearedStage);
+                const earnedCoins = alreadyCompleted
+                  ? 0
+                  : getGoldStageClearCoins(diamondsRef.current);
+                setLastEarnedCoins(earnedCoins);
+                if (earnedCoins > 0) {
+                  const nextCoins = coinsRef.current + earnedCoins;
+                  coinsRef.current = nextCoins;
+                  setCoins(nextCoins);
+                  try {
+                    window.localStorage.setItem(
+                      COINS_STORAGE_KEY,
+                      String(nextCoins)
+                    );
+                  } catch {
+                    // Ignore storage errors
+                  }
+                }
+
+                if (!alreadyCompleted) {
+                  const updated = [...completedGoldStagesRef.current, clearedStage];
+                  completedGoldStagesRef.current = updated;
+                  setCompletedGoldStages(updated);
+                  try {
+                    window.localStorage.setItem(
+                      COMPLETED_GOLD_STAGES_STORAGE_KEY,
+                      JSON.stringify(updated)
+                    );
+                  } catch {
+                    // Ignore storage errors
+                  }
+                }
+
+                sim.input.pointerActive = false;
+                sim.input.pointerId = null;
+                sim.input.leftBtn = false;
+                sim.input.rightBtn = false;
+
+                if (clearedStage >= TOTAL_GOLD_STAGES) {
+                  statusRef.current = 'VICTORY';
+                  setStatus('VICTORY');
+                  spawnBurst(sim.width * 0.35, sim.height * 0.4, '#fbbf24', 24, 1.35);
+                  spawnBurst(sim.width * 0.65, sim.height * 0.4, '#38bdf8', 24, 1.35);
+                  audioRef.current.playVictory();
+                } else {
+                  statusRef.current = 'STAGE_CLEAR';
+                  setStatus('STAGE_CLEAR');
+                  spawnBurst(sim.width * 0.35, sim.height * 0.42, '#fbbf24', 18, 1.2);
+                  spawnBurst(sim.width * 0.65, sim.height * 0.42, '#38bdf8', 18, 1.2);
+                  audioRef.current.playStageUp();
+                }
+                streakRef.current = Math.min(streakRef.current + 1, 10);
+                break;
+              } else {
+                audioRef.current.playCatch(streakRef.current, value >= 4);
+                streakRef.current = Math.min(streakRef.current + 1, 10);
+              }
+            } else {
+              // Active 2-second shield barrier blocks all vault hazards cleanly
+              if (sim.shieldTimer > 0) {
+                sim.playerGlowColor = '#38bdf8';
+                sim.playerGlowAlpha = 0.9;
+                spawnBurst(item.x, item.y, '#7dd3fc', 16, 1.1);
+                sim.floatingTexts.push({
+                  x: item.x,
+                  y: item.y - 12,
+                  vy: -50,
+                  text: langRef.current === 'ar' ? 'محمي!' : 'Shielded!',
+                  color: '#bae6fd',
+                  life: 0.75,
+                  maxLife: 0.75,
+                });
+                audioRef.current.playBuyHeart();
+                continue;
+              }
+
+              // Shop Shield auto-activates for 2 full seconds on vault hazard contact
+              if (sim.invulnTimer <= 0 && shopRef.current.shields > 0) {
+                const nextShop: ShopState = {
+                  ...shopRef.current,
+                  shields: Math.max(0, shopRef.current.shields - 1),
+                };
+                shopRef.current = nextShop;
+                setShop(nextShop);
+                persistShopState(nextShop);
+
+                sim.shieldTimer = SHIELD_DURATION;
+                sim.playerGlowColor = '#38bdf8';
+                sim.playerGlowAlpha = 1;
+                spawnBurst(item.x, item.y, '#7dd3fc', 22, 1.25);
+                sim.floatingTexts.push({
+                  x: item.x,
+                  y: item.y - 12,
+                  vy: -52,
+                  text:
+                    langRef.current === 'ar'
+                      ? `درع الحماية · ${SHIELD_DURATION}ث!`
+                      : `Shield · ${SHIELD_DURATION}s!`,
+                  color: '#bae6fd',
+                  life: 0.95,
+                  maxLife: 0.95,
+                });
+                audioRef.current.playBuyHeart();
+                continue;
+              }
+
+              // Vault hazard hit: subtracts stage points & score AND deducts Diamond lives
+              const penalty = Math.abs(gStats.pointsDelta);
+              const nextStagePoints = Math.max(0, stagePointsRef.current - penalty);
+              stagePointsRef.current = nextStagePoints;
+              setStagePoints(nextStagePoints);
+
+              const nextScore = Math.max(0, scoreRef.current - penalty);
+              scoreRef.current = nextScore;
+              setScore(nextScore);
+              streakRef.current = 0;
+
+              if (sim.invulnTimer <= 0) {
+                const prevDiamonds = diamondsRef.current;
+                const nextDiamonds = Math.max(0, prevDiamonds - gStats.diamondDamage);
+                diamondsRef.current = nextDiamonds;
+                setDiamonds(nextDiamonds);
+                if (prevDiamonds >= MAX_DIAMONDS && nextDiamonds < MAX_DIAMONDS) {
+                  lastDiamondRegenAtRef.current = Date.now();
+                  setNextDiamondInMs(HEART_REGEN_MS);
+                }
+                persistDiamondsState(nextDiamonds, lastDiamondRegenAtRef.current);
+
+                const isHeavyHaz = gStats.diamondDamage >= 2;
+                sim.shakeTimer = isHeavyHaz ? 0.32 : 0.24;
+                sim.shakeIntensity = isHeavyHaz ? 10 : 7;
+                sim.hitFlashAlpha = isHeavyHaz ? 0.42 : 0.3;
+                sim.invulnTimer = 0.75;
+
+                spawnBurst(item.x, item.y, '#ef4444', isHeavyHaz ? 22 : 16, 1.2);
+                spawnBurst(item.x, item.y, '#38bdf8', 8, 0.9);
+                sim.floatingTexts.push({
+                  x: item.x,
+                  y: item.y - 12,
+                  vy: -52,
+                  text:
+                    langRef.current === 'ar'
+                      ? `-${penalty} · -${gStats.diamondDamage} ألماسة`
+                      : `-${penalty} · -${gStats.diamondDamage} 💎`,
+                  color: '#fecaca',
+                  life: 0.9,
+                  maxLife: 0.9,
+                });
+
+                if (nextDiamonds <= 0) {
+                  statusRef.current = 'GAME_OVER';
+                  setStatus('GAME_OVER');
+                  audioRef.current.playGameOver();
+                  break;
+                } else {
+                  audioRef.current.playHazardHit(isHeavyHaz);
+                }
+              } else {
+                spawnBurst(item.x, item.y, '#fca5a5', 8, 0.85);
+                sim.floatingTexts.push({
+                  x: item.x,
+                  y: item.y - 12,
+                  vy: -48,
+                  text: `-${penalty}`,
+                  color: '#fecaca',
+                  life: 0.7,
+                  maxLife: 0.7,
+                });
+              }
+            }
+            continue;
+          }
 
           if (isFruitWorld) {
             const fKind = item.kind as FruitItemKind;
@@ -2761,7 +3931,7 @@ export default function App() {
                   completedFruitStagesRef.current.includes(clearedStage);
                 const earnedCoins = alreadyCompleted
                   ? 0
-                  : getStageClearCoins(cornRef.current);
+                  : getFruitStageClearCoins(cornRef.current);
                 setLastEarnedCoins(earnedCoins);
                 if (earnedCoins > 0) {
                   const nextCoins = coinsRef.current + earnedCoins;
@@ -2950,17 +4120,31 @@ export default function App() {
           if (isPoint) {
             const isGreen = item.kind === 'green_circle';
             const isTriangle = item.kind === 'blue_triangle';
-            const value = isGreen
+            const isPurple = item.kind === 'purple_diamond';
+            const isGoldStar = item.kind === 'gold_star';
+            const value = isGoldStar
+              ? GOLD_STAR_POINTS
+              : isPurple
+              ? PURPLE_DIAMOND_POINTS
+              : isGreen
               ? GREEN_CIRCLE_POINTS
               : isTriangle
               ? BLUE_TRIANGLE_POINTS
               : PINK_CIRCLE_POINTS;
-            const color = isGreen
+            const color = isGoldStar
+              ? '#fbbf24'
+              : isPurple
+              ? '#c084fc'
+              : isGreen
               ? '#10b981'
               : isTriangle
               ? '#38bdf8'
               : '#f472b6';
-            const textColor = isGreen
+            const textColor = isGoldStar
+              ? '#fef08a'
+              : isPurple
+              ? '#f3e8ff'
+              : isGreen
               ? '#a7f3d0'
               : isTriangle
               ? '#bae6fd'
@@ -3052,6 +4236,7 @@ export default function App() {
                 }
               }
 
+              sim.slowTimer = 0;
               sim.speedBoostTimer = 0;
               sim.input.pointerActive = false;
               sim.input.pointerId = null;
@@ -3169,6 +4354,7 @@ export default function App() {
               }
 
               sim.freezeTimer = 0;
+              sim.slowTimer = 0;
               sim.speedBoostTimer = 0;
               sim.input.pointerActive = false;
               sim.input.pointerId = null;
@@ -3192,6 +4378,115 @@ export default function App() {
             } else {
               audioRef.current.playFreeze();
             }
+          } else if (item.kind === 'hazard_arrow_amber') {
+            // Mild Amber Slant Arrow: spares hearts, deducts only 2 stage points (blocked cleanly by active shield)
+            if (sim.shieldTimer > 0) {
+              sim.playerGlowColor = '#38bdf8';
+              sim.playerGlowAlpha = 0.85;
+              spawnBurst(item.x, item.y, '#7dd3fc', 14, 1.0);
+              sim.floatingTexts.push({
+                x: item.x,
+                y: item.y - 12,
+                vy: -50,
+                text: langRef.current === 'ar' ? 'محمي!' : 'Shielded!',
+                color: '#bae6fd',
+                life: 0.72,
+                maxLife: 0.72,
+              });
+              audioRef.current.playBuyHeart();
+              continue;
+            }
+            const nextScore = Math.max(
+              0,
+              scoreRef.current - AMBER_ARROW_POINT_PENALTY
+            );
+            scoreRef.current = nextScore;
+            setScore(nextScore);
+
+            const nextStagePoints = Math.max(
+              0,
+              stagePointsRef.current - AMBER_ARROW_POINT_PENALTY
+            );
+            stagePointsRef.current = nextStagePoints;
+            setStagePoints(nextStagePoints);
+
+            streakRef.current = 0;
+            sim.playerBounce = 0.55;
+            sim.playerGlowColor = '#f59e0b';
+            sim.playerGlowAlpha = 0.85;
+            sim.shakeTimer = 0.14;
+            sim.shakeIntensity = 3.5;
+
+            spawnBurst(item.x, item.y, '#f59e0b', 14, 0.95);
+            spawnBurst(item.x, item.y, '#fde68a', 6, 0.7);
+            sim.floatingTexts.push({
+              x: item.x,
+              y: item.y - 12,
+              vy: -50,
+              text:
+                langRef.current === 'ar'
+                  ? `-${AMBER_ARROW_POINT_PENALTY} نقاط`
+                  : `-${AMBER_ARROW_POINT_PENALTY} pts`,
+              color: '#fde68a',
+              life: 0.85,
+              maxLife: 0.85,
+            });
+            audioRef.current.playHazardHit(false);
+          } else if (item.kind === 'hazard_arrow_violet') {
+            // Mild Violet Slow Arrow: spares hearts, gently slows (-30% for 2.5s) & deducts 1 point
+            if (sim.shieldTimer > 0) {
+              sim.playerGlowColor = '#38bdf8';
+              sim.playerGlowAlpha = 0.85;
+              spawnBurst(item.x, item.y, '#7dd3fc', 14, 1.0);
+              sim.floatingTexts.push({
+                x: item.x,
+                y: item.y - 12,
+                vy: -50,
+                text: langRef.current === 'ar' ? 'محمي!' : 'Shielded!',
+                color: '#bae6fd',
+                life: 0.72,
+                maxLife: 0.72,
+              });
+              audioRef.current.playBuyHeart();
+              continue;
+            }
+            const nextScore = Math.max(
+              0,
+              scoreRef.current - VIOLET_ARROW_POINT_PENALTY
+            );
+            scoreRef.current = nextScore;
+            setScore(nextScore);
+
+            const nextStagePoints = Math.max(
+              0,
+              stagePointsRef.current - VIOLET_ARROW_POINT_PENALTY
+            );
+            stagePointsRef.current = nextStagePoints;
+            setStagePoints(nextStagePoints);
+
+            streakRef.current = 0;
+            sim.slowTimer = VIOLET_ARROW_SLOW_DURATION;
+            sim.playerBounce = 0.55;
+            sim.playerGlowColor = '#c084fc';
+            sim.playerGlowAlpha = 0.9;
+            sim.shakeTimer = 0.14;
+            sim.shakeIntensity = 3.5;
+
+            spawnBurst(item.x, item.y, '#a855f7', 14, 0.95);
+            spawnBurst(item.x, item.y, '#e9d5ff', 7, 0.75);
+            sim.floatingTexts.push({
+              x: item.x,
+              y: item.y - 12,
+              vy: -50,
+              text:
+                langRef.current === 'ar'
+                  ? `تبطيء 2.5ث · -${VIOLET_ARROW_POINT_PENALTY}`
+                  : `Slow 2.5s · -${VIOLET_ARROW_POINT_PENALTY}`,
+              color: '#e9d5ff',
+              life: 0.92,
+              maxLife: 0.92,
+            });
+            audioRef.current.playHazardHit(false);
           } else {
             // Red hazard hit: spike = -1 life, red square = -2 lives
             const isHeavySquare = item.kind === 'hazard_square';
@@ -3280,6 +4575,7 @@ export default function App() {
               });
 
               if (nextLives <= 0) {
+                sim.slowTimer = 0;
                 sim.speedBoostTimer = 0;
                 statusRef.current = 'GAME_OVER';
                 setStatus('GAME_OVER');
@@ -3619,6 +4915,164 @@ export default function App() {
       ctx.fillText('4', 1, r * 0.28 + 1.5);
       ctx.fillStyle = '#ffffff';
       ctx.fillText('4', 0, r * 0.28);
+
+      ctx.restore();
+    };
+
+    const drawPurpleDiamond = (item: FallingItem) => {
+      const r = item.radius * 1.12;
+      const pulse = 1 + Math.sin(item.pulsePhase * 1.2) * 0.06;
+
+      ctx.save();
+      ctx.translate(item.x, item.y);
+      ctx.scale(pulse, pulse);
+
+      // Luminous royal violet aura
+      const aura = ctx.createRadialGradient(0, 0, r * 0.2, 0, 0, r * 1.8);
+      aura.addColorStop(0, 'rgba(192, 132, 252, 0.58)');
+      aura.addColorStop(0.55, 'rgba(147, 51, 234, 0.24)');
+      aura.addColorStop(1, 'rgba(147, 51, 234, 0)');
+      ctx.fillStyle = aura;
+      ctx.beginPath();
+      ctx.arc(0, 0, r * 1.8, 0, Math.PI * 2);
+      ctx.fill();
+
+      // 3D drop shadow
+      ctx.beginPath();
+      ctx.moveTo(2, -r * 1.05 + 3);
+      ctx.lineTo(r * 0.92 + 2, 3);
+      ctx.lineTo(2, r * 1.05 + 3);
+      ctx.lineTo(-r * 0.92 + 2, 3);
+      ctx.closePath();
+      ctx.fillStyle = 'rgba(2, 6, 23, 0.5)';
+      ctx.fill();
+
+      // Faceted crystal diamond body
+      const topFacet = ctx.createLinearGradient(-r, -r, r, r);
+      topFacet.addColorStop(0, '#f5d0fe');
+      topFacet.addColorStop(0.42, '#c084fc');
+      topFacet.addColorStop(1, '#7e22ce');
+      ctx.fillStyle = topFacet;
+      ctx.beginPath();
+      ctx.moveTo(0, -r * 1.08);
+      ctx.lineTo(r * 0.94, 0);
+      ctx.lineTo(0, r * 1.08);
+      ctx.lineTo(-r * 0.94, 0);
+      ctx.closePath();
+      ctx.fill();
+
+      // Lower-right shaded facet
+      ctx.fillStyle = 'rgba(88, 28, 135, 0.55)';
+      ctx.beginPath();
+      ctx.moveTo(0, 0);
+      ctx.lineTo(r * 0.94, 0);
+      ctx.lineTo(0, r * 1.08);
+      ctx.closePath();
+      ctx.fill();
+
+      // Bright top-left crystal highlight facet
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.32)';
+      ctx.beginPath();
+      ctx.moveTo(0, -r * 1.02);
+      ctx.lineTo(-r * 0.86, 0);
+      ctx.lineTo(0, 0);
+      ctx.closePath();
+      ctx.fill();
+
+      ctx.strokeStyle = '#f3e8ff';
+      ctx.lineWidth = 1.8;
+      ctx.lineJoin = 'round';
+      ctx.beginPath();
+      ctx.moveTo(0, -r * 1.08);
+      ctx.lineTo(r * 0.94, 0);
+      ctx.lineTo(0, r * 1.08);
+      ctx.lineTo(-r * 0.94, 0);
+      ctx.closePath();
+      ctx.stroke();
+
+      ctx.font = `800 ${Math.round(r * 0.84)}px "Segoe UI", system-ui, sans-serif`;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillStyle = 'rgba(59, 7, 100, 0.85)';
+      ctx.fillText('5', 1, 2);
+      ctx.fillStyle = '#ffffff';
+      ctx.fillText('5', 0, 1);
+
+      ctx.restore();
+    };
+
+    const drawGoldStar = (item: FallingItem) => {
+      const r = item.radius * 1.15;
+      const pulse = 1 + Math.sin(item.pulsePhase * 1.5) * 0.07;
+
+      ctx.save();
+      ctx.translate(item.x, item.y);
+      ctx.scale(pulse, pulse);
+
+      // Radiant golden glow aura
+      const aura = ctx.createRadialGradient(0, 0, r * 0.2, 0, 0, r * 1.95);
+      aura.addColorStop(0, 'rgba(254, 240, 138, 0.7)');
+      aura.addColorStop(0.5, 'rgba(251, 191, 36, 0.3)');
+      aura.addColorStop(1, 'rgba(251, 191, 36, 0)');
+      ctx.fillStyle = aura;
+      ctx.beginPath();
+      ctx.arc(0, 0, r * 1.95, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.save();
+      ctx.rotate(item.rotation);
+      const spikes = 5;
+      const outerR = r * 1.2;
+      const innerR = r * 0.56;
+      const verts: { x: number; y: number }[] = [];
+      for (let i = 0; i < spikes * 2; i++) {
+        const rad = i % 2 === 0 ? outerR : innerR;
+        const ang = (i * Math.PI) / spikes - Math.PI / 2;
+        verts.push({ x: Math.cos(ang) * rad, y: Math.sin(ang) * rad });
+      }
+
+      // 3D beveled gold facets
+      for (let i = 0; i < verts.length; i++) {
+        const curr = verts[i];
+        const next = verts[(i + 1) % verts.length];
+        const grad = ctx.createLinearGradient(0, 0, curr.x, curr.y);
+        if (i % 2 === 0) {
+          grad.addColorStop(0, '#fef9c3');
+          grad.addColorStop(0.5, '#fbbf24');
+          grad.addColorStop(1, '#d97706');
+        } else {
+          grad.addColorStop(0, '#fde047');
+          grad.addColorStop(0.55, '#f59e0b');
+          grad.addColorStop(1, '#92400e');
+        }
+        ctx.beginPath();
+        ctx.moveTo(0, 0);
+        ctx.lineTo(curr.x, curr.y);
+        ctx.lineTo(next.x, next.y);
+        ctx.closePath();
+        ctx.fillStyle = grad;
+        ctx.fill();
+      }
+
+      ctx.beginPath();
+      verts.forEach((v, idx) => {
+        if (idx === 0) ctx.moveTo(v.x, v.y);
+        else ctx.lineTo(v.x, v.y);
+      });
+      ctx.closePath();
+      ctx.strokeStyle = '#fef9c3';
+      ctx.lineWidth = 1.6;
+      ctx.lineJoin = 'round';
+      ctx.stroke();
+      ctx.restore();
+
+      ctx.font = `900 ${Math.round(r * 0.8)}px "Segoe UI", system-ui, sans-serif`;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillStyle = 'rgba(120, 53, 15, 0.9)';
+      ctx.fillText('7', 1, 2);
+      ctx.fillStyle = '#ffffff';
+      ctx.fillText('7', 0, 1);
 
       ctx.restore();
     };
@@ -4005,6 +5459,216 @@ export default function App() {
       ctx.restore();
     };
 
+    const drawHazardArrowAmber = (item: FallingItem) => {
+      const r = item.radius * 1.08;
+      // Gently align arrow nose along its slanted fall trajectory
+      const slantAngle = Math.max(
+        -0.42,
+        Math.min(0.42, Math.atan2(-item.vx, Math.max(80, item.speed)))
+      );
+
+      ctx.save();
+      ctx.translate(item.x, item.y);
+      ctx.rotate(slantAngle);
+
+      // Warm amber slipstream trail
+      const trailGrad = ctx.createLinearGradient(0, -r * 3.1, 0, r * 0.35);
+      trailGrad.addColorStop(0, 'rgba(245, 158, 11, 0)');
+      trailGrad.addColorStop(0.55, 'rgba(245, 158, 11, 0.32)');
+      trailGrad.addColorStop(1, 'rgba(253, 230, 138, 0.65)');
+      ctx.fillStyle = trailGrad;
+      ctx.beginPath();
+      ctx.moveTo(-r * 0.36, -r * 0.35);
+      ctx.lineTo(r * 0.36, -r * 0.35);
+      ctx.lineTo(0, -r * 3.1);
+      ctx.closePath();
+      ctx.fill();
+
+      // Soft amber aura
+      const glow = ctx.createRadialGradient(0, r * 0.25, r * 0.15, 0, r * 0.2, r * 1.75);
+      glow.addColorStop(0, 'rgba(245, 158, 11, 0.52)');
+      glow.addColorStop(1, 'rgba(245, 158, 11, 0)');
+      ctx.fillStyle = glow;
+      ctx.beginPath();
+      ctx.arc(0, r * 0.2, r * 1.75, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Drop shadow
+      ctx.save();
+      ctx.translate(2, 3);
+      ctx.beginPath();
+      ctx.moveTo(0, r * 1.38);
+      ctx.lineTo(r * 0.98, r * 0.08);
+      ctx.lineTo(r * 0.36, r * 0.08);
+      ctx.lineTo(r * 0.42, -r * 1.25);
+      ctx.lineTo(0, -r * 0.92);
+      ctx.lineTo(-r * 0.42, -r * 1.25);
+      ctx.lineTo(-r * 0.36, r * 0.08);
+      ctx.lineTo(-r * 0.98, r * 0.08);
+      ctx.closePath();
+      ctx.fillStyle = 'rgba(2, 6, 23, 0.48)';
+      ctx.fill();
+      ctx.restore();
+
+      // Lit left bevel
+      const leftGrad = ctx.createLinearGradient(-r, -r * 1.2, 0, r * 1.38);
+      leftGrad.addColorStop(0, '#fef3c7');
+      leftGrad.addColorStop(0.45, '#f59e0b');
+      leftGrad.addColorStop(1, '#d97706');
+      ctx.beginPath();
+      ctx.moveTo(0, r * 1.38);
+      ctx.lineTo(-r * 0.98, r * 0.08);
+      ctx.lineTo(-r * 0.36, r * 0.08);
+      ctx.lineTo(-r * 0.42, -r * 1.25);
+      ctx.lineTo(0, -r * 0.92);
+      ctx.closePath();
+      ctx.fillStyle = leftGrad;
+      ctx.fill();
+
+      // Shaded right bevel
+      const rightGrad = ctx.createLinearGradient(0, -r * 1.2, r, r * 1.38);
+      rightGrad.addColorStop(0, '#d97706');
+      rightGrad.addColorStop(0.55, '#b45309');
+      rightGrad.addColorStop(1, '#78350f');
+      ctx.beginPath();
+      ctx.moveTo(0, r * 1.38);
+      ctx.lineTo(r * 0.98, r * 0.08);
+      ctx.lineTo(r * 0.36, r * 0.08);
+      ctx.lineTo(r * 0.42, -r * 1.25);
+      ctx.lineTo(0, -r * 0.92);
+      ctx.closePath();
+      ctx.fillStyle = rightGrad;
+      ctx.fill();
+
+      // Spine ridge & crisp outline
+      ctx.strokeStyle = 'rgba(254, 243, 199, 0.9)';
+      ctx.lineWidth = 1.3;
+      ctx.beginPath();
+      ctx.moveTo(0, -r * 0.9);
+      ctx.lineTo(0, r * 1.32);
+      ctx.stroke();
+
+      ctx.beginPath();
+      ctx.moveTo(0, r * 1.38);
+      ctx.lineTo(r * 0.98, r * 0.08);
+      ctx.lineTo(r * 0.36, r * 0.08);
+      ctx.lineTo(r * 0.42, -r * 1.25);
+      ctx.lineTo(0, -r * 0.92);
+      ctx.lineTo(-r * 0.42, -r * 1.25);
+      ctx.lineTo(-r * 0.36, r * 0.08);
+      ctx.lineTo(-r * 0.98, r * 0.08);
+      ctx.closePath();
+      ctx.strokeStyle = '#fde68a';
+      ctx.lineWidth = 1.35;
+      ctx.lineJoin = 'round';
+      ctx.stroke();
+
+      ctx.restore();
+    };
+
+    const drawHazardArrowViolet = (item: FallingItem) => {
+      const r = item.radius * 1.08;
+      const pulse = 1 + Math.sin(item.pulsePhase * 1.4) * 0.04;
+
+      ctx.save();
+      ctx.translate(item.x, item.y);
+      ctx.scale(pulse, pulse);
+
+      // Mystic violet speed streak
+      const trailGrad = ctx.createLinearGradient(0, -r * 3.3, 0, r * 0.35);
+      trailGrad.addColorStop(0, 'rgba(168, 85, 247, 0)');
+      trailGrad.addColorStop(0.55, 'rgba(168, 85, 247, 0.34)');
+      trailGrad.addColorStop(1, 'rgba(233, 213, 255, 0.68)');
+      ctx.fillStyle = trailGrad;
+      ctx.beginPath();
+      ctx.moveTo(-r * 0.38, -r * 0.35);
+      ctx.lineTo(r * 0.38, -r * 0.35);
+      ctx.lineTo(0, -r * 3.3);
+      ctx.closePath();
+      ctx.fill();
+
+      // Violet slow-field aura
+      const glow = ctx.createRadialGradient(0, r * 0.25, r * 0.15, 0, r * 0.2, r * 1.85);
+      glow.addColorStop(0, 'rgba(168, 85, 247, 0.55)');
+      glow.addColorStop(1, 'rgba(168, 85, 247, 0)');
+      ctx.fillStyle = glow;
+      ctx.beginPath();
+      ctx.arc(0, r * 0.2, r * 1.85, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Subtle shadow
+      ctx.save();
+      ctx.translate(2, 3);
+      ctx.beginPath();
+      ctx.moveTo(0, r * 1.4);
+      ctx.lineTo(r * 1.0, r * 0.05);
+      ctx.lineTo(r * 0.35, r * 0.18);
+      ctx.lineTo(r * 0.44, -r * 1.28);
+      ctx.lineTo(0, -r * 0.9);
+      ctx.lineTo(-r * 0.44, -r * 1.28);
+      ctx.lineTo(-r * 0.35, r * 0.18);
+      ctx.lineTo(-r * 1.0, r * 0.05);
+      ctx.closePath();
+      ctx.fillStyle = 'rgba(2, 6, 23, 0.5)';
+      ctx.fill();
+      ctx.restore();
+
+      // Lit left bevel
+      const leftGrad = ctx.createLinearGradient(-r, -r * 1.2, 0, r * 1.4);
+      leftGrad.addColorStop(0, '#f3e8ff');
+      leftGrad.addColorStop(0.45, '#a855f7');
+      leftGrad.addColorStop(1, '#7e22ce');
+      ctx.beginPath();
+      ctx.moveTo(0, r * 1.4);
+      ctx.lineTo(-r * 1.0, r * 0.05);
+      ctx.lineTo(-r * 0.35, r * 0.18);
+      ctx.lineTo(-r * 0.44, -r * 1.28);
+      ctx.lineTo(0, -r * 0.9);
+      ctx.closePath();
+      ctx.fillStyle = leftGrad;
+      ctx.fill();
+
+      // Shaded right bevel
+      const rightGrad = ctx.createLinearGradient(0, -r * 1.2, r, r * 1.4);
+      rightGrad.addColorStop(0, '#9333ea');
+      rightGrad.addColorStop(0.55, '#6b21a8');
+      rightGrad.addColorStop(1, '#3b0764');
+      ctx.beginPath();
+      ctx.moveTo(0, r * 1.4);
+      ctx.lineTo(r * 1.0, r * 0.05);
+      ctx.lineTo(r * 0.35, r * 0.18);
+      ctx.lineTo(r * 0.44, -r * 1.28);
+      ctx.lineTo(0, -r * 0.9);
+      ctx.closePath();
+      ctx.fillStyle = rightGrad;
+      ctx.fill();
+
+      // Center luminous ridge + crisp outline
+      ctx.strokeStyle = 'rgba(243, 232, 255, 0.9)';
+      ctx.lineWidth = 1.3;
+      ctx.beginPath();
+      ctx.moveTo(0, -r * 0.88);
+      ctx.lineTo(0, r * 1.34);
+      ctx.stroke();
+
+      ctx.beginPath();
+      ctx.moveTo(0, r * 1.4);
+      ctx.lineTo(r * 1.0, r * 0.05);
+      ctx.lineTo(r * 0.35, r * 0.18);
+      ctx.lineTo(r * 0.44, -r * 1.28);
+      ctx.lineTo(0, -r * 0.9);
+      ctx.lineTo(-r * 0.44, -r * 1.28);
+      ctx.lineTo(-r * 0.35, r * 0.18);
+      ctx.lineTo(-r * 1.0, r * 0.05);
+      ctx.closePath();
+      ctx.strokeStyle = '#e9d5ff';
+      ctx.lineWidth = 1.35;
+      ctx.lineJoin = 'round';
+      ctx.stroke();
+
+      ctx.restore();
+    };
+
     const drawPlayer = () => {
       const sim = simRef.current;
       if (sim.invulnTimer > 0 && Math.floor(sim.invulnTimer * 16) % 2 === 0) {
@@ -4022,6 +5686,32 @@ export default function App() {
         : Math.max(-0.14, Math.min(0.14, sim.playerVx / 3000));
       const scaleX = 1 + sim.playerBounce * 0.11;
       const scaleY = 1 - sim.playerBounce * 0.13;
+
+      if (gameModeRef.current === 'gold') {
+        drawGoldTreasureCatcher(
+          ctx,
+          sim.playerX,
+          sim.playerY,
+          w,
+          h,
+          tilt,
+          scaleX,
+          scaleY,
+          sim.playerGlowColor,
+          sim.playerGlowAlpha
+        );
+        drawCatcherShieldBubble(
+          ctx,
+          sim.playerX,
+          sim.playerY,
+          w,
+          h,
+          shopRef.current.shields,
+          false,
+          sim.shieldTimer
+        );
+        return;
+      }
 
       if (gameModeRef.current === 'fruit') {
         drawFruitPearCatcher(
@@ -4098,6 +5788,27 @@ export default function App() {
           ctx.textAlign = 'center';
           ctx.textBaseline = 'bottom';
           ctx.fillText(`❄ ${sim.freezeTimer.toFixed(1)}s`, 0, meterY - 3);
+          ctx.restore();
+        } else if (sim.slowTimer > 0) {
+          ctx.save();
+          ctx.translate(sim.playerX, sim.playerY);
+          const slowFrac = Math.max(
+            0,
+            Math.min(1, sim.slowTimer / VIOLET_ARROW_SLOW_DURATION)
+          );
+          const meterW = w * 0.84;
+          const meterY = -halfH - 19;
+          drawRoundedRectPath(ctx, -meterW / 2, meterY, meterW, 4.5, 2.25);
+          ctx.fillStyle = 'rgba(15, 23, 42, 0.78)';
+          ctx.fill();
+          drawRoundedRectPath(ctx, -meterW / 2, meterY, meterW * slowFrac, 4.5, 2.25);
+          ctx.fillStyle = '#c084fc';
+          ctx.fill();
+          ctx.fillStyle = '#f3e8ff';
+          ctx.font = '700 11px "Segoe UI", system-ui, sans-serif';
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'bottom';
+          ctx.fillText(`▼ ${sim.slowTimer.toFixed(1)}s`, 0, meterY - 3);
           ctx.restore();
         }
         return;
@@ -4282,6 +5993,24 @@ export default function App() {
         ctx.textAlign = 'center';
         ctx.textBaseline = 'bottom';
         ctx.fillText(`❄ ${sim.freezeTimer.toFixed(1)}s`, 0, meterY - 3);
+      } else if (sim.slowTimer > 0) {
+        const slowFrac = Math.max(
+          0,
+          Math.min(1, sim.slowTimer / VIOLET_ARROW_SLOW_DURATION)
+        );
+        const meterW = w * 0.84;
+        const meterY = -halfH - 19;
+        drawRoundedRectPath(ctx, -meterW / 2, meterY, meterW, 4.5, 2.25);
+        ctx.fillStyle = 'rgba(15, 23, 42, 0.78)';
+        ctx.fill();
+        drawRoundedRectPath(ctx, -meterW / 2, meterY, meterW * slowFrac, 4.5, 2.25);
+        ctx.fillStyle = '#c084fc';
+        ctx.fill();
+        ctx.fillStyle = '#f3e8ff';
+        ctx.font = '700 11px "Segoe UI", system-ui, sans-serif';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'bottom';
+        ctx.fillText(`▼ ${sim.slowTimer.toFixed(1)}s`, 0, meterY - 3);
       }
 
       ctx.restore();
@@ -4313,13 +6042,17 @@ export default function App() {
       }
 
       const isFruitRender = gameModeRef.current === 'fruit';
+      const isGoldRender = gameModeRef.current === 'gold';
       const isSpeedBoost =
         !isFruitRender &&
+        !isGoldRender &&
         sim.speedBoostTimer > 0 &&
         statusRef.current === 'PLAYING';
 
       if (isFruitRender) {
         drawFruitBackground(ctx, width, height, sim.fruitMotifs);
+      } else if (isGoldRender) {
+        drawGoldBackground(ctx, width, height, sim.goldMotifs);
       } else {
         const bgGrad = ctx.createLinearGradient(0, 0, 0, height);
         bgGrad.addColorStop(0, '#070f1e');
@@ -4374,9 +6107,10 @@ export default function App() {
       }
 
       const railY = sim.playerY + sim.playerHeight / 2 + 10;
-      ctx.strokeStyle = isFruitRender
-        ? 'rgba(250, 204, 21, 0.25)'
-        : 'rgba(148, 163, 184, 0.2)';
+      ctx.strokeStyle =
+        isFruitRender || isGoldRender
+          ? 'rgba(250, 204, 21, 0.28)'
+          : 'rgba(148, 163, 184, 0.2)';
       ctx.lineWidth = 2;
       ctx.beginPath();
       ctx.moveTo(20, railY);
@@ -4392,7 +6126,7 @@ export default function App() {
       );
       railGlow.addColorStop(
         0,
-        isFruitRender
+        isFruitRender || isGoldRender
           ? 'rgba(250, 204, 21, 0)'
           : isSpeedBoost
           ? 'rgba(16, 185, 129, 0)'
@@ -4400,7 +6134,9 @@ export default function App() {
       );
       railGlow.addColorStop(
         0.5,
-        isFruitRender
+        isGoldRender
+          ? 'rgba(251, 191, 36, 0.96)'
+          : isFruitRender
           ? 'rgba(250, 204, 21, 0.92)'
           : isSpeedBoost
           ? 'rgba(52, 211, 153, 0.95)'
@@ -4408,7 +6144,7 @@ export default function App() {
       );
       railGlow.addColorStop(
         1,
-        isFruitRender
+        isFruitRender || isGoldRender
           ? 'rgba(250, 204, 21, 0)'
           : isSpeedBoost
           ? 'rgba(16, 185, 129, 0)'
@@ -4427,10 +6163,14 @@ export default function App() {
       for (const item of sim.items) {
         if (isFruitRender) {
           drawFruitCanvasItem(ctx, item as FruitRenderItem);
+        } else if (isGoldRender) {
+          drawGoldCanvasItem(ctx, item as GoldRenderItem);
         } else if (
           item.kind === 'pink_circle' ||
           item.kind === 'green_circle' ||
-          item.kind === 'blue_triangle'
+          item.kind === 'blue_triangle' ||
+          item.kind === 'purple_diamond' ||
+          item.kind === 'gold_star'
         ) {
           if (activePlusSkin !== 'classic') {
             drawCustomPlusPoint(ctx, item, activePlusSkin);
@@ -4438,6 +6178,10 @@ export default function App() {
             drawPinkCircle(item);
           } else if (item.kind === 'green_circle') {
             drawGreenCircle(item);
+          } else if (item.kind === 'purple_diamond') {
+            drawPurpleDiamond(item);
+          } else if (item.kind === 'gold_star') {
+            drawGoldStar(item);
           } else {
             drawBlueTriangle(item);
           }
@@ -4449,6 +6193,10 @@ export default function App() {
           drawHazardStar(item);
         } else if (item.kind === 'hazard_arrow') {
           drawHazardArrow(item);
+        } else if (item.kind === 'hazard_arrow_amber') {
+          drawHazardArrowAmber(item);
+        } else if (item.kind === 'hazard_arrow_violet') {
+          drawHazardArrowViolet(item);
         } else {
           drawHazardSpike(item);
         }
@@ -4617,7 +6365,12 @@ export default function App() {
   };
 
   const anyModalOpen =
-    stagesModalOpen || indexModalOpen || shopModalOpen || settingsModalOpen;
+    stagesModalOpen ||
+    indexModalOpen ||
+    shopModalOpen ||
+    bagModalOpen ||
+    settingsModalOpen;
+  const totalBagCount = bag.hearts + bag.corn + bag.diamonds;
   const positiveCatalog = INDEX_CATALOG.filter((e) => e.category === 'positive');
   const negativeCatalog = INDEX_CATALOG.filter((e) => e.category === 'negative');
   const activeIndexEntries =
@@ -4642,6 +6395,21 @@ export default function App() {
   ).length;
   const fruitNegativeDiscoveredCount = fruitNegativeCatalog.filter((e) =>
     discoveredFruitItems.includes(e.kind)
+  ).length;
+
+  const goldPositiveCatalog = GOLD_INDEX_CATALOG.filter(
+    (e) => e.category === 'positive'
+  );
+  const goldNegativeCatalog = GOLD_INDEX_CATALOG.filter(
+    (e) => e.category === 'negative'
+  );
+  const activeGoldIndexEntries =
+    indexTab === 'positive' ? goldPositiveCatalog : goldNegativeCatalog;
+  const goldPositiveDiscoveredCount = goldPositiveCatalog.filter((e) =>
+    discoveredGoldItems.includes(e.kind)
+  ).length;
+  const goldNegativeDiscoveredCount = goldNegativeCatalog.filter((e) =>
+    discoveredGoldItems.includes(e.kind)
   ).length;
 
   return (
@@ -4716,6 +6484,39 @@ export default function App() {
                   <path d="M16 10a4 4 0 0 1-8 0" />
                 </svg>
                 <span>{t.shopBtn}</span>
+              </button>
+
+              {/* Bag Button ("الحقيبة") */}
+              <button
+                type="button"
+                onClick={openBagModal}
+                aria-expanded={bagModalOpen}
+                className={`h-7 lg:h-8 px-1.5 sm:px-2.5 inline-flex items-center justify-center gap-1 rounded-md border text-[11px] sm:text-xs font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-400 whitespace-nowrap shrink-0 cursor-pointer ${
+                  bagModalOpen
+                    ? 'border-rose-400/60 bg-rose-500/20 text-rose-200'
+                    : 'border-rose-400/30 bg-rose-500/10 text-rose-200 hover:bg-rose-500/20 hover:text-rose-100'
+                }`}
+              >
+                <svg
+                  viewBox="0 0 24 24"
+                  className="w-3 h-3 sm:w-3.5 sm:h-3.5 shrink-0"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  aria-hidden="true"
+                >
+                  <path d="M5 10a4 4 0 0 1 4-4h6a4 4 0 0 1 4 4v9a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2v-9z" />
+                  <path d="M9 6V5a3 3 0 0 1 6 0v1" />
+                  <path d="M9 13h6" />
+                </svg>
+                <span>{t.bagBtn}</span>
+                {totalBagCount > 0 && (
+                  <span className="font-num text-[10px] font-bold text-white">
+                    ({totalBagCount})
+                  </span>
+                )}
               </button>
 
               {/* Index Button ("الاندكس") */}
@@ -4826,7 +6627,11 @@ export default function App() {
               </span>
               <span
                 className={`font-num text-xs sm:text-sm lg:text-base font-bold ${
-                  isFruitMode ? 'text-amber-300' : 'text-sky-300'
+                  isGoldMode
+                    ? 'text-yellow-300'
+                    : isFruitMode
+                    ? 'text-amber-300'
+                    : 'text-sky-300'
                 }`}
               >
                 {stageNum}/{activeTotalStages}
@@ -4894,12 +6699,20 @@ export default function App() {
 
             <div className="h-3.5 sm:h-4 w-px bg-white/10 shrink-0" aria-hidden="true" />
 
-            {/* Lives (Hearts in Normal mode, Corn in Fruit mode) + live 5-min regen + buy for 13 coins */}
+            {/* Lives (Hearts in Normal, Corn in Fruit, Diamonds in Gold) + live 5-min regen + buy button */}
             <div
               className="flex items-center gap-1 sm:gap-1.5 whitespace-nowrap"
-              aria-label={`${isFruitMode ? t.cornLabel : t.lives}: ${activeLives}/${activeMaxLives}`}
+              aria-label={`${
+                isGoldMode ? t.diamondsLabel : isFruitMode ? t.cornLabel : t.lives
+              }: ${activeLives}/${activeMaxLives}`}
             >
-              {isFruitMode ? (
+              {isGoldMode ? (
+                <DiamondIcon
+                  className={`w-4 h-4 sm:w-5 sm:h-5 shrink-0 ${
+                    activeLives > 0 ? '' : 'opacity-40 grayscale'
+                  }`}
+                />
+              ) : isFruitMode ? (
                 <CornIcon
                   className={`w-4 h-4 sm:w-5 sm:h-5 shrink-0 ${
                     activeLives > 0 ? '' : 'opacity-40 grayscale'
@@ -4920,7 +6733,9 @@ export default function App() {
               <span
                 className={`font-num text-xs sm:text-sm lg:text-base font-bold ${
                   activeLives > 0
-                    ? isFruitMode
+                    ? isGoldMode
+                      ? 'text-sky-300'
+                      : isFruitMode
                       ? 'text-amber-300'
                       : 'text-rose-300'
                     : 'text-slate-400'
@@ -4936,29 +6751,43 @@ export default function App() {
               <button
                 type="button"
                 onClick={buyHeart}
-                disabled={activeLives >= activeMaxLives || coins < HEART_COST_COINS}
-                aria-label={isFruitMode ? t.buyCornAria : t.buyHeartAria}
+                disabled={activeLives >= activeMaxLives || coins < activeLifeBuyCost}
+                aria-label={
+                  isGoldMode
+                    ? t.buyDiamondAria
+                    : isFruitMode
+                    ? t.buyCornAria
+                    : t.buyHeartAria
+                }
                 title={
                   activeLives >= activeMaxLives
-                    ? isFruitMode
+                    ? isGoldMode
+                      ? t.diamondsFullTip
+                      : isFruitMode
                       ? t.cornFullTip
                       : t.heartsFullTip
-                    : coins < HEART_COST_COINS
-                    ? isFruitMode
+                    : coins < activeLifeBuyCost
+                    ? isGoldMode
+                      ? t.needCoinsDiamondTip
+                      : isFruitMode
                       ? t.needCoinsCornTip
                       : t.needCoinsTip
+                    : isGoldMode
+                    ? t.buyDiamondAria
                     : isFruitMode
                     ? t.buyCornAria
                     : t.buyHeartAria
                 }
                 className={`h-6 px-1.5 inline-flex items-center justify-center gap-0.5 rounded border text-[10px] sm:text-[11px] font-bold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400 shrink-0 ${
-                  activeLives < activeMaxLives && coins >= HEART_COST_COINS
-                    ? 'border-amber-400/50 bg-amber-500/20 text-amber-200 hover:bg-amber-500/35 active:scale-95 cursor-pointer'
+                  activeLives < activeMaxLives && coins >= activeLifeBuyCost
+                    ? isGoldMode
+                      ? 'border-yellow-400/60 bg-yellow-400/20 text-yellow-200 hover:bg-yellow-400/35 active:scale-95 cursor-pointer'
+                      : 'border-amber-400/50 bg-amber-500/20 text-amber-200 hover:bg-amber-500/35 active:scale-95 cursor-pointer'
                     : 'border-white/10 bg-slate-900/70 text-slate-500 cursor-not-allowed'
                 }`}
               >
                 <span>+</span>
-                <span className="font-num">{HEART_COST_COINS}</span>
+                <span className="font-num">{activeLifeBuyCost}</span>
                 <svg
                   viewBox="0 0 24 24"
                   className="w-2.5 h-2.5 sm:w-3 sm:h-3 text-amber-400 shrink-0"
@@ -4989,7 +6818,9 @@ export default function App() {
         >
           <div
             className={`h-full transition-transform duration-150 origin-left rtl:origin-right ${
-              isFruitMode
+              isGoldMode
+                ? 'bg-gradient-to-r from-amber-300 via-yellow-400 to-sky-400'
+                : isFruitMode
                 ? 'bg-gradient-to-r from-amber-400 via-lime-400 to-rose-400'
                 : 'bg-gradient-to-r from-pink-400 to-sky-400'
             }`}
@@ -5208,11 +7039,17 @@ export default function App() {
             <div className="absolute inset-0 flex items-center justify-center p-4 bg-[#060c17]/76 backdrop-blur-[3px]">
               <div
                 className={`w-full max-w-md rounded-xl border bg-[#0f1a2e]/95 p-6 sm:p-8 text-center shadow-2xl ${
-                  isFruitMode ? 'border-amber-400/30' : 'border-sky-400/25'
+                  isGoldMode
+                    ? 'border-yellow-400/40'
+                    : isFruitMode
+                    ? 'border-amber-400/30'
+                    : 'border-sky-400/25'
                 }`}
               >
                 <h2 className="text-2xl sm:text-3xl font-bold text-white mb-2 text-balance">
-                  {isFruitMode
+                  {isGoldMode
+                    ? t.goldStageCompleteTitle(stageNum)
+                    : isFruitMode
                     ? t.fruitStageCompleteTitle(stageNum)
                     : t.stageCompleteTitle(stageNum)}
                 </h2>
@@ -5221,7 +7058,9 @@ export default function App() {
                     lastEarnedCoins > 0 ? 'text-amber-300' : 'text-slate-400'
                   }`}
                 >
-                  {isFruitMode
+                  {isGoldMode
+                    ? t.goldCoinsEarned(lastEarnedCoins, diamonds)
+                    : isFruitMode
                     ? t.fruitCoinsEarned(lastEarnedCoins, corn)
                     : t.coinsEarned(lastEarnedCoins, lives)}
                 </p>
@@ -5248,11 +7087,19 @@ export default function App() {
                   </div>
                   <div className="px-2">
                     <div className="text-xs text-slate-400 mb-1">
-                      {isFruitMode ? t.cornLabel : t.lives}
+                      {isGoldMode
+                        ? t.diamondsLabel
+                        : isFruitMode
+                        ? t.cornLabel
+                        : t.lives}
                     </div>
                     <div
                       className={`font-num text-2xl sm:text-3xl font-bold ${
-                        isFruitMode ? 'text-amber-300' : 'text-rose-400'
+                        isGoldMode
+                          ? 'text-sky-300'
+                          : isFruitMode
+                          ? 'text-amber-300'
+                          : 'text-rose-400'
                       }`}
                     >
                       {activeLives}/{activeMaxLives}
@@ -5267,15 +7114,21 @@ export default function App() {
                   className={`w-full sm:w-auto min-w-[220px] px-8 py-3.5 rounded-lg font-bold text-base transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-300 focus-visible:ring-offset-2 focus-visible:ring-offset-[#0f1a2e] whitespace-nowrap ${
                     activeLives <= 0
                       ? 'bg-slate-700 text-slate-300 cursor-not-allowed'
+                      : isGoldMode
+                      ? 'bg-gradient-to-r from-yellow-400 via-amber-400 to-sky-400 hover:brightness-110 active:scale-[0.98] text-slate-950 cursor-pointer'
                       : isFruitMode
                       ? 'bg-amber-400 hover:bg-amber-300 active:scale-[0.98] text-slate-950 cursor-pointer'
                       : 'bg-sky-500 hover:bg-sky-400 active:scale-[0.98] text-slate-950 cursor-pointer'
                   }`}
                 >
                   {activeLives <= 0
-                    ? isFruitMode
+                    ? isGoldMode
+                      ? t.waitDiamondBtn(formatCountdown(activeNextRegenMs))
+                      : isFruitMode
                       ? t.waitCornBtn(formatCountdown(activeNextRegenMs))
                       : t.waitHeartBtn(formatCountdown(activeNextRegenMs))
+                    : isGoldMode
+                    ? t.goldNextStageBtn(stageNum + 1)
                     : isFruitMode
                     ? t.fruitNextStageBtn(stageNum + 1)
                     : t.nextStageBtn(stageNum + 1)}
@@ -5287,10 +7140,16 @@ export default function App() {
           {/* Game Over / Victory Overlay */}
           {(status === 'GAME_OVER' || status === 'VICTORY') && !anyModalOpen && (
               <div className="absolute inset-0 flex items-center justify-center p-4 bg-[#060c17]/78 backdrop-blur-[3px]">
-                <div className="w-full max-w-md rounded-xl border border-white/12 bg-[#0f1a2e]/95 p-6 sm:p-8 text-center shadow-2xl">
+                <div
+                  className={`w-full max-w-md rounded-xl border bg-[#0f1a2e]/95 p-6 sm:p-8 text-center shadow-2xl ${
+                    isGoldMode ? 'border-yellow-400/35' : 'border-white/12'
+                  }`}
+                >
                   <h2 className="text-2xl sm:text-3xl font-bold text-white mb-2 text-balance">
                     {status === 'VICTORY'
-                      ? isFruitMode
+                      ? isGoldMode
+                        ? t.goldVictoryTitle
+                        : isFruitMode
                         ? t.fruitVictoryTitle
                         : t.victoryTitle
                       : t.gameOver}
@@ -5303,12 +7162,16 @@ export default function App() {
                           lastEarnedCoins > 0 ? 'text-amber-300' : 'text-slate-400'
                         }`}
                       >
-                        {isFruitMode
+                        {isGoldMode
+                          ? t.goldCoinsEarned(lastEarnedCoins, diamonds)
+                          : isFruitMode
                           ? t.fruitCoinsEarned(lastEarnedCoins, corn)
                           : t.coinsEarned(lastEarnedCoins, lives)}
                       </p>
                       <p className="text-sm font-medium text-emerald-300 mb-3">
-                        {isFruitMode
+                        {isGoldMode
+                          ? t.goldVictorySubtitle
+                          : isFruitMode
                           ? t.fruitVictorySubtitle
                           : t.victorySubtitle}
                       </p>
@@ -5345,7 +7208,11 @@ export default function App() {
                       </div>
                       <div
                         className={`font-num text-2xl sm:text-3xl font-bold ${
-                          isFruitMode ? 'text-amber-300' : 'text-sky-300'
+                          isGoldMode
+                            ? 'text-yellow-300'
+                            : isFruitMode
+                            ? 'text-amber-300'
+                            : 'text-sky-300'
                         }`}
                       >
                         {stageNum}/{activeTotalStages}
@@ -5362,7 +7229,9 @@ export default function App() {
 
                   {activeLives <= 0 && (
                     <p className="text-xs sm:text-sm font-semibold text-rose-300 mb-3">
-                      {isFruitMode
+                      {isGoldMode
+                        ? t.noDiamondsNotice(formatCountdown(activeNextRegenMs))
+                        : isFruitMode
                         ? t.noCornNotice(formatCountdown(activeNextRegenMs))
                         : t.noHeartsNotice(formatCountdown(activeNextRegenMs))}
                     </p>
@@ -5372,15 +7241,19 @@ export default function App() {
                     {activeLives <= 0 && (
                       <button
                         type="button"
-                        disabled={coins < HEART_COST_COINS}
+                        disabled={coins < activeLifeBuyCost}
                         onClick={buyHeart}
                         className={`w-full sm:w-auto px-5 py-3.5 rounded-lg font-bold text-sm sm:text-base transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-300 whitespace-nowrap ${
-                          coins >= HEART_COST_COINS
+                          coins >= activeLifeBuyCost
                             ? 'bg-amber-400 hover:bg-amber-300 active:scale-[0.98] text-slate-950 cursor-pointer'
                             : 'bg-slate-800 text-slate-500 border border-white/10 cursor-not-allowed'
                         }`}
                       >
-                        {isFruitMode ? t.buyCornBtn : t.buyHeartBtn}
+                        {isGoldMode
+                          ? t.buyDiamondBtn
+                          : isFruitMode
+                          ? t.buyCornBtn
+                          : t.buyHeartBtn}
                       </button>
                     )}
                     <button
@@ -5394,13 +7267,17 @@ export default function App() {
                       className={`w-full sm:w-auto min-w-[200px] px-8 py-3.5 rounded-lg font-bold text-base transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-300 focus-visible:ring-offset-2 focus-visible:ring-offset-[#0f1a2e] whitespace-nowrap ${
                         activeLives <= 0
                           ? 'bg-slate-700 text-slate-300 cursor-not-allowed'
+                          : isGoldMode
+                          ? 'bg-gradient-to-r from-yellow-400 via-amber-400 to-sky-400 hover:brightness-110 active:scale-[0.98] text-slate-950 cursor-pointer'
                           : isFruitMode
                           ? 'bg-amber-400 hover:bg-amber-300 active:scale-[0.98] text-slate-950 cursor-pointer'
                           : 'bg-sky-500 hover:bg-sky-400 active:scale-[0.98] text-slate-950 cursor-pointer'
                       }`}
                     >
                       {activeLives <= 0
-                        ? isFruitMode
+                        ? isGoldMode
+                          ? t.waitDiamondBtn(formatCountdown(activeNextRegenMs))
+                          : isFruitMode
                           ? t.waitCornBtn(formatCountdown(activeNextRegenMs))
                           : t.waitHeartBtn(formatCountdown(activeNextRegenMs))
                         : t.playAgainBtn}
@@ -5446,18 +7323,18 @@ export default function App() {
                 </div>
 
                 <div className="px-5 pt-3.5 pb-5 overflow-y-auto">
-                  {/* World Tabs inside Stages Modal: Normal Stages vs Fruit Stages (32 Coins) */}
+                  {/* World Tabs inside Stages Modal: Normal (50) | Fruit (15, 28 Coins) | Gold (15, Free) */}
                   <div
                     role="tablist"
                     aria-label={t.stagesModalTitle}
-                    className="grid grid-cols-2 gap-2 p-1 rounded-lg bg-slate-950/75 border border-white/10 mb-3.5"
+                    className="grid grid-cols-3 gap-1.5 p-1 rounded-lg bg-slate-950/75 border border-white/10 mb-3.5"
                   >
                     <button
                       type="button"
                       role="tab"
                       aria-selected={stagesModalTab === 'normal'}
                       onClick={() => setStagesModalTab('normal')}
-                      className={`h-10 px-2.5 rounded-md inline-flex items-center justify-center gap-1.5 text-xs sm:text-sm font-bold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400 whitespace-nowrap cursor-pointer ${
+                      className={`h-10 px-2 rounded-md inline-flex items-center justify-center gap-1 text-[11px] sm:text-xs font-bold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400 whitespace-nowrap cursor-pointer ${
                         stagesModalTab === 'normal'
                           ? 'bg-sky-500 text-slate-950'
                           : 'text-slate-300 hover:text-white hover:bg-slate-800/70'
@@ -5465,7 +7342,7 @@ export default function App() {
                     >
                       <span>{t.normalWorldLabel}</span>
                       <span
-                        className={`font-num text-[11px] ${
+                        className={`font-num text-[10px] sm:text-[11px] ${
                           stagesModalTab === 'normal'
                             ? 'text-slate-900'
                             : 'text-slate-400'
@@ -5480,7 +7357,7 @@ export default function App() {
                       role="tab"
                       aria-selected={stagesModalTab === 'fruit'}
                       onClick={() => setStagesModalTab('fruit')}
-                      className={`h-10 px-2.5 rounded-md inline-flex items-center justify-center gap-1.5 text-xs sm:text-sm font-bold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400 whitespace-nowrap cursor-pointer ${
+                      className={`h-10 px-2 rounded-md inline-flex items-center justify-center gap-1 text-[11px] sm:text-xs font-bold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400 whitespace-nowrap cursor-pointer ${
                         stagesModalTab === 'fruit'
                           ? 'bg-amber-400 text-slate-950'
                           : 'text-amber-200 hover:text-white hover:bg-amber-500/15'
@@ -5489,7 +7366,7 @@ export default function App() {
                       <span>{t.fruitWorldLabel}</span>
                       {!fruitUnlocked ? (
                         <span
-                          className={`font-num text-[11px] inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded ${
+                          className={`font-num text-[10px] inline-flex items-center gap-0.5 px-1 py-0.5 rounded ${
                             stagesModalTab === 'fruit'
                               ? 'bg-slate-950/20 text-slate-950'
                               : 'bg-amber-500/20 text-amber-300'
@@ -5497,7 +7374,7 @@ export default function App() {
                         >
                           <svg
                             viewBox="0 0 24 24"
-                            className="w-3 h-3"
+                            className="w-2.5 h-2.5"
                             fill="none"
                             stroke="currentColor"
                             strokeWidth="2.4"
@@ -5512,13 +7389,61 @@ export default function App() {
                         </span>
                       ) : (
                         <span
-                          className={`font-num text-[11px] ${
+                          className={`font-num text-[10px] sm:text-[11px] ${
                             stagesModalTab === 'fruit'
                               ? 'text-slate-900'
                               : 'text-amber-300/80'
                           }`}
                         >
                           ({TOTAL_FRUIT_STAGES})
+                        </span>
+                      )}
+                    </button>
+
+                    <button
+                      type="button"
+                      role="tab"
+                      aria-selected={stagesModalTab === 'gold'}
+                      onClick={() => setStagesModalTab('gold')}
+                      className={`h-10 px-2 rounded-md inline-flex items-center justify-center gap-1 text-[11px] sm:text-xs font-bold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-yellow-300 whitespace-nowrap cursor-pointer ${
+                        stagesModalTab === 'gold'
+                          ? 'bg-gradient-to-r from-yellow-400 via-amber-400 to-sky-400 text-slate-950'
+                          : 'text-yellow-200 hover:text-white hover:bg-yellow-500/15'
+                      }`}
+                    >
+                      <span>{t.goldWorldLabel}</span>
+                      {!goldUnlocked ? (
+                        <span
+                          className={`font-num text-[10px] inline-flex items-center gap-0.5 px-1 py-0.5 rounded ${
+                            stagesModalTab === 'gold'
+                              ? 'bg-slate-950/20 text-slate-950'
+                              : 'bg-yellow-400/20 text-yellow-300'
+                          }`}
+                        >
+                          <svg
+                            viewBox="0 0 24 24"
+                            className="w-2.5 h-2.5"
+                            fill="none"
+                            stroke="currentColor"
+                            strokeWidth="2.4"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            aria-hidden="true"
+                          >
+                            <rect x="5" y="11" width="14" height="10" rx="2" />
+                            <path d="M8 11V7a4 4 0 0 1 8 0v4" />
+                          </svg>
+                          {GOLD_UNLOCK_COST}
+                        </span>
+                      ) : (
+                        <span
+                          className={`font-num text-[10px] sm:text-[11px] ${
+                            stagesModalTab === 'gold'
+                              ? 'text-slate-950/85'
+                              : 'text-sky-300/90'
+                          }`}
+                        >
+                          ({TOTAL_GOLD_STAGES})
                         </span>
                       )}
                     </button>
@@ -5551,7 +7476,8 @@ export default function App() {
 
                       <div className="grid grid-cols-4 sm:grid-cols-5 gap-2.5">
                         {STAGES.map((cfg) => {
-                          const isCurrent = !isFruitMode && cfg.stage === stageNum;
+                          const isCurrent =
+                            !isFruitMode && !isGoldMode && cfg.stage === stageNum;
                           const isCompleted = completedStages.includes(cfg.stage);
                           const unlocked = isStageUnlocked(cfg.stage, completedStages);
                           const canEnter = unlocked && lives > 0;
@@ -5631,6 +7557,172 @@ export default function App() {
                         })}
                       </div>
                     </>
+                  ) : stagesModalTab === 'gold' ? (
+                    !goldUnlocked ? (
+                      <div className="rounded-xl border border-yellow-400/35 bg-gradient-to-b from-[#332208]/90 via-[#1b150a]/95 to-[#0c1624]/95 p-5 text-center">
+                        <div className="flex items-center justify-center gap-2 mb-3">
+                          <GoldIndexIcon kind="gold_coin" />
+                          <GoldIndexIcon kind="gold_bar" />
+                          <GoldIndexIcon kind="gold_crown" />
+                          <GoldIndexIcon kind="blue_diamond" />
+                          <DiamondIcon className="w-8 h-8" />
+                        </div>
+                        <h3 className="text-lg sm:text-xl font-bold text-yellow-200 mb-2">
+                          {t.goldUnlockTitle}
+                        </h3>
+                        <p className="text-xs sm:text-sm text-slate-200 leading-relaxed mb-4">
+                          {t.goldUnlockDesc}
+                        </p>
+
+                        <button
+                          type="button"
+                          disabled={coins < GOLD_UNLOCK_COST}
+                          onClick={unlockGoldWorld}
+                          className={`w-full sm:w-auto min-w-[230px] px-6 py-3 rounded-lg font-bold text-sm sm:text-base transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-yellow-300 whitespace-nowrap ${
+                            coins >= GOLD_UNLOCK_COST
+                              ? 'bg-gradient-to-r from-yellow-400 via-amber-400 to-sky-400 hover:brightness-110 active:scale-[0.98] text-slate-950 cursor-pointer'
+                              : 'bg-slate-800 text-slate-400 border border-white/10 cursor-not-allowed'
+                          }`}
+                        >
+                          {t.goldUnlockBtn}
+                        </button>
+
+                        {coins < GOLD_UNLOCK_COST && (
+                          <p className="text-xs text-yellow-300/85 mt-2.5 font-medium">
+                            {t.goldNeedCoins(GOLD_UNLOCK_COST - coins)}
+                          </p>
+                        )}
+                      </div>
+                    ) : (
+                      <>
+                        <p className="text-xs sm:text-sm text-yellow-100/90 mb-3">
+                          {t.goldStagesModalHint}
+                        </p>
+
+                      {/* Dedicated Diamonds Lives Bar inside Gold Stages (10 coins per diamond) */}
+                      <div className="flex flex-wrap items-center justify-between gap-2 mb-3 p-2.5 rounded-lg border border-yellow-400/30 bg-gradient-to-r from-[#231907]/90 via-[#1b160b]/90 to-[#0d1f32]/90">
+                        <div className="flex items-center gap-1.5">
+                          <DiamondIcon className="w-5 h-5 shrink-0" />
+                          <span className="text-xs sm:text-sm font-bold text-sky-200">
+                            {t.diamondsLabel}:{' '}
+                            <span className="font-num text-yellow-200">
+                              {diamonds}/{MAX_DIAMONDS}
+                            </span>
+                          </span>
+                          {diamonds < MAX_DIAMONDS && (
+                            <span className="font-num text-[11px] font-semibold text-sky-300 bg-sky-500/15 border border-sky-400/25 rounded px-1.5 py-0.5">
+                              {formatCountdown(nextDiamondInMs)}
+                            </span>
+                          )}
+                        </div>
+                        {diamonds < MAX_DIAMONDS && (
+                          <button
+                            type="button"
+                            disabled={coins < DIAMOND_COST_COINS}
+                            onClick={() => buyLifeForMode('gold')}
+                            className={`px-2.5 py-1 rounded-md text-xs font-bold transition-colors whitespace-nowrap ${
+                              coins >= DIAMOND_COST_COINS
+                                ? 'bg-gradient-to-r from-yellow-400 to-sky-400 hover:brightness-110 text-slate-950 cursor-pointer'
+                                : 'bg-slate-800 text-slate-500 cursor-not-allowed'
+                            }`}
+                          >
+                            {t.buyDiamondBtn}
+                          </button>
+                        )}
+                      </div>
+
+                      {diamonds <= 0 && (
+                        <p className="text-xs sm:text-sm font-semibold text-rose-300 mb-3">
+                          {t.noDiamondsNotice(formatCountdown(nextDiamondInMs))}
+                        </p>
+                      )}
+
+                      <div className="grid grid-cols-3 sm:grid-cols-5 gap-2.5">
+                        {GOLD_STAGES.map((cfg) => {
+                          const isCurrent = isGoldMode && cfg.stage === stageNum;
+                          const isCompleted = completedGoldStages.includes(cfg.stage);
+                          const unlocked = isStageUnlocked(
+                            cfg.stage,
+                            completedGoldStages
+                          );
+                          const canEnter = unlocked && diamonds > 0;
+                          return (
+                            <button
+                              key={cfg.stage}
+                              type="button"
+                              disabled={!canEnter}
+                              aria-label={
+                                unlocked
+                                  ? `${t.goldStageBanner(cfg.stage)} — ${cfg.pointsNeeded} ${t.ptsShort}`
+                                  : t.lockedStageAria(cfg.stage)
+                              }
+                              onClick={() => {
+                                if (canEnter) startAtStage(cfg.stage, 'gold');
+                              }}
+                              className={`relative flex flex-col items-center justify-center py-3 px-2 rounded-lg border transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-yellow-400 ${
+                                !unlocked
+                                  ? 'border-white/5 bg-slate-950/70 text-slate-500 opacity-65 cursor-not-allowed'
+                                  : isCurrent
+                                  ? 'border-yellow-400 bg-gradient-to-b from-yellow-400/25 to-sky-500/20 text-white cursor-pointer'
+                                  : isCompleted
+                                  ? 'border-sky-400/40 bg-gradient-to-b from-amber-500/20 to-sky-500/15 text-yellow-50 hover:from-amber-500/30 hover:to-sky-500/25 cursor-pointer'
+                                  : 'border-yellow-400/25 bg-[#1e1709]/80 text-yellow-100 hover:bg-[#2a200d]/90 hover:border-yellow-300/45 cursor-pointer'
+                              }`}
+                            >
+                              {!unlocked ? (
+                                <span
+                                  className="absolute top-1.5 end-1.5 text-slate-500"
+                                  aria-hidden="true"
+                                >
+                                  <svg
+                                    viewBox="0 0 24 24"
+                                    className="w-3.5 h-3.5"
+                                    fill="none"
+                                    stroke="currentColor"
+                                    strokeWidth="2.2"
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                  >
+                                    <rect x="5" y="11" width="14" height="10" rx="2" />
+                                    <path d="M8 11V7a4 4 0 0 1 8 0v4" />
+                                  </svg>
+                                </span>
+                              ) : (
+                                isCompleted && (
+                                  <span
+                                    className="absolute top-1.5 end-1.5 text-sky-300"
+                                    aria-hidden="true"
+                                  >
+                                    <svg
+                                      viewBox="0 0 24 24"
+                                      className="w-3.5 h-3.5"
+                                      fill="none"
+                                      stroke="currentColor"
+                                      strokeWidth="3"
+                                      strokeLinecap="round"
+                                      strokeLinejoin="round"
+                                    >
+                                      <polyline points="20 6 9 17 4 12" />
+                                    </svg>
+                                  </span>
+                                )
+                              )}
+                              <span className="font-num text-base sm:text-lg font-bold">
+                                {cfg.stage}
+                              </span>
+                              <span
+                                className={`font-num text-[11px] whitespace-nowrap ${
+                                  unlocked ? 'text-yellow-200/85' : 'text-slate-600'
+                                }`}
+                              >
+                                {cfg.pointsNeeded} {t.ptsShort}
+                              </span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                      </>
+                    )
                   ) : !fruitUnlocked ? (
                     <div className="rounded-xl border border-amber-400/25 bg-gradient-to-b from-emerald-950/75 via-slate-900/90 to-slate-950/90 p-5 text-center">
                       <div className="flex items-center justify-center gap-2 mb-3">
@@ -5801,26 +7893,35 @@ export default function App() {
             </div>
           )}
 
-          {/* Index Overlay ("الاندكس") — Normal Index + Dedicated Fruit Index with catch-based discovery lock */}
+          {/* Index Overlay ("الاندكس") — Normal + Fruit + Gold Indexes with catch-based discovery lock */}
           {indexModalOpen && (
             <div className="absolute inset-0 z-20 flex items-center justify-center p-3 sm:p-5 bg-[#060c17]/82 backdrop-blur-[4px]">
               <div className="w-full max-w-md max-h-full flex flex-col rounded-xl border border-white/14 bg-[#0f1a2e]/98 shadow-2xl overflow-hidden">
                 <div className="flex items-center justify-between gap-3 px-5 py-4 border-b border-white/10 shrink-0">
                   <div className="flex items-center gap-2.5 min-w-0">
                     <h2 className="text-lg sm:text-xl font-bold text-white whitespace-nowrap">
-                      {indexModalWorld === 'fruit'
+                      {indexModalWorld === 'gold'
+                        ? t.goldIndexWorldBtn
+                        : indexModalWorld === 'fruit'
                         ? t.fruitIndexWorldBtn
                         : t.indexModalTitle}
                     </h2>
                     <span
                       className={`text-xs sm:text-sm font-semibold font-num whitespace-nowrap ${
-                        indexModalWorld === 'fruit'
+                        indexModalWorld === 'gold'
+                          ? 'text-yellow-300'
+                          : indexModalWorld === 'fruit'
                           ? 'text-amber-300'
                           : 'text-sky-300'
                       }`}
                     >
                       ·{' '}
-                      {indexModalWorld === 'fruit'
+                      {indexModalWorld === 'gold'
+                        ? t.indexDiscoveredCount(
+                            discoveredGoldItems.length,
+                            GOLD_INDEX_CATALOG.length
+                          )
+                        : indexModalWorld === 'fruit'
                         ? t.indexDiscoveredCount(
                             discoveredFruitItems.length,
                             FRUIT_INDEX_CATALOG.length
@@ -5854,18 +7955,18 @@ export default function App() {
                 </div>
 
                 <div className="px-5 pt-3.5 pb-5 overflow-y-auto">
-                  {/* World Switcher: Normal Index vs Dedicated Fruit Index */}
+                  {/* World Switcher: Normal Index vs Fruit Index vs Gold Index */}
                   <div
                     role="tablist"
                     aria-label={t.indexModalTitle}
-                    className="grid grid-cols-2 gap-2 p-1 rounded-lg bg-slate-950/75 border border-white/10 mb-3"
+                    className="grid grid-cols-3 gap-1.5 p-1 rounded-lg bg-slate-950/75 border border-white/10 mb-3"
                   >
                     <button
                       type="button"
                       role="tab"
                       aria-selected={indexModalWorld === 'normal'}
                       onClick={() => setIndexModalWorld('normal')}
-                      className={`h-9 px-2.5 rounded-md inline-flex items-center justify-center gap-1.5 text-xs sm:text-sm font-bold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400 whitespace-nowrap cursor-pointer ${
+                      className={`h-9 px-1.5 rounded-md inline-flex items-center justify-center gap-1 text-[11px] sm:text-xs font-bold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400 whitespace-nowrap cursor-pointer ${
                         indexModalWorld === 'normal'
                           ? 'bg-sky-500 text-slate-950'
                           : 'text-slate-300 hover:text-white hover:bg-slate-800/70'
@@ -5873,7 +7974,7 @@ export default function App() {
                     >
                       <span>{t.normalIndexWorldBtn}</span>
                       <span
-                        className={`font-num text-[11px] ${
+                        className={`font-num text-[10px] ${
                           indexModalWorld === 'normal'
                             ? 'text-slate-900'
                             : 'text-slate-400'
@@ -5888,7 +7989,7 @@ export default function App() {
                       role="tab"
                       aria-selected={indexModalWorld === 'fruit'}
                       onClick={() => setIndexModalWorld('fruit')}
-                      className={`h-9 px-2.5 rounded-md inline-flex items-center justify-center gap-1.5 text-xs sm:text-sm font-bold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400 whitespace-nowrap cursor-pointer ${
+                      className={`h-9 px-1.5 rounded-md inline-flex items-center justify-center gap-1 text-[11px] sm:text-xs font-bold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400 whitespace-nowrap cursor-pointer ${
                         indexModalWorld === 'fruit'
                           ? 'bg-amber-400 text-slate-950'
                           : 'text-amber-200 hover:text-white hover:bg-amber-500/15'
@@ -5896,7 +7997,7 @@ export default function App() {
                     >
                       <span>{t.fruitIndexWorldBtn}</span>
                       <span
-                        className={`font-num text-[11px] ${
+                        className={`font-num text-[10px] ${
                           indexModalWorld === 'fruit'
                             ? 'text-slate-900'
                             : 'text-amber-300/80'
@@ -5905,10 +8006,35 @@ export default function App() {
                         {discoveredFruitItems.length}/{FRUIT_INDEX_CATALOG.length}
                       </span>
                     </button>
+
+                    <button
+                      type="button"
+                      role="tab"
+                      aria-selected={indexModalWorld === 'gold'}
+                      onClick={() => setIndexModalWorld('gold')}
+                      className={`h-9 px-1.5 rounded-md inline-flex items-center justify-center gap-1 text-[11px] sm:text-xs font-bold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-yellow-300 whitespace-nowrap cursor-pointer ${
+                        indexModalWorld === 'gold'
+                          ? 'bg-gradient-to-r from-yellow-400 via-amber-400 to-sky-400 text-slate-950'
+                          : 'text-yellow-200 hover:text-white hover:bg-yellow-500/15'
+                      }`}
+                    >
+                      <span>{t.goldIndexWorldBtn}</span>
+                      <span
+                        className={`font-num text-[10px] ${
+                          indexModalWorld === 'gold'
+                            ? 'text-slate-950/85'
+                            : 'text-sky-300/90'
+                        }`}
+                      >
+                        {discoveredGoldItems.length}/{GOLD_INDEX_CATALOG.length}
+                      </span>
+                    </button>
                   </div>
 
                   <p className="text-xs sm:text-sm text-slate-300 mb-3.5 leading-relaxed">
-                    {indexModalWorld === 'fruit'
+                    {indexModalWorld === 'gold'
+                      ? t.goldIndexModalHint
+                      : indexModalWorld === 'fruit'
                       ? t.fruitIndexModalHint
                       : t.indexModalHint}
                   </p>
@@ -5926,14 +8052,18 @@ export default function App() {
                       onClick={() => setIndexTab('positive')}
                       className={`h-10 px-3 rounded-md inline-flex items-center justify-center gap-2 text-xs sm:text-sm font-bold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400 whitespace-nowrap cursor-pointer ${
                         indexTab === 'positive'
-                          ? indexModalWorld === 'fruit'
+                          ? indexModalWorld === 'gold'
+                            ? 'bg-gradient-to-r from-yellow-400 to-sky-400 text-slate-950'
+                            : indexModalWorld === 'fruit'
                             ? 'bg-emerald-500 text-slate-950'
                             : 'bg-sky-500 text-slate-950'
                           : 'text-slate-300 hover:text-white hover:bg-slate-800/70'
                       }`}
                     >
                       <span>
-                        {indexModalWorld === 'fruit'
+                        {indexModalWorld === 'gold'
+                          ? t.goldIndexPlusTab
+                          : indexModalWorld === 'fruit'
                           ? t.fruitIndexPlusTab
                           : t.indexPlusTab}
                       </span>
@@ -5942,7 +8072,9 @@ export default function App() {
                           indexTab === 'positive' ? 'text-slate-900' : 'text-slate-400'
                         }`}
                       >
-                        {indexModalWorld === 'fruit'
+                        {indexModalWorld === 'gold'
+                          ? `${goldPositiveDiscoveredCount}/${goldPositiveCatalog.length}`
+                          : indexModalWorld === 'fruit'
                           ? `${fruitPositiveDiscoveredCount}/${fruitPositiveCatalog.length}`
                           : `${positiveDiscoveredCount}/${positiveCatalog.length}`}
                       </span>
@@ -5960,7 +8092,9 @@ export default function App() {
                       }`}
                     >
                       <span>
-                        {indexModalWorld === 'fruit'
+                        {indexModalWorld === 'gold'
+                          ? t.goldIndexMinusTab
+                          : indexModalWorld === 'fruit'
                           ? t.fruitIndexMinusTab
                           : t.indexMinusTab}
                       </span>
@@ -5969,7 +8103,9 @@ export default function App() {
                           indexTab === 'negative' ? 'text-rose-100' : 'text-slate-400'
                         }`}
                       >
-                        {indexModalWorld === 'fruit'
+                        {indexModalWorld === 'gold'
+                          ? `${goldNegativeDiscoveredCount}/${goldNegativeCatalog.length}`
+                          : indexModalWorld === 'fruit'
                           ? `${fruitNegativeDiscoveredCount}/${fruitNegativeCatalog.length}`
                           : `${negativeDiscoveredCount}/${negativeCatalog.length}`}
                       </span>
@@ -5978,7 +8114,92 @@ export default function App() {
 
                   {/* Entries List */}
                   <div className="space-y-3" role="tabpanel">
-                    {indexModalWorld === 'fruit'
+                    {indexModalWorld === 'gold'
+                      ? activeGoldIndexEntries.map((entry) => {
+                          const discovered = discoveredGoldItems.includes(entry.kind);
+                          const isPositive = entry.category === 'positive';
+                          return (
+                            <div
+                              key={entry.kind}
+                              className={`flex items-center gap-3.5 p-3.5 rounded-lg border transition-colors ${
+                                discovered
+                                  ? isPositive
+                                    ? 'border-yellow-400/30 bg-gradient-to-r from-[#221908]/85 to-[#101c2d]/85'
+                                    : 'border-rose-400/25 bg-slate-900/85'
+                                  : 'border-white/8 bg-slate-950/75 opacity-85'
+                              }`}
+                            >
+                              <div
+                                className={`w-12 h-12 rounded-lg border flex items-center justify-center shrink-0 ${
+                                  discovered
+                                    ? 'border-yellow-400/25 bg-[#161108]'
+                                    : 'border-white/8 bg-slate-900/80 text-slate-500'
+                                }`}
+                                aria-hidden="true"
+                              >
+                                {!discovered ? (
+                                  <svg
+                                    viewBox="0 0 24 24"
+                                    className="w-5 h-5"
+                                    fill="none"
+                                    stroke="currentColor"
+                                    strokeWidth="2.1"
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                  >
+                                    <rect x="5" y="11" width="14" height="10" rx="2" />
+                                    <path d="M8 11V7a4 4 0 0 1 8 0v4" />
+                                  </svg>
+                                ) : (
+                                  <GoldIndexIcon kind={entry.kind} />
+                                )}
+                              </div>
+
+                              <div className="min-w-0 flex-1">
+                                {discovered ? (
+                                  <>
+                                    <div className="flex items-baseline justify-between gap-2">
+                                      <span className="text-sm sm:text-base font-bold text-white truncate">
+                                        {lang === 'ar' ? entry.nameAr : entry.nameEn}
+                                      </span>
+                                      <span
+                                        className={`font-num text-xs sm:text-sm font-bold whitespace-nowrap shrink-0 ${
+                                          entry.kind === 'blue_diamond'
+                                            ? 'text-sky-300'
+                                            : isPositive
+                                            ? 'text-yellow-300'
+                                            : 'text-rose-400'
+                                        }`}
+                                      >
+                                        {lang === 'ar' ? entry.valueAr : entry.valueEn}
+                                      </span>
+                                    </div>
+                                    <p className="text-xs text-slate-300 mt-1 leading-relaxed">
+                                      {lang === 'ar'
+                                        ? entry.benefitAr
+                                        : entry.benefitEn}
+                                    </p>
+                                  </>
+                                ) : (
+                                  <>
+                                    <div className="flex items-baseline justify-between gap-2">
+                                      <span className="text-sm sm:text-base font-bold text-slate-400">
+                                        {t.indexUnknownTitle}
+                                      </span>
+                                      <span className="text-[11px] font-semibold text-slate-500 whitespace-nowrap shrink-0">
+                                        {t.indexLockedBadge}
+                                      </span>
+                                    </div>
+                                    <p className="text-xs text-slate-500 mt-1 leading-relaxed">
+                                      {t.indexLockedDesc}
+                                    </p>
+                                  </>
+                                )}
+                              </div>
+                            </div>
+                          );
+                        })
+                      : indexModalWorld === 'fruit'
                       ? activeFruitIndexEntries.map((entry) => {
                           const discovered = discoveredFruitItems.includes(entry.kind);
                           const isPositive = entry.category === 'positive';
@@ -6159,6 +8380,46 @@ export default function App() {
                                       2
                                     </text>
                                   </svg>
+                                ) : entry.kind === 'purple_diamond' ? (
+                                  <svg viewBox="0 0 24 24" className="w-8 h-8">
+                                    <polygon
+                                      points="12,2 22,12 12,22 2,12"
+                                      fill="#9333ea"
+                                      stroke="#f3e8ff"
+                                      strokeWidth="1.8"
+                                      strokeLinejoin="round"
+                                    />
+                                    <text
+                                      x="12"
+                                      y="15.8"
+                                      textAnchor="middle"
+                                      fill="#ffffff"
+                                      fontSize="10.5"
+                                      fontWeight="800"
+                                    >
+                                      5
+                                    </text>
+                                  </svg>
+                                ) : entry.kind === 'gold_star' ? (
+                                  <svg viewBox="0 0 24 24" className="w-8 h-8">
+                                    <polygon
+                                      points="12,2 14.9,8.6 22,9.3 16.6,14 18.2,21 12,17.3 5.8,21 7.4,14 2,9.3 9.1,8.6"
+                                      fill="#f59e0b"
+                                      stroke="#fef9c3"
+                                      strokeWidth="1.6"
+                                      strokeLinejoin="round"
+                                    />
+                                    <text
+                                      x="12"
+                                      y="15.8"
+                                      textAnchor="middle"
+                                      fill="#ffffff"
+                                      fontSize="9.5"
+                                      fontWeight="900"
+                                    >
+                                      7
+                                    </text>
+                                  </svg>
                                 ) : entry.kind === 'hazard_spike' ? (
                                   <svg viewBox="0 0 24 24" className="w-8 h-8">
                                     <polygon
@@ -6214,6 +8475,44 @@ export default function App() {
                                       strokeWidth="1.2"
                                     />
                                   </svg>
+                                ) : entry.kind === 'hazard_arrow_amber' ? (
+                                  <svg viewBox="0 0 24 24" className="w-8 h-8">
+                                    <g transform="rotate(-18 12 12)">
+                                      <polygon
+                                        points="12,21.5 19.5,11 14.8,11 15.2,2.5 12,4.8 8.8,2.5 9.2,11 4.5,11"
+                                        fill="#f59e0b"
+                                        stroke="#fde68a"
+                                        strokeWidth="1.5"
+                                        strokeLinejoin="round"
+                                      />
+                                      <line
+                                        x1="12"
+                                        y1="4.8"
+                                        x2="12"
+                                        y2="19.8"
+                                        stroke="#fef3c7"
+                                        strokeWidth="1.2"
+                                      />
+                                    </g>
+                                  </svg>
+                                ) : entry.kind === 'hazard_arrow_violet' ? (
+                                  <svg viewBox="0 0 24 24" className="w-8 h-8">
+                                    <polygon
+                                      points="12,22 19.8,10.8 14.8,11.6 15.4,2.2 12,4.8 8.6,2.2 9.2,11.6 4.2,10.8"
+                                      fill="#9333ea"
+                                      stroke="#e9d5ff"
+                                      strokeWidth="1.5"
+                                      strokeLinejoin="round"
+                                    />
+                                    <line
+                                      x1="12"
+                                      y1="4.8"
+                                      x2="12"
+                                      y2="20"
+                                      stroke="#f3e8ff"
+                                      strokeWidth="1.2"
+                                    />
+                                  </svg>
                                 ) : (
                                   <svg viewBox="0 0 24 24" className="w-8 h-8">
                                     <rect
@@ -6256,6 +8555,14 @@ export default function App() {
                                             ? 'text-sky-300'
                                             : entry.kind === 'green_circle'
                                             ? 'text-emerald-300'
+                                            : entry.kind === 'purple_diamond'
+                                            ? 'text-purple-300'
+                                            : entry.kind === 'gold_star'
+                                            ? 'text-yellow-300'
+                                            : entry.kind === 'hazard_arrow_amber'
+                                            ? 'text-amber-300'
+                                            : entry.kind === 'hazard_arrow_violet'
+                                            ? 'text-violet-300'
                                             : 'text-rose-400'
                                         }`}
                                       >
@@ -6302,6 +8609,8 @@ export default function App() {
               maxLives={MAX_LIVES}
               corn={corn}
               maxCorn={MAX_CORN}
+              diamonds={diamonds}
+              maxDiamonds={MAX_DIAMONDS}
               shop={shop}
               activeTab={shopTab}
               pointsSubTab={shopPointsSubTab}
@@ -6313,6 +8622,192 @@ export default function App() {
               onSelectOrBuyMinusSkin={selectOrBuyMinusSkin}
               onBuySupply={buySupply}
             />
+          )}
+
+          {/* Bag Overlay ("الحقيبة") — Store & Use Hearts, Corn, and Diamonds */}
+          {bagModalOpen && (
+            <div className="absolute inset-0 z-20 flex items-center justify-center p-3 sm:p-5 bg-[#060c17]/82 backdrop-blur-[4px]">
+              <div className="w-full max-w-md max-h-full flex flex-col rounded-xl border border-white/14 bg-[#0f1a2e]/98 shadow-2xl overflow-hidden">
+                <div className="flex items-center justify-between gap-3 px-5 py-4 border-b border-white/10 shrink-0">
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    <h2 className="text-lg sm:text-xl font-bold text-white whitespace-nowrap">
+                      {t.bagTitle}
+                    </h2>
+                    <span className="text-xs sm:text-sm text-amber-300 font-semibold font-num whitespace-nowrap">
+                      · {coins} {t.coins}
+                    </span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={closeBagModal}
+                    aria-label={t.close}
+                    className="h-9 w-9 inline-flex items-center justify-center rounded-lg border border-white/10 bg-slate-900/80 text-slate-300 hover:bg-slate-800 hover:text-white transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-400 cursor-pointer shrink-0"
+                  >
+                    <svg
+                      viewBox="0 0 24 24"
+                      className="w-4 h-4"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2.2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      aria-hidden="true"
+                    >
+                      <line x1="18" y1="6" x2="6" y2="18" />
+                      <line x1="6" y1="6" x2="18" y2="18" />
+                    </svg>
+                  </button>
+                </div>
+
+                <div className="px-5 pt-3.5 pb-5 overflow-y-auto space-y-3">
+                  <p className="text-xs sm:text-sm text-slate-300 leading-relaxed">
+                    {t.bagDesc}
+                  </p>
+
+                  {(
+                    [
+                      {
+                        mode: 'normal' as GameMode,
+                        title: t.bagHeartsTitle,
+                        sub: t.bagHeartsSub,
+                        stored: bag.hearts,
+                        active: lives,
+                        max: MAX_LIVES,
+                        cost: HEART_COST_COINS,
+                        borderClass: 'border-rose-400/25 bg-rose-950/20',
+                        countClass: 'text-rose-300',
+                        useBtnClass:
+                          'bg-rose-500 hover:bg-rose-400 text-white cursor-pointer',
+                      },
+                      {
+                        mode: 'fruit' as GameMode,
+                        title: t.bagCornTitle,
+                        sub: t.bagCornSub,
+                        stored: bag.corn,
+                        active: corn,
+                        max: MAX_CORN,
+                        cost: HEART_COST_COINS,
+                        borderClass: 'border-amber-400/25 bg-amber-950/20',
+                        countClass: 'text-amber-300',
+                        useBtnClass:
+                          'bg-amber-400 hover:bg-amber-300 text-slate-950 cursor-pointer',
+                      },
+                      {
+                        mode: 'gold' as GameMode,
+                        title: t.bagDiamondsTitle,
+                        sub: t.bagDiamondsSub,
+                        stored: bag.diamonds,
+                        active: diamonds,
+                        max: MAX_DIAMONDS,
+                        cost: DIAMOND_COST_COINS,
+                        borderClass: 'border-sky-400/25 bg-sky-950/25',
+                        countClass: 'text-sky-300',
+                        useBtnClass:
+                          'bg-gradient-to-r from-yellow-400 to-sky-400 hover:brightness-110 text-slate-950 cursor-pointer',
+                      },
+                    ] as const
+                  ).map((row) => {
+                    const canUse = row.stored > 0 && row.active < row.max;
+                    const canStore = row.active > 1;
+                    const canBuyToBag = coins >= row.cost;
+                    return (
+                      <div
+                        key={row.mode}
+                        className={`p-3.5 rounded-lg border ${row.borderClass} space-y-3`}
+                      >
+                        <div className="flex items-center justify-between gap-3">
+                          <div className="flex items-center gap-3 min-w-0">
+                            <div
+                              className="w-11 h-11 rounded-lg border border-white/10 bg-[#0a1324] flex items-center justify-center shrink-0"
+                              aria-hidden="true"
+                            >
+                              {row.mode === 'normal' ? (
+                                <svg
+                                  viewBox="0 0 24 24"
+                                  className="w-6 h-6 text-rose-500"
+                                  fill="currentColor"
+                                >
+                                  <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z" />
+                                </svg>
+                              ) : row.mode === 'fruit' ? (
+                                <CornIcon className="w-6 h-6" />
+                              ) : (
+                                <DiamondIcon className="w-6 h-6" />
+                              )}
+                            </div>
+                            <div className="min-w-0">
+                              <div className="text-sm sm:text-base font-bold text-white truncate">
+                                {row.title}
+                              </div>
+                              <div className="text-xs text-slate-400">
+                                {row.sub} · {t.bagActiveLabel}:{' '}
+                                <span className="font-num font-bold text-slate-200">
+                                  {row.active}/{row.max}
+                                </span>
+                              </div>
+                            </div>
+                          </div>
+
+                          <div className="text-end shrink-0">
+                            <div className="text-[11px] text-slate-400">
+                              {t.bagInBagLabel}
+                            </div>
+                            <div
+                              className={`font-num text-xl font-bold ${row.countClass}`}
+                            >
+                              {row.stored}
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="flex flex-wrap items-center gap-2">
+                          <button
+                            type="button"
+                            disabled={!canUse}
+                            onClick={() => useLifeFromBag(row.mode)}
+                            className={`flex-1 min-w-[110px] h-9 px-3 rounded-md text-xs font-bold transition-all active:scale-[0.98] whitespace-nowrap ${
+                              canUse
+                                ? row.useBtnClass
+                                : 'bg-slate-800/90 text-slate-500 border border-white/10 cursor-not-allowed'
+                            }`}
+                          >
+                            {row.active >= row.max
+                              ? t.bagFullBadge
+                              : t.bagUseBtn}
+                          </button>
+
+                          <button
+                            type="button"
+                            disabled={!canStore}
+                            onClick={() => storeLifeInBag(row.mode)}
+                            className={`h-9 px-3 rounded-md text-xs font-semibold border transition-colors whitespace-nowrap ${
+                              canStore
+                                ? 'border-white/15 bg-slate-900/90 text-slate-100 hover:bg-slate-800 cursor-pointer'
+                                : 'border-white/5 bg-slate-950/60 text-slate-600 cursor-not-allowed'
+                            }`}
+                          >
+                            {t.bagStoreBtn}
+                          </button>
+
+                          <button
+                            type="button"
+                            disabled={!canBuyToBag}
+                            onClick={() => buyLifeToBag(row.mode)}
+                            className={`h-9 px-3 rounded-md text-xs font-bold border transition-colors whitespace-nowrap ${
+                              canBuyToBag
+                                ? 'border-amber-400/45 bg-amber-500/15 text-amber-200 hover:bg-amber-500/25 cursor-pointer'
+                                : 'border-white/5 bg-slate-950/60 text-slate-600 cursor-not-allowed'
+                            }`}
+                          >
+                            {t.bagBuyBtn}
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
           )}
 
           {/* Settings Overlay ("الإعدادات") */}
