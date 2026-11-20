@@ -55,7 +55,7 @@ export interface GoldRenderItem {
 export const TOTAL_GOLD_STAGES = 15;
 export const GOLD_UNLOCK_COST = 40;
 export const MAX_DIAMONDS = 10;
-export const DIAMOND_COST_COINS = 5;
+export const DIAMOND_COST_COINS = 40;
 
 export function getGoldStageClearCoins(remainingDiamonds: number): number {
   if (remainingDiamonds >= 3) return 30;

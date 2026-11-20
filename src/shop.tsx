@@ -52,6 +52,7 @@ export interface PointSkinDefinition<T extends string> {
 export interface SupplyDefinition {
   id: SupplyId;
   price: number;
+  currency?: 'gold' | 'pink';
   nameAr: string;
   nameEn: string;
   descAr: string;
@@ -133,10 +134,11 @@ export const SUPPLY_CATALOG: SupplyDefinition[] = [
   {
     id: 'one_diamond',
     price: DIAMOND_COST_COINS,
+    currency: 'pink',
     nameAr: '+1 ألماسة',
     nameEn: '+1 Diamond',
-    descAr: 'يضيف ألماسة (قلب) واحدة فوراً مقابل 5 فلوس (وإذا امتلأ الألماس يُخزَّن في الحقيبة).',
-    descEn: 'Adds 1 diamond for 5 coins (stores in your Bag if diamonds are already full).',
+    descAr: `يضيف ألماسة (قلب) واحدة فوراً مقابل ${DIAMOND_COST_COINS} عملة وردية (وإذا امتلأ الألماس يُخزَّن في الحقيبة).`,
+    descEn: `Adds 1 diamond for ${DIAMOND_COST_COINS} Pink Coins (stores in your Bag if diamonds are already full).`,
   },
   {
     id: 'full_hearts',
@@ -156,11 +158,12 @@ export const SUPPLY_CATALOG: SupplyDefinition[] = [
   },
   {
     id: 'full_diamonds',
-    price: 100,
+    price: 400,
+    currency: 'pink',
     nameAr: 'تعبئة الألماس (10/10)',
     nameEn: 'Full Diamonds Refill',
-    descAr: 'يعبّئ رصيد الألماس في مراحل الذهب بالكامل إلى 10/10 دفعة واحدة.',
-    descEn: 'Refills your entire Gold Stages diamond pool back to 10/10.',
+    descAr: 'يعبّئ رصيد الألماس في مراحل الذهب بالكامل إلى 10/10 دفعة واحدة مقابل 400 عملة وردية.',
+    descEn: 'Refills your entire Gold Stages diamond pool back to 10/10 for 400 Pink Coins.',
   },
 ];
 
@@ -1107,6 +1110,38 @@ function CoinMiniIcon() {
   );
 }
 
+export function PinkCoinIcon({ className = 'w-3.5 h-3.5 shrink-0' }: { className?: string }) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      className={className}
+      aria-hidden="true"
+    >
+      <circle
+        cx="12"
+        cy="12"
+        r="9.5"
+        fill="#ec4899"
+        stroke="#fbcfe8"
+        strokeWidth="1.7"
+      />
+      <circle
+        cx="12"
+        cy="12"
+        r="5.6"
+        fill="none"
+        stroke="#9d174d"
+        strokeWidth="1.4"
+      />
+      <polygon
+        points="12,8 15,12 12,16 9,12"
+        fill="#fdf2f8"
+        fillOpacity="0.92"
+      />
+    </svg>
+  );
+}
+
 function SkinArt({ id }: { id: CatcherSkinId }) {
   if (id === 'ufo') {
     return (
@@ -1282,6 +1317,7 @@ function MinusPointArt({ id }: { id: MinusPointSkinId }) {
 interface ShopModalProps {
   lang: 'ar' | 'en';
   coins: number;
+  pinkCoins: number;
   lives: number;
   maxLives: number;
   corn: number;
@@ -1303,6 +1339,7 @@ interface ShopModalProps {
 export function ShopModal({
   lang,
   coins,
+  pinkCoins,
   lives,
   maxLives,
   corn,
@@ -1327,7 +1364,7 @@ export function ShopModal({
       <div className="w-full max-w-lg max-h-full flex flex-col rounded-xl border border-white/14 bg-[#0f1a2e]/98 shadow-2xl overflow-hidden">
         {/* Header */}
         <div className="flex items-center justify-between gap-3 px-5 py-4 border-b border-white/10 shrink-0">
-          <div className="flex items-center gap-3 min-w-0">
+          <div className="flex items-center flex-wrap gap-x-3 gap-y-1 min-w-0">
             <h2 className="text-lg sm:text-xl font-bold text-white whitespace-nowrap">
               {isAr ? 'المتجر' : 'Shop'}
             </h2>
@@ -1336,6 +1373,12 @@ export function ShopModal({
               <CoinMiniIcon />
               <span>{coins}</span>
               <span>{isAr ? 'فلوس' : 'Coins'}</span>
+            </span>
+            <span className="text-xs sm:text-sm text-pink-300 font-semibold font-num whitespace-nowrap inline-flex items-center gap-1">
+              <span aria-hidden="true">·</span>
+              <PinkCoinIcon />
+              <span>{pinkCoins}</span>
+              <span>{isAr ? 'وردي' : 'Pink'}</span>
             </span>
           </div>
           <button
@@ -1648,13 +1691,26 @@ export function ShopModal({
           {/* Supplies Tab */}
           {activeTab === 'supplies' && (
             <div className="space-y-3" role="tabpanel">
+              <div className="flex items-start gap-2.5 p-3 rounded-lg border border-pink-400/30 bg-pink-950/30">
+                <PinkCoinIcon className="w-5 h-5 shrink-0 mt-0.5" />
+                <p className="text-xs text-pink-100 leading-relaxed">
+                  <strong className="text-pink-300">
+                    {isAr ? 'العملة الوردية:' : 'Pink Coins:'}
+                  </strong>{' '}
+                  {isAr
+                    ? `فائدتها شراء الألماس لمراحل الذهب (${DIAMOND_COST_COINS} عملة وردية = +1 ألماسة). مع كل نقطة تلتقطها احتمال 50% لربح 1 إلى 3 عملات وردية (فقط في المراحل التي لم تفز بها بعد).`
+                    : `Used to buy Diamonds for Gold Stages (${DIAMOND_COST_COINS} Pink Coins = +1 Diamond). Every point caught has a 50% chance to drop 1–3 Pink Coins (only in stages not yet cleared).`}
+                </p>
+              </div>
               {SUPPLY_CATALOG.map((sup) => {
+                const isPinkCurrency = sup.currency === 'pink';
+                const balance = isPinkCurrency ? pinkCoins : coins;
                 const isFull =
                   (sup.id === 'shield' && shop.shields >= MAX_SHIELDS) ||
                   (sup.id === 'full_hearts' && lives >= maxLives) ||
                   (sup.id === 'full_corn' && corn >= maxCorn) ||
                   (sup.id === 'full_diamonds' && diamonds >= maxDiamonds);
-                const canAfford = !isFull && coins >= sup.price;
+                const canAfford = !isFull && balance >= sup.price;
                 const stockText =
                   sup.id === 'shield'
                     ? isAr
@@ -1675,7 +1731,11 @@ export function ShopModal({
                 return (
                   <div
                     key={sup.id}
-                    className="flex items-center gap-3.5 p-3.5 rounded-lg border border-white/10 bg-slate-900/80"
+                    className={`flex items-center gap-3.5 p-3.5 rounded-lg border ${
+                      isPinkCurrency
+                        ? 'border-pink-400/25 bg-pink-950/15'
+                        : 'border-white/10 bg-slate-900/80'
+                    }`}
                   >
                     <div
                       className="w-12 h-12 rounded-lg border border-white/10 bg-[#0a1324] flex items-center justify-center shrink-0"
@@ -1704,7 +1764,9 @@ export function ShopModal({
                         isFull
                           ? 'bg-emerald-500/15 text-emerald-300 border border-emerald-400/25 cursor-default'
                           : canAfford
-                          ? 'bg-amber-400 hover:bg-amber-300 active:scale-95 text-slate-950 cursor-pointer'
+                          ? isPinkCurrency
+                            ? 'bg-pink-400 hover:bg-pink-300 active:scale-95 text-slate-950 cursor-pointer'
+                            : 'bg-amber-400 hover:bg-amber-300 active:scale-95 text-slate-950 cursor-pointer'
                           : 'bg-slate-800 text-slate-500 border border-white/10 cursor-not-allowed'
                       }`}
                     >
@@ -1713,7 +1775,7 @@ export function ShopModal({
                       ) : (
                         <>
                           <span className="font-num">{sup.price}</span>
-                          <CoinMiniIcon />
+                          {isPinkCurrency ? <PinkCoinIcon /> : <CoinMiniIcon />}
                         </>
                       )}
                     </button>

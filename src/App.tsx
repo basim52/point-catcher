@@ -55,6 +55,7 @@ import {
   MINUS_POINT_CATALOG,
   MinusPointSkinId,
   persistShopState,
+  PinkCoinIcon,
   PLUS_POINT_CATALOG,
   PlusPointSkinId,
   PointsSubTab,
@@ -182,6 +183,10 @@ const FREEZE_STAR_POINTS = 3;
 const FREEZE_DURATION = 4.0;
 const BEST_SCORE_STORAGE_KEY = 'point_catcher_best_score_v1';
 const COINS_STORAGE_KEY = 'point_catcher_coins_v1';
+const PINK_COINS_STORAGE_KEY = 'point_catcher_pink_coins_v1';
+const PINK_COIN_DROP_CHANCE = 0.5;
+const PINK_COIN_MIN_DROP = 1;
+const PINK_COIN_MAX_DROP = 3;
 const LIVES_STATE_STORAGE_KEY = 'point_catcher_lives_state_v1';
 const COMPLETED_STAGES_STORAGE_KEY = 'point_catcher_completed_stages_v1';
 const DISCOVERED_ITEMS_STORAGE_KEY = 'point_catcher_discovered_items_v2';
@@ -298,12 +303,12 @@ const INDEX_CATALOG: IndexEntry[] = [
   {
     kind: 'hazard_arrow_amber',
     category: 'negative',
-    nameAr: 'السهم البرتقالي المائل',
-    nameEn: 'Amber Slant Arrow',
+    nameAr: 'السهم الذهبي المائل',
+    nameEn: 'Golden Slant Arrow',
     valueAr: '-2 نقاط · مرحلة 3+',
     valueEn: '-2 pts · Stage 3+',
-    benefitAr: 'سهم خفيف ينزل بزاوية مائلة وبسرعة معتدلة؛ لا ينقص القلوب بل يخصم نقطتين فقط من رصيد المرحلة (من المرحلة 3).',
-    benefitEn: 'Mild slanted arrow at moderate speed; spares your hearts and only deducts 2 stage points (Stage 3+).',
+    benefitAr: 'سهم ذهبي خفيف ينزل بزاوية مائلة وبسرعة معتدلة؛ لا ينقص القلوب بل يخصم نقطتين فقط من رصيد المرحلة (من المرحلة 3).',
+    benefitEn: 'Mild golden slanted dart at moderate speed; spares your hearts and only deducts 2 stage points (Stage 3+).',
   },
   {
     kind: 'hazard_arrow_violet',
@@ -312,17 +317,17 @@ const INDEX_CATALOG: IndexEntry[] = [
     nameEn: 'Violet Slow Arrow',
     valueAr: 'تبطيء 2.5ث · -1 نقطة · مرحلة 6+',
     valueEn: 'Slow 2.5s · -1 pt · Stage 6+',
-    benefitAr: 'سهم معتدل السرعة لا ينقص القلوب؛ يخصم نقطة واحدة ويبطّئ حركتك قليلاً (-30%) لمدة 2.5 ثانية (من المرحلة 6).',
-    benefitEn: 'Moderate-speed arrow that spares your hearts; deducts 1 point and gently slows movement (-30%) for 2.5s (Stage 6+).',
+    benefitAr: 'سهم بنفسجي معتدل السرعة لا ينقص القلوب؛ يخصم نقطة واحدة ويبطّئ حركتك قليلاً (-30%) لمدة 2.5 ثانية (من المرحلة 6).',
+    benefitEn: 'Moderate-speed violet bolt that spares your hearts; deducts 1 point and gently slows movement (-30%) for 2.5s (Stage 6+).',
   },
 ];
 
 const VALID_ITEM_KINDS: ItemKind[] = INDEX_CATALOG.map((item) => item.kind);
 
 function getStageClearCoins(remainingLives: number): number {
-  if (remainingLives >= 8) return 4;
-  if (remainingLives >= 4) return 2;
-  return 1;
+  if (remainingLives >= 8) return 8;
+  if (remainingLives >= 4) return 4;
+  return 2;
 }
 
 // Build 50 stages with smooth difficulty progression:
@@ -405,7 +410,7 @@ const COPY = {
     nextGoalText: (pts: number) => `هدف المرحلة التالية: ${pts} نقطة`,
     stagesBtn: 'المراحل',
     stagesModalTitle: 'المراحل',
-    stagesModalHint: 'فُز بكل مرحلة لفتح التالية — مكافأة أول فوز: 1–3 قلوب = 1، 4–7 = 2، 8–10 = 4 فلوس.',
+    stagesModalHint: `سعر القلب ثابت (${HEART_COST_COINS} فلوس) · مكافأة الفوز بالمرحلة (حسب القلوب المتبقية): 1–3 = 2، 4–7 = 4، 8–10 = 8 فلوس.`,
     noHeartsNotice: (timer: string) => `نفدت القلوب — يتجدد القلب القادم خلال ${timer}`,
     waitHeartBtn: (timer: string) => `انتظر تجدد القلب (${timer})`,
     nextHeartShort: (timer: string) => `+1♥ خلال ${timer}`,
@@ -432,6 +437,7 @@ const COPY = {
     bagUseBtn: 'استخدام (+1)',
     bagStoreBtn: 'تخزين +1',
     bagBuyBtn: `شراء للحقيبة (${HEART_COST_COINS} فلوس)`,
+    bagBuyDiamondBtn: `شراء للحقيبة (${DIAMOND_COST_COINS} عملة وردية)`,
     bagFullBadge: 'ممتلئ 10/10',
     bagEmptyHint: 'فارغ',
     bagHeartsTitle: 'القلوب المخزّنة',
@@ -450,6 +456,10 @@ const COPY = {
     onLabel: 'تشغيل',
     offLabel: 'إيقاف',
     coins: 'الفلوس',
+    pinkCoins: 'عملات وردية',
+    pinkCoinShortBenefit: 'لشراء الألماس',
+    pinkCoinBenefitTitle: 'فائدة العملة الوردية',
+    pinkCoinBenefitDesc: `تُستخدم لشراء الألماس لمراحل الذهب (${DIAMOND_COST_COINS} عملة وردية = +1 ألماسة). مع كل نقطة تمسكها احتمال 50% أن تعطيك من 1 إلى 3 عملات وردية (فقط في المراحل التي لم تفز بها بعد).`,
     coinsEarned: (earned: number, remainingLives: number) =>
       earned <= 0
         ? 'تم استلام مكافأة هذه المرحلة مسبقاً (بدون فلوس إضافية)'
@@ -472,7 +482,7 @@ const COPY = {
     fruitUnlockBtn: `فتح مراحل الفواكه (${FRUIT_UNLOCK_COST} فلوس)`,
     fruitNeedCoins: (need: number) => `تحتاج ${need} فلوس إضافية لفتح مراحل الفواكه`,
     fruitStagesModalHint:
-      '15 مرحلة للفواكه — الخضار تنقص النقاط والذرة (10 ذرة تتجدد كل 5 دقائق). مكافأة أول فوز: ذرة واحدة = 3 · ذرتان = 6 · 3+ ذرات = 9 فلوس.',
+      `15 مرحلة للفواكه — سعر الذرة ثابت (${HEART_COST_COINS} فلوس) · مكافأة الفوز بالمرحلة (حسب الذرة المتبقية): 1 = 6 · 2 = 12 · 3+ = 18 فلوس.`,
     noCornNotice: (timer: string) => `نفدت الذرة — تتجدد الذرة القادمة خلال ${timer}`,
     waitCornBtn: (timer: string) => `انتظر تجدد الذرة (${timer})`,
     buyCornBtn: `+1 ذرة (${HEART_COST_COINS} فلوس)`,
@@ -498,17 +508,17 @@ const COPY = {
     goldNextStageBtn: (n: number) => `الانتقال إلى مرحلة الذهب ${n}`,
     goldUnlockTitle: 'عالم الذهب والألماس (15 مرحلة)',
     goldUnlockDesc:
-      `افتح 15 مرحلة بخلفية ذهب وألماس لامعة، كنوز ذهبية وألماس نادر (+2 إلى +6 نقاط)، نظام الألماس الخاص (${DIAMOND_COST_COINS} فلوس لكل ألماسة)، واندكس ذهب مستقل!`,
+      `افتح 15 مرحلة بخلفية ذهب وألماس لامعة، كنوز ذهبية وألماس نادر (+2 إلى +6 نقاط)، نظام الألماس الخاص (${DIAMOND_COST_COINS} عملة وردية لكل ألماسة)، واندكس ذهب مستقل!`,
     goldUnlockBtn: `فتح مراحل الذهب (${GOLD_UNLOCK_COST} فلوس)`,
     goldNeedCoins: (need: number) => `تحتاج ${need} فلوس إضافية لفتح مراحل الذهب`,
     goldStagesModalHint:
-      `15 مرحلة ذهب وألماس — سعر الألماسة ${DIAMOND_COST_COINS} فلوس · مكافأة أول فوز: ألماسة = 10 · ألماستان = 20 · 3+ ألماسات = 30 فلوس.`,
+      `15 مرحلة ذهب وألماس — سعر الألماسة ${DIAMOND_COST_COINS} عملة وردية · مكافأة الفوز بالمرحلة (حسب الألماس المتبقي): 1 = 10 · 2 = 20 · 3+ = 30 فلوس.`,
     noDiamondsNotice: (timer: string) => `نفد الألماس — تتجدد الألماسة القادمة خلال ${timer}`,
     waitDiamondBtn: (timer: string) => `انتظر تجدد الألماسة (${timer})`,
-    buyDiamondBtn: `+1 ألماسة (${DIAMOND_COST_COINS} فلوس)`,
-    buyDiamondAria: `شراء ألماسة واحدة مقابل ${DIAMOND_COST_COINS} فلوس`,
+    buyDiamondBtn: `+1 ألماسة (${DIAMOND_COST_COINS} عملة وردية)`,
+    buyDiamondAria: `شراء ألماسة واحدة مقابل ${DIAMOND_COST_COINS} عملة وردية`,
     diamondsFullTip: 'الألماس ممتلئ (10/10)',
-    needCoinsDiamondTip: `تحتاج ${DIAMOND_COST_COINS} فلوس لشراء ألماسة`,
+    needCoinsDiamondTip: `تحتاج ${DIAMOND_COST_COINS} عملة وردية لشراء ألماسة`,
     goldIndexWorldBtn: 'اندكس الذهب',
     goldIndexModalHint:
       'جميع كنوز الذهب والألماس وعوائق الخزنة — كل عنصر يبقى مقفلاً حتى تلتقطه أو تلمسه في مراحل الذهب.',
@@ -558,7 +568,7 @@ const COPY = {
     nextGoalText: (pts: number) => `Next Stage Goal: ${pts} pts`,
     stagesBtn: 'Stages',
     stagesModalTitle: 'Stages',
-    stagesModalHint: 'Clear each stage to unlock the next — First-clear reward: 1–3♥ = 1, 4–7♥ = 2, 8–10♥ = 4 coins.',
+    stagesModalHint: `Heart price is fixed (${HEART_COST_COINS} coins) · Stage-win reward (by remaining ♥): 1–3 = 2, 4–7 = 4, 8–10 = 8 coins.`,
     noHeartsNotice: (timer: string) => `Out of hearts — next heart regenerates in ${timer}`,
     waitHeartBtn: (timer: string) => `Next Heart in ${timer}`,
     nextHeartShort: (timer: string) => `+1♥ in ${timer}`,
@@ -585,6 +595,7 @@ const COPY = {
     bagUseBtn: 'Use (+1)',
     bagStoreBtn: 'Store +1',
     bagBuyBtn: `Buy to Bag (${HEART_COST_COINS} Coins)`,
+    bagBuyDiamondBtn: `Buy to Bag (${DIAMOND_COST_COINS} Pink Coins)`,
     bagFullBadge: 'Full 10/10',
     bagEmptyHint: 'Empty',
     bagHeartsTitle: 'Stored Hearts',
@@ -603,6 +614,10 @@ const COPY = {
     onLabel: 'On',
     offLabel: 'Off',
     coins: 'Coins',
+    pinkCoins: 'Pink Coins',
+    pinkCoinShortBenefit: 'For Diamonds',
+    pinkCoinBenefitTitle: 'Pink Coin Benefit',
+    pinkCoinBenefitDesc: `Used to buy Diamonds for Gold Stages (${DIAMOND_COST_COINS} Pink Coins = +1 Diamond). Every point you catch has a 50% chance to drop 1–3 Pink Coins (only in stages you haven't cleared yet).`,
     coinsEarned: (earned: number, remainingLives: number) =>
       earned <= 0
         ? 'Stage coin reward already claimed (no extra coins)'
@@ -625,7 +640,7 @@ const COPY = {
     fruitUnlockBtn: `Unlock Fruit Stages (${FRUIT_UNLOCK_COST} Coins)`,
     fruitNeedCoins: (need: number) => `Need ${need} more coins to unlock Fruit Stages`,
     fruitStagesModalHint:
-      '15 Fruit stages — vegetables subtract points and corn (10 corn, +1 every 5 min). First-clear reward: 1 corn = 3, 2 corn = 6, 3+ corn = 9 coins.',
+      `15 Fruit stages — Corn price is fixed (${HEART_COST_COINS} coins) · Stage-win reward (by remaining corn): 1 = 6, 2 = 12, 3+ = 18 coins.`,
     noCornNotice: (timer: string) => `Out of corn — next corn regenerates in ${timer}`,
     waitCornBtn: (timer: string) => `Next Corn in ${timer}`,
     buyCornBtn: `Buy +1 Corn (${HEART_COST_COINS} Coins)`,
@@ -651,17 +666,17 @@ const COPY = {
     goldNextStageBtn: (n: number) => `Continue to Gold Stage ${n}`,
     goldUnlockTitle: 'Gold & Diamond Vault (15 Stages)',
     goldUnlockDesc:
-      `Unlock 15 gleaming gold & diamond stages with royal treasures (+2 to +6 pts), dedicated diamond lives (${DIAMOND_COST_COINS} coins per diamond, 10/20/30 clear rewards), and a dedicated Gold Index!`,
+      `Unlock 15 gleaming gold & diamond stages with royal treasures (+2 to +6 pts), dedicated diamond lives (${DIAMOND_COST_COINS} Pink Coins per diamond, 10/20/30 clear rewards), and a dedicated Gold Index!`,
     goldUnlockBtn: `Unlock Gold Stages (${GOLD_UNLOCK_COST} Coins)`,
     goldNeedCoins: (need: number) => `Need ${need} more coins to unlock Gold Stages`,
     goldStagesModalHint:
-      `15 Gold & Diamond stages — each diamond life costs ${DIAMOND_COST_COINS} coins · First-clear reward: 1 = 10, 2 = 20, 3+ = 30 coins.`,
+      `15 Gold & Diamond stages — Diamond price is ${DIAMOND_COST_COINS} Pink Coins · Stage-win reward (by remaining diamonds): 1 = 10, 2 = 20, 3+ = 30 coins.`,
     noDiamondsNotice: (timer: string) => `Out of diamonds — next diamond regenerates in ${timer}`,
     waitDiamondBtn: (timer: string) => `Next Diamond in ${timer}`,
-    buyDiamondBtn: `Buy +1 Diamond (${DIAMOND_COST_COINS} Coins)`,
-    buyDiamondAria: `Buy 1 diamond for ${DIAMOND_COST_COINS} coins`,
+    buyDiamondBtn: `Buy +1 Diamond (${DIAMOND_COST_COINS} Pink Coins)`,
+    buyDiamondAria: `Buy 1 diamond for ${DIAMOND_COST_COINS} Pink Coins`,
     diamondsFullTip: 'Diamonds full (10/10)',
-    needCoinsDiamondTip: `Need ${DIAMOND_COST_COINS} coins to buy a diamond`,
+    needCoinsDiamondTip: `Need ${DIAMOND_COST_COINS} Pink Coins to buy a diamond`,
     goldIndexWorldBtn: 'Gold Index',
     goldIndexModalHint:
       'All gold treasures, diamonds & vault hazards — each entry stays locked until you catch or touch it in Gold Stages.',
@@ -1412,6 +1427,10 @@ export default function App() {
   const [coins, setCoins] = useState<number>(() =>
     readStoredNumber(COINS_STORAGE_KEY, 0)
   );
+  const [pinkCoins, setPinkCoins] = useState<number>(() =>
+    readStoredNumber(PINK_COINS_STORAGE_KEY, 0)
+  );
+  const [pinkCoinInfoOpen, setPinkCoinInfoOpen] = useState<boolean>(false);
   const [lastEarnedCoins, setLastEarnedCoins] = useState<number>(4);
   const [completedStages, setCompletedStages] = useState<number[]>(() =>
     readStoredCompletedStages()
@@ -1500,6 +1519,7 @@ export default function App() {
   const stagePointsRef = useRef<number>(0);
   const bestScoreRef = useRef<number>(bestScore);
   const coinsRef = useRef<number>(coins);
+  const pinkCoinsRef = useRef<number>(pinkCoins);
   const completedStagesRef = useRef<number[]>(completedStages);
   const discoveredItemsRef = useRef<ItemKind[]>(discoveredItems);
   const fruitUnlockedRef = useRef<boolean>(fruitUnlocked);
@@ -1579,6 +1599,7 @@ export default function App() {
     ? nextDiamondInMs
     : nextHeartInMs;
   const activeLifeBuyCost = isGoldMode ? DIAMOND_COST_COINS : HEART_COST_COINS;
+  const activeLifeCurrencyBalance = isGoldMode ? pinkCoins : coins;
   const currentStageConfig = isFruitMode
     ? FRUIT_STAGES[Math.min(stageNum - 1, TOTAL_FRUIT_STAGES - 1)]
     : isGoldMode
@@ -1785,13 +1806,16 @@ export default function App() {
     const mode = targetMode ?? gameModeRef.current;
 
     if (mode === 'gold') {
-      if (coinsRef.current < DIAMOND_COST_COINS) return;
+      if (pinkCoinsRef.current < DIAMOND_COST_COINS) return;
       if (diamondsRef.current >= MAX_DIAMONDS) return;
-      const nextCoins = coinsRef.current - DIAMOND_COST_COINS;
-      coinsRef.current = nextCoins;
-      setCoins(nextCoins);
+      const nextPinkCoins = pinkCoinsRef.current - DIAMOND_COST_COINS;
+      pinkCoinsRef.current = nextPinkCoins;
+      setPinkCoins(nextPinkCoins);
       try {
-        window.localStorage.setItem(COINS_STORAGE_KEY, String(nextCoins));
+        window.localStorage.setItem(
+          PINK_COINS_STORAGE_KEY,
+          String(nextPinkCoins)
+        );
       } catch {
         // Ignore storage errors
       }
@@ -1923,9 +1947,32 @@ export default function App() {
   }, []);
 
   const buyLifeToBag = useCallback((mode: GameMode) => {
-    const cost = mode === 'gold' ? DIAMOND_COST_COINS : HEART_COST_COINS;
-    if (coinsRef.current < cost) return;
-    const nextCoins = coinsRef.current - cost;
+    if (mode === 'gold') {
+      if (pinkCoinsRef.current < DIAMOND_COST_COINS) return;
+      const nextPinkCoins = pinkCoinsRef.current - DIAMOND_COST_COINS;
+      pinkCoinsRef.current = nextPinkCoins;
+      setPinkCoins(nextPinkCoins);
+      try {
+        window.localStorage.setItem(
+          PINK_COINS_STORAGE_KEY,
+          String(nextPinkCoins)
+        );
+      } catch {
+        // Ignore storage errors
+      }
+      const nextBag: BagState = {
+        ...bagRef.current,
+        diamonds: bagRef.current.diamonds + 1,
+      };
+      bagRef.current = nextBag;
+      setBag(nextBag);
+      persistBagState(nextBag);
+      audioRef.current.playBuyHeart();
+      return;
+    }
+
+    if (coinsRef.current < HEART_COST_COINS) return;
+    const nextCoins = coinsRef.current - HEART_COST_COINS;
     coinsRef.current = nextCoins;
     setCoins(nextCoins);
     try {
@@ -1934,9 +1981,7 @@ export default function App() {
       // Ignore storage errors
     }
     const nextBag: BagState =
-      mode === 'gold'
-        ? { ...bagRef.current, diamonds: bagRef.current.diamonds + 1 }
-        : mode === 'fruit'
+      mode === 'fruit'
         ? { ...bagRef.current, corn: bagRef.current.corn + 1 }
         : { ...bagRef.current, hearts: bagRef.current.hearts + 1 };
     bagRef.current = nextBag;
@@ -2448,6 +2493,29 @@ export default function App() {
         return;
       }
 
+      if (id === 'full_diamonds') {
+        if (diamondsRef.current >= MAX_DIAMONDS) return;
+        if (pinkCoinsRef.current < def.price) return;
+        const nextPinkCoins = pinkCoinsRef.current - def.price;
+        pinkCoinsRef.current = nextPinkCoins;
+        setPinkCoins(nextPinkCoins);
+        try {
+          window.localStorage.setItem(
+            PINK_COINS_STORAGE_KEY,
+            String(nextPinkCoins)
+          );
+        } catch {
+          // Ignore storage errors
+        }
+        diamondsRef.current = MAX_DIAMONDS;
+        lastDiamondRegenAtRef.current = 0;
+        setDiamonds(MAX_DIAMONDS);
+        setNextDiamondInMs(0);
+        persistDiamondsState(MAX_DIAMONDS, 0);
+        audioRef.current.playStageUp();
+        return;
+      }
+
       if (coinsRef.current < def.price) return;
 
       if (id === 'shield') {
@@ -2509,26 +2577,8 @@ export default function App() {
         audioRef.current.playStageUp();
         return;
       }
-
-      if (id === 'full_diamonds') {
-        if (diamondsRef.current >= MAX_DIAMONDS) return;
-        const nextCoins = coinsRef.current - def.price;
-        coinsRef.current = nextCoins;
-        setCoins(nextCoins);
-        try {
-          window.localStorage.setItem(COINS_STORAGE_KEY, String(nextCoins));
-        } catch {
-          // Ignore storage errors
-        }
-        diamondsRef.current = MAX_DIAMONDS;
-        lastDiamondRegenAtRef.current = 0;
-        setDiamonds(MAX_DIAMONDS);
-        setNextDiamondInMs(0);
-        persistDiamondsState(MAX_DIAMONDS, 0);
-        audioRef.current.playStageUp();
-      }
     },
-    [buyLifeForMode]
+    [buyLifeForMode, buyLifeToBag]
   );
 
   const openStagesModal = useCallback(() => {
@@ -3080,6 +3130,46 @@ export default function App() {
           maxLife,
         });
       }
+    };
+
+    const tryAwardPinkCoins = (x: number, y: number) => {
+      const currentStage = stageNumRef.current;
+      const alreadyWonStage =
+        gameModeRef.current === 'gold'
+          ? completedGoldStagesRef.current.includes(currentStage)
+          : gameModeRef.current === 'fruit'
+          ? completedFruitStagesRef.current.includes(currentStage)
+          : completedStagesRef.current.includes(currentStage);
+      if (alreadyWonStage) return;
+
+      if (Math.random() >= PINK_COIN_DROP_CHANCE) return;
+      const drop =
+        PINK_COIN_MIN_DROP +
+        Math.floor(Math.random() * (PINK_COIN_MAX_DROP - PINK_COIN_MIN_DROP + 1));
+      const nextPinkCoins = pinkCoinsRef.current + drop;
+      pinkCoinsRef.current = nextPinkCoins;
+      setPinkCoins(nextPinkCoins);
+      try {
+        window.localStorage.setItem(
+          PINK_COINS_STORAGE_KEY,
+          String(nextPinkCoins)
+        );
+      } catch {
+        // Ignore storage errors
+      }
+      spawnBurst(x, y, '#f472b6', 8, 0.88);
+      simRef.current.floatingTexts.push({
+        x,
+        y: y - 32,
+        vy: -48,
+        text:
+          langRef.current === 'ar'
+            ? `+${drop} عملة وردية`
+            : `+${drop} Pink`,
+        color: '#f9a8d4',
+        life: 0.85,
+        maxLife: 0.85,
+      });
     };
 
     const spawnFallingObject = () => {
@@ -3679,6 +3769,7 @@ export default function App() {
                 life: 0.7,
                 maxLife: 0.7,
               });
+              tryAwardPinkCoins(item.x, item.y);
 
               const currentGoldCfg =
                 GOLD_STAGES[
@@ -3919,6 +4010,7 @@ export default function App() {
                 life: 0.68,
                 maxLife: 0.68,
               });
+              tryAwardPinkCoins(item.x, item.y);
 
               const currentFruitCfg =
                 FRUIT_STAGES[
@@ -4195,6 +4287,7 @@ export default function App() {
               life: isGreen ? 0.95 : 0.65,
               maxLife: isGreen ? 0.95 : 0.65,
             });
+            tryAwardPinkCoins(item.x, item.y);
 
             // Check stage completion (1 heart = +1 coin, 2 hearts = +2 coins, 3 hearts = +4 coins)
             const currentStageCfg =
@@ -5460,210 +5553,233 @@ export default function App() {
     };
 
     const drawHazardArrowAmber = (item: FallingItem) => {
-      const r = item.radius * 1.08;
-      // Gently align arrow nose along its slanted fall trajectory
+      // Golden Slant Arrow: distinctive Twin-Winged Golden Dart / Spearhead
+      const r = item.radius * 1.12;
       const slantAngle = Math.max(
-        -0.42,
-        Math.min(0.42, Math.atan2(-item.vx, Math.max(80, item.speed)))
+        -0.44,
+        Math.min(0.44, Math.atan2(-item.vx, Math.max(80, item.speed)))
       );
 
       ctx.save();
       ctx.translate(item.x, item.y);
       ctx.rotate(slantAngle);
 
-      // Warm amber slipstream trail
-      const trailGrad = ctx.createLinearGradient(0, -r * 3.1, 0, r * 0.35);
-      trailGrad.addColorStop(0, 'rgba(245, 158, 11, 0)');
-      trailGrad.addColorStop(0.55, 'rgba(245, 158, 11, 0.32)');
-      trailGrad.addColorStop(1, 'rgba(253, 230, 138, 0.65)');
+      // Twin golden shimmer slipstream ribbons
+      const trailGrad = ctx.createLinearGradient(0, -r * 3.1, 0, r * 0.2);
+      trailGrad.addColorStop(0, 'rgba(250, 204, 21, 0)');
+      trailGrad.addColorStop(0.55, 'rgba(250, 204, 21, 0.34)');
+      trailGrad.addColorStop(1, 'rgba(254, 249, 195, 0.72)');
       ctx.fillStyle = trailGrad;
       ctx.beginPath();
-      ctx.moveTo(-r * 0.36, -r * 0.35);
-      ctx.lineTo(r * 0.36, -r * 0.35);
-      ctx.lineTo(0, -r * 3.1);
+      ctx.moveTo(-r * 0.52, -r * 0.55);
+      ctx.lineTo(-r * 0.14, -r * 0.55);
+      ctx.lineTo(-r * 0.25, -r * 3.0);
+      ctx.closePath();
+      ctx.fill();
+      ctx.beginPath();
+      ctx.moveTo(r * 0.52, -r * 0.55);
+      ctx.lineTo(r * 0.14, -r * 0.55);
+      ctx.lineTo(r * 0.25, -r * 3.0);
       ctx.closePath();
       ctx.fill();
 
-      // Soft amber aura
-      const glow = ctx.createRadialGradient(0, r * 0.25, r * 0.15, 0, r * 0.2, r * 1.75);
-      glow.addColorStop(0, 'rgba(245, 158, 11, 0.52)');
-      glow.addColorStop(1, 'rgba(245, 158, 11, 0)');
+      // Radiant golden aura
+      const glow = ctx.createRadialGradient(0, r * 0.15, r * 0.12, 0, r * 0.1, r * 1.85);
+      glow.addColorStop(0, 'rgba(250, 204, 21, 0.56)');
+      glow.addColorStop(1, 'rgba(250, 204, 21, 0)');
       ctx.fillStyle = glow;
       ctx.beginPath();
-      ctx.arc(0, r * 0.2, r * 1.75, 0, Math.PI * 2);
+      ctx.arc(0, r * 0.1, r * 1.85, 0, Math.PI * 2);
       ctx.fill();
 
-      // Drop shadow
-      ctx.save();
-      ctx.translate(2, 3);
+      // Swept falcon-wing double chevron blades
+      const wingGrad = ctx.createLinearGradient(-r * 1.25, -r * 0.5, r * 1.25, r * 0.75);
+      wingGrad.addColorStop(0, '#fef08a');
+      wingGrad.addColorStop(0.5, '#eab308');
+      wingGrad.addColorStop(1, '#a16207');
+      ctx.fillStyle = wingGrad;
       ctx.beginPath();
-      ctx.moveTo(0, r * 1.38);
-      ctx.lineTo(r * 0.98, r * 0.08);
-      ctx.lineTo(r * 0.36, r * 0.08);
-      ctx.lineTo(r * 0.42, -r * 1.25);
-      ctx.lineTo(0, -r * 0.92);
-      ctx.lineTo(-r * 0.42, -r * 1.25);
-      ctx.lineTo(-r * 0.36, r * 0.08);
-      ctx.lineTo(-r * 0.98, r * 0.08);
+      ctx.moveTo(0, r * 0.92);
+      ctx.lineTo(r * 1.28, -r * 0.12);
+      ctx.lineTo(r * 0.96, -r * 0.56);
+      ctx.lineTo(r * 0.28, r * 0.15);
+      ctx.lineTo(0, -r * 0.22);
+      ctx.lineTo(-r * 0.28, r * 0.15);
+      ctx.lineTo(-r * 0.96, -r * 0.56);
+      ctx.lineTo(-r * 1.28, -r * 0.12);
       ctx.closePath();
-      ctx.fillStyle = 'rgba(2, 6, 23, 0.48)';
       ctx.fill();
-      ctx.restore();
+      ctx.strokeStyle = '#fef9c3';
+      ctx.lineWidth = 1.25;
+      ctx.lineJoin = 'round';
+      ctx.stroke();
 
-      // Lit left bevel
-      const leftGrad = ctx.createLinearGradient(-r, -r * 1.2, 0, r * 1.38);
-      leftGrad.addColorStop(0, '#fef3c7');
-      leftGrad.addColorStop(0.45, '#f59e0b');
-      leftGrad.addColorStop(1, '#d97706');
+      // Forked swallowtail golden tail fins
+      ctx.fillStyle = '#ca8a04';
       ctx.beginPath();
-      ctx.moveTo(0, r * 1.38);
-      ctx.lineTo(-r * 0.98, r * 0.08);
-      ctx.lineTo(-r * 0.36, r * 0.08);
-      ctx.lineTo(-r * 0.42, -r * 1.25);
-      ctx.lineTo(0, -r * 0.92);
+      ctx.moveTo(0, -r * 0.52);
+      ctx.lineTo(r * 0.62, -r * 1.38);
+      ctx.lineTo(r * 0.24, -r * 0.96);
+      ctx.lineTo(0, -r * 1.15);
+      ctx.lineTo(-r * 0.24, -r * 0.96);
+      ctx.lineTo(-r * 0.62, -r * 1.38);
       ctx.closePath();
-      ctx.fillStyle = leftGrad;
       ctx.fill();
+      ctx.strokeStyle = '#fde047';
+      ctx.lineWidth = 1.1;
+      ctx.stroke();
 
-      // Shaded right bevel
-      const rightGrad = ctx.createLinearGradient(0, -r * 1.2, r, r * 1.38);
-      rightGrad.addColorStop(0, '#d97706');
-      rightGrad.addColorStop(0.55, '#b45309');
-      rightGrad.addColorStop(1, '#78350f');
+      // Central faceted golden spearhead (lit left + shaded right)
+      const spearLeft = ctx.createLinearGradient(-r * 0.45, -r * 1.0, 0, r * 1.56);
+      spearLeft.addColorStop(0, '#fefce8');
+      spearLeft.addColorStop(0.4, '#facc15');
+      spearLeft.addColorStop(1, '#ca8a04');
       ctx.beginPath();
-      ctx.moveTo(0, r * 1.38);
-      ctx.lineTo(r * 0.98, r * 0.08);
-      ctx.lineTo(r * 0.36, r * 0.08);
-      ctx.lineTo(r * 0.42, -r * 1.25);
-      ctx.lineTo(0, -r * 0.92);
+      ctx.moveTo(0, r * 1.56);
+      ctx.lineTo(-r * 0.48, r * 0.46);
+      ctx.lineTo(-r * 0.2, -r * 0.95);
+      ctx.lineTo(0, -r * 0.78);
       ctx.closePath();
-      ctx.fillStyle = rightGrad;
+      ctx.fillStyle = spearLeft;
       ctx.fill();
 
-      // Spine ridge & crisp outline
-      ctx.strokeStyle = 'rgba(254, 243, 199, 0.9)';
+      const spearRight = ctx.createLinearGradient(0, -r * 1.0, r * 0.45, r * 1.56);
+      spearRight.addColorStop(0, '#eab308');
+      spearRight.addColorStop(0.55, '#a16207');
+      spearRight.addColorStop(1, '#713f12');
+      ctx.beginPath();
+      ctx.moveTo(0, r * 1.56);
+      ctx.lineTo(r * 0.48, r * 0.46);
+      ctx.lineTo(r * 0.2, -r * 0.95);
+      ctx.lineTo(0, -r * 0.78);
+      ctx.closePath();
+      ctx.fillStyle = spearRight;
+      ctx.fill();
+
+      // Spearhead highlight outline & glowing collar gem
+      ctx.beginPath();
+      ctx.moveTo(0, r * 1.56);
+      ctx.lineTo(r * 0.48, r * 0.46);
+      ctx.lineTo(r * 0.2, -r * 0.95);
+      ctx.lineTo(0, -r * 0.78);
+      ctx.lineTo(-r * 0.2, -r * 0.95);
+      ctx.lineTo(-r * 0.48, r * 0.46);
+      ctx.closePath();
+      ctx.strokeStyle = '#fef9c3';
       ctx.lineWidth = 1.3;
-      ctx.beginPath();
-      ctx.moveTo(0, -r * 0.9);
-      ctx.lineTo(0, r * 1.32);
+      ctx.lineJoin = 'round';
       ctx.stroke();
 
       ctx.beginPath();
-      ctx.moveTo(0, r * 1.38);
-      ctx.lineTo(r * 0.98, r * 0.08);
-      ctx.lineTo(r * 0.36, r * 0.08);
-      ctx.lineTo(r * 0.42, -r * 1.25);
-      ctx.lineTo(0, -r * 0.92);
-      ctx.lineTo(-r * 0.42, -r * 1.25);
-      ctx.lineTo(-r * 0.36, r * 0.08);
-      ctx.lineTo(-r * 0.98, r * 0.08);
-      ctx.closePath();
-      ctx.strokeStyle = '#fde68a';
-      ctx.lineWidth = 1.35;
-      ctx.lineJoin = 'round';
+      ctx.arc(0, -r * 0.14, r * 0.22, 0, Math.PI * 2);
+      ctx.fillStyle = '#ffffff';
+      ctx.fill();
+      ctx.strokeStyle = '#f59e0b';
+      ctx.lineWidth = 1.4;
       ctx.stroke();
 
       ctx.restore();
     };
 
     const drawHazardArrowViolet = (item: FallingItem) => {
-      const r = item.radius * 1.08;
-      const pulse = 1 + Math.sin(item.pulsePhase * 1.4) * 0.04;
+      // Violet Slow Arrow: distinctive Crescent-Blade Arcane Bolt
+      const r = item.radius * 1.12;
+      const pulse = 1 + Math.sin(item.pulsePhase * 1.5) * 0.045;
 
       ctx.save();
       ctx.translate(item.x, item.y);
       ctx.scale(pulse, pulse);
 
-      // Mystic violet speed streak
-      const trailGrad = ctx.createLinearGradient(0, -r * 3.3, 0, r * 0.35);
+      // Arcane mist trail
+      const trailGrad = ctx.createLinearGradient(0, -r * 3.3, 0, r * 0.2);
       trailGrad.addColorStop(0, 'rgba(168, 85, 247, 0)');
-      trailGrad.addColorStop(0.55, 'rgba(168, 85, 247, 0.34)');
-      trailGrad.addColorStop(1, 'rgba(233, 213, 255, 0.68)');
+      trailGrad.addColorStop(0.55, 'rgba(168, 85, 247, 0.32)');
+      trailGrad.addColorStop(1, 'rgba(245, 208, 254, 0.7)');
       ctx.fillStyle = trailGrad;
       ctx.beginPath();
-      ctx.moveTo(-r * 0.38, -r * 0.35);
-      ctx.lineTo(r * 0.38, -r * 0.35);
+      ctx.moveTo(-r * 0.34, -r * 0.45);
+      ctx.lineTo(r * 0.34, -r * 0.45);
       ctx.lineTo(0, -r * 3.3);
       ctx.closePath();
       ctx.fill();
 
-      // Violet slow-field aura
-      const glow = ctx.createRadialGradient(0, r * 0.25, r * 0.15, 0, r * 0.2, r * 1.85);
-      glow.addColorStop(0, 'rgba(168, 85, 247, 0.55)');
-      glow.addColorStop(1, 'rgba(168, 85, 247, 0)');
+      // Pulsing slow-field halo ring
+      const glow = ctx.createRadialGradient(0, 0, r * 0.18, 0, 0, r * 1.9);
+      glow.addColorStop(0, 'rgba(192, 132, 252, 0.58)');
+      glow.addColorStop(1, 'rgba(147, 51, 234, 0)');
       ctx.fillStyle = glow;
       ctx.beginPath();
-      ctx.arc(0, r * 0.2, r * 1.85, 0, Math.PI * 2);
+      ctx.arc(0, 0, r * 1.9, 0, Math.PI * 2);
       ctx.fill();
 
-      // Subtle shadow
-      ctx.save();
-      ctx.translate(2, 3);
+      ctx.strokeStyle = 'rgba(233, 213, 255, 0.42)';
+      ctx.lineWidth = 1.2;
       ctx.beginPath();
-      ctx.moveTo(0, r * 1.4);
-      ctx.lineTo(r * 1.0, r * 0.05);
-      ctx.lineTo(r * 0.35, r * 0.18);
-      ctx.lineTo(r * 0.44, -r * 1.28);
-      ctx.lineTo(0, -r * 0.9);
-      ctx.lineTo(-r * 0.44, -r * 1.28);
-      ctx.lineTo(-r * 0.35, r * 0.18);
-      ctx.lineTo(-r * 1.0, r * 0.05);
-      ctx.closePath();
-      ctx.fillStyle = 'rgba(2, 6, 23, 0.5)';
-      ctx.fill();
-      ctx.restore();
-
-      // Lit left bevel
-      const leftGrad = ctx.createLinearGradient(-r, -r * 1.2, 0, r * 1.4);
-      leftGrad.addColorStop(0, '#f3e8ff');
-      leftGrad.addColorStop(0.45, '#a855f7');
-      leftGrad.addColorStop(1, '#7e22ce');
-      ctx.beginPath();
-      ctx.moveTo(0, r * 1.4);
-      ctx.lineTo(-r * 1.0, r * 0.05);
-      ctx.lineTo(-r * 0.35, r * 0.18);
-      ctx.lineTo(-r * 0.44, -r * 1.28);
-      ctx.lineTo(0, -r * 0.9);
-      ctx.closePath();
-      ctx.fillStyle = leftGrad;
-      ctx.fill();
-
-      // Shaded right bevel
-      const rightGrad = ctx.createLinearGradient(0, -r * 1.2, r, r * 1.4);
-      rightGrad.addColorStop(0, '#9333ea');
-      rightGrad.addColorStop(0.55, '#6b21a8');
-      rightGrad.addColorStop(1, '#3b0764');
-      ctx.beginPath();
-      ctx.moveTo(0, r * 1.4);
-      ctx.lineTo(r * 1.0, r * 0.05);
-      ctx.lineTo(r * 0.35, r * 0.18);
-      ctx.lineTo(r * 0.44, -r * 1.28);
-      ctx.lineTo(0, -r * 0.9);
-      ctx.closePath();
-      ctx.fillStyle = rightGrad;
-      ctx.fill();
-
-      // Center luminous ridge + crisp outline
-      ctx.strokeStyle = 'rgba(243, 232, 255, 0.9)';
-      ctx.lineWidth = 1.3;
-      ctx.beginPath();
-      ctx.moveTo(0, -r * 0.88);
-      ctx.lineTo(0, r * 1.34);
+      ctx.arc(0, -r * 0.05, r * 0.78, 0, Math.PI * 2);
       ctx.stroke();
 
+      // Sweeping curved crescent-moon guard blades
+      const crescentGrad = ctx.createLinearGradient(-r * 1.25, -r * 0.3, r * 1.25, r * 0.85);
+      crescentGrad.addColorStop(0, '#f5d0fe');
+      crescentGrad.addColorStop(0.45, '#a855f7');
+      crescentGrad.addColorStop(1, '#581c87');
+      ctx.fillStyle = crescentGrad;
       ctx.beginPath();
-      ctx.moveTo(0, r * 1.4);
-      ctx.lineTo(r * 1.0, r * 0.05);
-      ctx.lineTo(r * 0.35, r * 0.18);
-      ctx.lineTo(r * 0.44, -r * 1.28);
-      ctx.lineTo(0, -r * 0.9);
-      ctx.lineTo(-r * 0.44, -r * 1.28);
-      ctx.lineTo(-r * 0.35, r * 0.18);
-      ctx.lineTo(-r * 1.0, r * 0.05);
+      ctx.moveTo(-r * 1.24, -r * 0.18);
+      ctx.quadraticCurveTo(0, r * 1.15, r * 1.24, -r * 0.18);
+      ctx.quadraticCurveTo(0, r * 0.45, -r * 1.24, -r * 0.18);
       ctx.closePath();
-      ctx.strokeStyle = '#e9d5ff';
-      ctx.lineWidth = 1.35;
+      ctx.fill();
+      ctx.strokeStyle = '#f3e8ff';
+      ctx.lineWidth = 1.25;
       ctx.lineJoin = 'round';
+      ctx.stroke();
+
+      // Flared twin arcane tail plumes
+      ctx.fillStyle = '#7e22ce';
+      ctx.beginPath();
+      ctx.moveTo(0, -r * 0.55);
+      ctx.quadraticCurveTo(r * 0.78, -r * 0.92, r * 0.62, -r * 1.42);
+      ctx.quadraticCurveTo(r * 0.2, -r * 1.05, 0, -r * 1.25);
+      ctx.quadraticCurveTo(-r * 0.2, -r * 1.05, -r * 0.62, -r * 1.42);
+      ctx.quadraticCurveTo(-r * 0.78, -r * 0.92, 0, -r * 0.55);
+      ctx.closePath();
+      ctx.fill();
+      ctx.strokeStyle = '#d8b4fe';
+      ctx.lineWidth = 1.1;
+      ctx.stroke();
+
+      // Crystal needle-lance shaft & sharp tip
+      const lanceGrad = ctx.createLinearGradient(-r * 0.35, -r * 1.1, r * 0.35, r * 1.54);
+      lanceGrad.addColorStop(0, '#faf5ff');
+      lanceGrad.addColorStop(0.45, '#c084fc');
+      lanceGrad.addColorStop(1, '#6b21a8');
+      ctx.fillStyle = lanceGrad;
+      ctx.beginPath();
+      ctx.moveTo(0, r * 1.54);
+      ctx.lineTo(r * 0.34, r * 0.52);
+      ctx.lineTo(r * 0.18, -r * 1.15);
+      ctx.lineTo(0, -r * 0.9);
+      ctx.lineTo(-r * 0.18, -r * 1.15);
+      ctx.lineTo(-r * 0.34, r * 0.52);
+      ctx.closePath();
+      ctx.fill();
+      ctx.strokeStyle = '#f5d0fe';
+      ctx.lineWidth = 1.25;
+      ctx.lineJoin = 'round';
+      ctx.stroke();
+
+      // Glowing amethyst diamond core
+      ctx.beginPath();
+      ctx.moveTo(0, r * 0.28);
+      ctx.lineTo(r * 0.28, -r * 0.05);
+      ctx.lineTo(0, -r * 0.38);
+      ctx.lineTo(-r * 0.28, -r * 0.05);
+      ctx.closePath();
+      ctx.fillStyle = '#ffffff';
+      ctx.fill();
+      ctx.strokeStyle = '#a855f7';
+      ctx.lineWidth = 1.3;
       ctx.stroke();
 
       ctx.restore();
@@ -6418,7 +6534,7 @@ export default function App() {
       className="h-[100dvh] w-full bg-[#070e1a] text-slate-100 flex flex-col overflow-hidden"
     >
       {/* Top HUD Bar — 2 compact rows on mobile & tablet (zero overlap), single spacious row on lg+ */}
-      <header className="w-full border-b border-white/10 bg-[#0b1424]/95 shrink-0">
+      <header className="relative z-30 w-full border-b border-white/10 bg-[#0b1424]/95 shrink-0">
         <div className="mx-auto max-w-[1040px] px-3 sm:px-6 flex flex-col lg:flex-row lg:items-center lg:justify-between lg:h-16 lg:gap-4">
           {/* Row 1 on <lg (Title + Controls); splits cleanly on lg+ via display:contents */}
           <div className="h-10 lg:h-auto flex items-center justify-between gap-1.5 lg:contents">
@@ -6687,6 +6803,66 @@ export default function App() {
               </span>
             </div>
 
+            <div className="h-3.5 sm:h-4 w-px bg-white/10 shrink-0" aria-hidden="true" />
+
+            {/* Pink Coins (العملات الوردية) + Benefit Info */}
+            <div className="relative flex items-center whitespace-nowrap">
+              <button
+                type="button"
+                onClick={() => setPinkCoinInfoOpen((prev) => !prev)}
+                aria-expanded={pinkCoinInfoOpen}
+                aria-label={`${t.pinkCoins}: ${pinkCoins} — ${t.pinkCoinBenefitDesc}`}
+                title={`${t.pinkCoinBenefitTitle}: ${t.pinkCoinBenefitDesc}`}
+                className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md border transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-pink-400 ${
+                  pinkCoinInfoOpen
+                    ? 'border-pink-400/70 bg-pink-500/20'
+                    : 'border-pink-400/30 bg-pink-500/10 hover:bg-pink-500/20'
+                }`}
+              >
+                <PinkCoinIcon className="w-3.5 h-3.5 sm:w-4 sm:h-4 lg:w-4.5 lg:h-4.5 shrink-0" />
+                <span className="font-num text-xs sm:text-sm lg:text-base font-bold text-pink-300">
+                  {pinkCoins}
+                </span>
+                <span className="hidden md:inline text-[10px] font-semibold text-pink-200/90 border-s border-pink-400/30 ps-1">
+                  {t.pinkCoinShortBenefit}
+                </span>
+                <span
+                  aria-hidden="true"
+                  className="inline-flex items-center justify-center w-3.5 h-3.5 rounded-full bg-pink-400/25 text-[9px] font-bold text-pink-100"
+                >
+                  ؟
+                </span>
+              </button>
+
+              {pinkCoinInfoOpen && (
+                <div
+                  role="dialog"
+                  aria-label={t.pinkCoinBenefitTitle}
+                  className="absolute top-full mt-2 left-1/2 -translate-x-1/2 z-40 w-64 sm:w-72 p-3 rounded-xl border border-pink-400/45 bg-[#120d1f]/98 shadow-2xl whitespace-normal text-start"
+                >
+                  <div className="flex items-center justify-between gap-2 mb-1.5">
+                    <div className="flex items-center gap-1.5">
+                      <PinkCoinIcon className="w-4 h-4 shrink-0" />
+                      <span className="text-xs font-bold text-pink-200">
+                        {t.pinkCoinBenefitTitle}
+                      </span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setPinkCoinInfoOpen(false)}
+                      aria-label={t.close}
+                      className="text-slate-400 hover:text-white text-xs font-bold px-1 cursor-pointer"
+                    >
+                      ✕
+                    </button>
+                  </div>
+                  <p className="text-[11px] sm:text-xs text-pink-100/95 leading-relaxed">
+                    {t.pinkCoinBenefitDesc}
+                  </p>
+                </div>
+              )}
+            </div>
+
             <div className="hidden xl:block h-4 w-px bg-white/10 shrink-0" aria-hidden="true" />
 
             {/* Best Score (desktop HUD; also always shown in overlays) */}
@@ -6751,7 +6927,10 @@ export default function App() {
               <button
                 type="button"
                 onClick={buyHeart}
-                disabled={activeLives >= activeMaxLives || coins < activeLifeBuyCost}
+                disabled={
+                  activeLives >= activeMaxLives ||
+                  activeLifeCurrencyBalance < activeLifeBuyCost
+                }
                 aria-label={
                   isGoldMode
                     ? t.buyDiamondAria
@@ -6766,7 +6945,7 @@ export default function App() {
                       : isFruitMode
                       ? t.cornFullTip
                       : t.heartsFullTip
-                    : coins < activeLifeBuyCost
+                    : activeLifeCurrencyBalance < activeLifeBuyCost
                     ? isGoldMode
                       ? t.needCoinsDiamondTip
                       : isFruitMode
@@ -6779,29 +6958,34 @@ export default function App() {
                     : t.buyHeartAria
                 }
                 className={`h-6 px-1.5 inline-flex items-center justify-center gap-0.5 rounded border text-[10px] sm:text-[11px] font-bold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400 shrink-0 ${
-                  activeLives < activeMaxLives && coins >= activeLifeBuyCost
+                  activeLives < activeMaxLives &&
+                  activeLifeCurrencyBalance >= activeLifeBuyCost
                     ? isGoldMode
-                      ? 'border-yellow-400/60 bg-yellow-400/20 text-yellow-200 hover:bg-yellow-400/35 active:scale-95 cursor-pointer'
+                      ? 'border-pink-400/65 bg-pink-500/25 text-pink-200 hover:bg-pink-500/40 active:scale-95 cursor-pointer'
                       : 'border-amber-400/50 bg-amber-500/20 text-amber-200 hover:bg-amber-500/35 active:scale-95 cursor-pointer'
                     : 'border-white/10 bg-slate-900/70 text-slate-500 cursor-not-allowed'
                 }`}
               >
                 <span>+</span>
                 <span className="font-num">{activeLifeBuyCost}</span>
-                <svg
-                  viewBox="0 0 24 24"
-                  className="w-2.5 h-2.5 sm:w-3 sm:h-3 text-amber-400 shrink-0"
-                  aria-hidden="true"
-                >
-                  <circle
-                    cx="12"
-                    cy="12"
-                    r="9.5"
-                    fill="currentColor"
-                    stroke="#fef3c7"
-                    strokeWidth="1.6"
-                  />
-                </svg>
+                {isGoldMode ? (
+                  <PinkCoinIcon className="w-2.5 h-2.5 sm:w-3 sm:h-3 shrink-0" />
+                ) : (
+                  <svg
+                    viewBox="0 0 24 24"
+                    className="w-2.5 h-2.5 sm:w-3 sm:h-3 text-amber-400 shrink-0"
+                    aria-hidden="true"
+                  >
+                    <circle
+                      cx="12"
+                      cy="12"
+                      r="9.5"
+                      fill="currentColor"
+                      stroke="#fef3c7"
+                      strokeWidth="1.6"
+                    />
+                  </svg>
+                )}
               </button>
             </div>
           </div>
@@ -7241,11 +7425,13 @@ export default function App() {
                     {activeLives <= 0 && (
                       <button
                         type="button"
-                        disabled={coins < activeLifeBuyCost}
+                        disabled={activeLifeCurrencyBalance < activeLifeBuyCost}
                         onClick={buyHeart}
                         className={`w-full sm:w-auto px-5 py-3.5 rounded-lg font-bold text-sm sm:text-base transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-300 whitespace-nowrap ${
-                          coins >= activeLifeBuyCost
-                            ? 'bg-amber-400 hover:bg-amber-300 active:scale-[0.98] text-slate-950 cursor-pointer'
+                          activeLifeCurrencyBalance >= activeLifeBuyCost
+                            ? isGoldMode
+                              ? 'bg-pink-400 hover:bg-pink-300 active:scale-[0.98] text-slate-950 cursor-pointer'
+                              : 'bg-amber-400 hover:bg-amber-300 active:scale-[0.98] text-slate-950 cursor-pointer'
                             : 'bg-slate-800 text-slate-500 border border-white/10 cursor-not-allowed'
                         }`}
                       >
@@ -7599,36 +7785,50 @@ export default function App() {
                           {t.goldStagesModalHint}
                         </p>
 
-                      {/* Dedicated Diamonds Lives Bar inside Gold Stages (10 coins per diamond) */}
-                      <div className="flex flex-wrap items-center justify-between gap-2 mb-3 p-2.5 rounded-lg border border-yellow-400/30 bg-gradient-to-r from-[#231907]/90 via-[#1b160b]/90 to-[#0d1f32]/90">
-                        <div className="flex items-center gap-1.5">
-                          <DiamondIcon className="w-5 h-5 shrink-0" />
-                          <span className="text-xs sm:text-sm font-bold text-sky-200">
-                            {t.diamondsLabel}:{' '}
-                            <span className="font-num text-yellow-200">
-                              {diamonds}/{MAX_DIAMONDS}
+                      {/* Dedicated Diamonds Lives Bar inside Gold Stages (10 Pink Coins per diamond) */}
+                      <div className="flex flex-col gap-2 mb-3 p-2.5 rounded-lg border border-yellow-400/30 bg-gradient-to-r from-[#231907]/90 via-[#1b160b]/90 to-[#0d1f32]/90">
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                          <div className="flex items-center gap-1.5">
+                            <DiamondIcon className="w-5 h-5 shrink-0" />
+                            <span className="text-xs sm:text-sm font-bold text-sky-200">
+                              {t.diamondsLabel}:{' '}
+                              <span className="font-num text-yellow-200">
+                                {diamonds}/{MAX_DIAMONDS}
+                              </span>
                             </span>
-                          </span>
+                            {diamonds < MAX_DIAMONDS && (
+                              <span className="font-num text-[11px] font-semibold text-sky-300 bg-sky-500/15 border border-sky-400/25 rounded px-1.5 py-0.5">
+                                {formatCountdown(nextDiamondInMs)}
+                              </span>
+                            )}
+                          </div>
                           {diamonds < MAX_DIAMONDS && (
-                            <span className="font-num text-[11px] font-semibold text-sky-300 bg-sky-500/15 border border-sky-400/25 rounded px-1.5 py-0.5">
-                              {formatCountdown(nextDiamondInMs)}
-                            </span>
+                            <button
+                              type="button"
+                              disabled={pinkCoins < DIAMOND_COST_COINS}
+                              onClick={() => buyLifeForMode('gold')}
+                              className={`px-2.5 py-1 rounded-md text-xs font-bold transition-colors whitespace-nowrap inline-flex items-center gap-1.5 ${
+                                pinkCoins >= DIAMOND_COST_COINS
+                                  ? 'bg-pink-400 hover:bg-pink-300 text-slate-950 cursor-pointer'
+                                  : 'bg-slate-800 text-slate-500 cursor-not-allowed'
+                              }`}
+                            >
+                              <PinkCoinIcon className="w-3.5 h-3.5 shrink-0" />
+                              <span>{t.buyDiamondBtn}</span>
+                            </button>
                           )}
                         </div>
-                        {diamonds < MAX_DIAMONDS && (
-                          <button
-                            type="button"
-                            disabled={coins < DIAMOND_COST_COINS}
-                            onClick={() => buyLifeForMode('gold')}
-                            className={`px-2.5 py-1 rounded-md text-xs font-bold transition-colors whitespace-nowrap ${
-                              coins >= DIAMOND_COST_COINS
-                                ? 'bg-gradient-to-r from-yellow-400 to-sky-400 hover:brightness-110 text-slate-950 cursor-pointer'
-                                : 'bg-slate-800 text-slate-500 cursor-not-allowed'
-                            }`}
-                          >
-                            {t.buyDiamondBtn}
-                          </button>
-                        )}
+                        <div className="flex items-center gap-1.5 text-[11px] text-pink-200/90 border-t border-white/10 pt-1.5">
+                          <PinkCoinIcon className="w-3.5 h-3.5 shrink-0" />
+                          <span className="font-num font-bold text-pink-300">
+                            {pinkCoins}
+                          </span>
+                          <span>{t.pinkCoins}</span>
+                          <span aria-hidden="true">·</span>
+                          <span className="text-pink-100/85">
+                            {t.pinkCoinBenefitDesc}
+                          </span>
+                        </div>
                       </div>
 
                       {diamonds <= 0 && (
@@ -8133,26 +8333,11 @@ export default function App() {
                                 className={`w-12 h-12 rounded-lg border flex items-center justify-center shrink-0 ${
                                   discovered
                                     ? 'border-yellow-400/25 bg-[#161108]'
-                                    : 'border-white/8 bg-slate-900/80 text-slate-500'
+                                    : 'border-yellow-400/18 bg-[#120e07]'
                                 }`}
                                 aria-hidden="true"
                               >
-                                {!discovered ? (
-                                  <svg
-                                    viewBox="0 0 24 24"
-                                    className="w-5 h-5"
-                                    fill="none"
-                                    stroke="currentColor"
-                                    strokeWidth="2.1"
-                                    strokeLinecap="round"
-                                    strokeLinejoin="round"
-                                  >
-                                    <rect x="5" y="11" width="14" height="10" rx="2" />
-                                    <path d="M8 11V7a4 4 0 0 1 8 0v4" />
-                                  </svg>
-                                ) : (
-                                  <GoldIndexIcon kind={entry.kind} />
-                                )}
+                                <GoldIndexIcon kind={entry.kind} />
                               </div>
 
                               <div className="min-w-0 flex-1">
@@ -8183,15 +8368,17 @@ export default function App() {
                                 ) : (
                                   <>
                                     <div className="flex items-baseline justify-between gap-2">
-                                      <span className="text-sm sm:text-base font-bold text-slate-400">
-                                        {t.indexUnknownTitle}
+                                      <span className="text-sm sm:text-base font-bold text-slate-100 truncate">
+                                        {lang === 'ar' ? entry.nameAr : entry.nameEn}
                                       </span>
-                                      <span className="text-[11px] font-semibold text-slate-500 whitespace-nowrap shrink-0">
-                                        {t.indexLockedBadge}
+                                      <span className="text-[11px] font-semibold text-slate-400 whitespace-nowrap shrink-0">
+                                        {lang === 'ar' ? 'فائدته مقفلة' : 'Effect Locked'}
                                       </span>
                                     </div>
-                                    <p className="text-xs text-slate-500 mt-1 leading-relaxed">
-                                      {t.indexLockedDesc}
+                                    <p className="text-xs text-slate-400 mt-1 leading-relaxed">
+                                      {lang === 'ar'
+                                        ? 'الفائدة مخفية — التقطه أو المسه أثناء اللعب لفتح فائدته.'
+                                        : 'Benefit hidden — catch or touch it during play to unlock its effect.'}
                                     </p>
                                   </>
                                 )}
@@ -8218,26 +8405,11 @@ export default function App() {
                                 className={`w-12 h-12 rounded-lg border flex items-center justify-center shrink-0 ${
                                   discovered
                                     ? 'border-white/12 bg-[#0a1a12]'
-                                    : 'border-white/8 bg-slate-900/80 text-slate-500'
+                                    : 'border-emerald-400/15 bg-[#09150f]'
                                 }`}
                                 aria-hidden="true"
                               >
-                                {!discovered ? (
-                                  <svg
-                                    viewBox="0 0 24 24"
-                                    className="w-5 h-5"
-                                    fill="none"
-                                    stroke="currentColor"
-                                    strokeWidth="2.1"
-                                    strokeLinecap="round"
-                                    strokeLinejoin="round"
-                                  >
-                                    <rect x="5" y="11" width="14" height="10" rx="2" />
-                                    <path d="M8 11V7a4 4 0 0 1 8 0v4" />
-                                  </svg>
-                                ) : (
-                                  <FruitIndexIcon kind={entry.kind} />
-                                )}
+                                <FruitIndexIcon kind={entry.kind} />
                               </div>
 
                               <div className="min-w-0 flex-1">
@@ -8266,15 +8438,17 @@ export default function App() {
                                 ) : (
                                   <>
                                     <div className="flex items-baseline justify-between gap-2">
-                                      <span className="text-sm sm:text-base font-bold text-slate-400">
-                                        {t.indexUnknownTitle}
+                                      <span className="text-sm sm:text-base font-bold text-slate-100 truncate">
+                                        {lang === 'ar' ? entry.nameAr : entry.nameEn}
                                       </span>
-                                      <span className="text-[11px] font-semibold text-slate-500 whitespace-nowrap shrink-0">
-                                        {t.indexLockedBadge}
+                                      <span className="text-[11px] font-semibold text-slate-400 whitespace-nowrap shrink-0">
+                                        {lang === 'ar' ? 'فائدته مقفلة' : 'Effect Locked'}
                                       </span>
                                     </div>
-                                    <p className="text-xs text-slate-500 mt-1 leading-relaxed">
-                                      {t.indexLockedDesc}
+                                    <p className="text-xs text-slate-400 mt-1 leading-relaxed">
+                                      {lang === 'ar'
+                                        ? 'الفائدة مخفية — التقطه أو المسه أثناء اللعب لفتح فائدته.'
+                                        : 'Benefit hidden — catch or touch it during play to unlock its effect.'}
                                     </p>
                                   </>
                                 )}
@@ -8293,71 +8467,62 @@ export default function App() {
                                   ? isPositive
                                     ? 'border-sky-400/25 bg-slate-900/85'
                                     : 'border-rose-400/25 bg-slate-900/85'
-                                  : 'border-white/8 bg-slate-950/75 opacity-85'
+                                  : 'border-white/10 bg-slate-900/65'
                               }`}
                             >
-                              {/* Item Artwork or Padlock */}
+                              {/* Item Artwork (always visible; value digits appear once discovered) */}
                               <div
                                 className={`w-12 h-12 rounded-lg border flex items-center justify-center shrink-0 ${
                                   discovered
                                     ? 'border-white/12 bg-[#0a1324]'
-                                    : 'border-white/8 bg-slate-900/80 text-slate-500'
+                                    : 'border-white/10 bg-[#0b1426]'
                                 }`}
                                 aria-hidden="true"
                               >
-                                {!discovered ? (
-                                  <svg
-                                    viewBox="0 0 24 24"
-                                    className="w-5 h-5"
-                                    fill="none"
-                                    stroke="currentColor"
-                                    strokeWidth="2.1"
-                                    strokeLinecap="round"
-                                    strokeLinejoin="round"
-                                  >
-                                    <rect x="5" y="11" width="14" height="10" rx="2" />
-                                    <path d="M8 11V7a4 4 0 0 1 8 0v4" />
-                                  </svg>
-                                ) : entry.kind === 'pink_circle' ? (
+                                {entry.kind === 'pink_circle' ? (
                                   <svg viewBox="0 0 24 24" className="w-8 h-8">
                                     <circle
                                       cx="12"
                                       cy="12"
-                                      r="10"
+                                      r="9.5"
                                       fill="#ec4899"
                                       stroke="#fbcfe8"
                                       strokeWidth="1.8"
                                     />
-                                    <text
-                                      x="12"
-                                      y="16"
-                                      textAnchor="middle"
-                                      fill="#ffffff"
-                                      fontSize="11"
-                                      fontWeight="700"
-                                    >
-                                      3
-                                    </text>
+                                    {discovered && (
+                                      <text
+                                        x="12"
+                                        y="16"
+                                        textAnchor="middle"
+                                        fill="#ffffff"
+                                        fontSize="11"
+                                        fontWeight="700"
+                                      >
+                                        3
+                                      </text>
+                                    )}
                                   </svg>
                                 ) : entry.kind === 'blue_triangle' ? (
                                   <svg viewBox="0 0 24 24" className="w-8 h-8">
                                     <polygon
-                                      points="12,2 22,20 2,20"
+                                      points="12,2.5 21.5,20 2.5,20"
                                       fill="#0284c7"
                                       stroke="#bae6fd"
                                       strokeWidth="1.8"
                                       strokeLinejoin="round"
                                     />
-                                    <text
-                                      x="12"
-                                      y="17.5"
-                                      textAnchor="middle"
-                                      fill="#ffffff"
-                                      fontSize="10"
-                                      fontWeight="700"
-                                    >
-                                      4
-                                    </text>
+                                    {discovered && (
+                                      <text
+                                        x="12"
+                                        y="17.5"
+                                        textAnchor="middle"
+                                        fill="#ffffff"
+                                        fontSize="10"
+                                        fontWeight="700"
+                                      >
+                                        4
+                                      </text>
+                                    )}
                                   </svg>
                                 ) : entry.kind === 'green_circle' ? (
                                   <svg viewBox="0 0 24 24" className="w-8 h-8">
@@ -8369,36 +8534,40 @@ export default function App() {
                                       stroke="#a7f3d0"
                                       strokeWidth="1.8"
                                     />
-                                    <text
-                                      x="12"
-                                      y="16"
-                                      textAnchor="middle"
-                                      fill="#ffffff"
-                                      fontSize="11"
-                                      fontWeight="800"
-                                    >
-                                      2
-                                    </text>
+                                    {discovered && (
+                                      <text
+                                        x="12"
+                                        y="16"
+                                        textAnchor="middle"
+                                        fill="#ffffff"
+                                        fontSize="11"
+                                        fontWeight="800"
+                                      >
+                                        2
+                                      </text>
+                                    )}
                                   </svg>
                                 ) : entry.kind === 'purple_diamond' ? (
                                   <svg viewBox="0 0 24 24" className="w-8 h-8">
                                     <polygon
-                                      points="12,2 22,12 12,22 2,12"
+                                      points="12,2.5 21.5,12 12,21.5 2.5,12"
                                       fill="#9333ea"
                                       stroke="#f3e8ff"
                                       strokeWidth="1.8"
                                       strokeLinejoin="round"
                                     />
-                                    <text
-                                      x="12"
-                                      y="15.8"
-                                      textAnchor="middle"
-                                      fill="#ffffff"
-                                      fontSize="10.5"
-                                      fontWeight="800"
-                                    >
-                                      5
-                                    </text>
+                                    {discovered && (
+                                      <text
+                                        x="12"
+                                        y="15.8"
+                                        textAnchor="middle"
+                                        fill="#ffffff"
+                                        fontSize="10.5"
+                                        fontWeight="800"
+                                      >
+                                        5
+                                      </text>
+                                    )}
                                   </svg>
                                 ) : entry.kind === 'gold_star' ? (
                                   <svg viewBox="0 0 24 24" className="w-8 h-8">
@@ -8409,33 +8578,40 @@ export default function App() {
                                       strokeWidth="1.6"
                                       strokeLinejoin="round"
                                     />
-                                    <text
-                                      x="12"
-                                      y="15.8"
-                                      textAnchor="middle"
-                                      fill="#ffffff"
-                                      fontSize="9.5"
-                                      fontWeight="900"
-                                    >
-                                      7
-                                    </text>
+                                    {discovered && (
+                                      <text
+                                        x="12"
+                                        y="15.8"
+                                        textAnchor="middle"
+                                        fill="#ffffff"
+                                        fontSize="9.5"
+                                        fontWeight="900"
+                                      >
+                                        7
+                                      </text>
+                                    )}
                                   </svg>
                                 ) : entry.kind === 'hazard_spike' ? (
-                                  <svg viewBox="0 0 24 24" className="w-8 h-8">
+                                  <svg viewBox="-1 -1 26 26" className="w-8 h-8">
                                     <polygon
                                       points="12,1 14.8,6.2 20.5,4.5 18.2,10 23,12 18.2,14 20.5,19.5 14.8,17.8 12,23 9.2,17.8 3.5,19.5 5.8,14 1,12 5.8,10 3.5,4.5 9.2,6.2"
                                       fill="#dc2626"
+                                      stroke="#fca5a5"
+                                      strokeWidth="1"
+                                      strokeLinejoin="round"
                                     />
-                                    <text
-                                      x="12"
-                                      y="15.5"
-                                      textAnchor="middle"
-                                      fill="#ffffff"
-                                      fontSize="9"
-                                      fontWeight="800"
-                                    >
-                                      -1
-                                    </text>
+                                    {discovered && (
+                                      <text
+                                        x="12"
+                                        y="15.5"
+                                        textAnchor="middle"
+                                        fill="#ffffff"
+                                        fontSize="9"
+                                        fontWeight="800"
+                                      >
+                                        -1
+                                      </text>
+                                    )}
                                   </svg>
                                 ) : entry.kind === 'hazard_star' ? (
                                   <svg viewBox="0 0 24 24" className="w-8 h-8">
@@ -8446,19 +8622,21 @@ export default function App() {
                                       strokeWidth="1.5"
                                       strokeLinejoin="round"
                                     />
-                                    <text
-                                      x="12"
-                                      y="15.2"
-                                      textAnchor="middle"
-                                      fill="#e0f2fe"
-                                      fontSize="8.5"
-                                      fontWeight="800"
-                                    >
-                                      ❄
-                                    </text>
+                                    {discovered && (
+                                      <text
+                                        x="12"
+                                        y="15.2"
+                                        textAnchor="middle"
+                                        fill="#e0f2fe"
+                                        fontSize="8.5"
+                                        fontWeight="800"
+                                      >
+                                        ❄
+                                      </text>
+                                    )}
                                   </svg>
                                 ) : entry.kind === 'hazard_arrow' ? (
-                                  <svg viewBox="0 0 24 24" className="w-8 h-8">
+                                  <svg viewBox="-1 -1 26 26" className="w-8 h-8">
                                     <polygon
                                       points="12,22 20,11 15,11 15.5,2 12,4.5 8.5,2 9,11 4,11"
                                       fill="#dc2626"
@@ -8476,41 +8654,84 @@ export default function App() {
                                     />
                                   </svg>
                                 ) : entry.kind === 'hazard_arrow_amber' ? (
-                                  <svg viewBox="0 0 24 24" className="w-8 h-8">
-                                    <g transform="rotate(-18 12 12)">
+                                  <svg viewBox="-2 -2 28 28" className="w-9 h-9">
+                                    <g transform="rotate(-16 12 12)">
+                                      {/* Swept golden falcon wings */}
                                       <polygon
-                                        points="12,21.5 19.5,11 14.8,11 15.2,2.5 12,4.8 8.8,2.5 9.2,11 4.5,11"
-                                        fill="#f59e0b"
-                                        stroke="#fde68a"
-                                        strokeWidth="1.5"
+                                        points="12,17.2 21.5,10.5 19.2,7.2 14,12.2 12,9.8 10,12.2 4.8,7.2 2.5,10.5"
+                                        fill="#eab308"
+                                        stroke="#fef9c3"
+                                        strokeWidth="1.15"
                                         strokeLinejoin="round"
                                       />
-                                      <line
-                                        x1="12"
-                                        y1="4.8"
-                                        x2="12"
-                                        y2="19.8"
-                                        stroke="#fef3c7"
+                                      {/* Forked tail fins */}
+                                      <polygon
+                                        points="12,8 16.5,2 13.8,5 12,3.6 10.2,5 7.5,2"
+                                        fill="#ca8a04"
+                                        stroke="#fde047"
+                                        strokeWidth="1"
+                                        strokeLinejoin="round"
+                                      />
+                                      {/* Central golden diamond spearhead */}
+                                      <polygon
+                                        points="12,22.2 15.6,14.5 13.4,5.4 12,6.8 10.6,5.4 8.4,14.5"
+                                        fill="#facc15"
+                                        stroke="#fef9c3"
                                         strokeWidth="1.2"
+                                        strokeLinejoin="round"
+                                      />
+                                      <circle
+                                        cx="12"
+                                        cy="10.8"
+                                        r="1.7"
+                                        fill="#ffffff"
+                                        stroke="#d97706"
+                                        strokeWidth="1"
                                       />
                                     </g>
                                   </svg>
                                 ) : entry.kind === 'hazard_arrow_violet' ? (
-                                  <svg viewBox="0 0 24 24" className="w-8 h-8">
-                                    <polygon
-                                      points="12,22 19.8,10.8 14.8,11.6 15.4,2.2 12,4.8 8.6,2.2 9.2,11.6 4.2,10.8"
-                                      fill="#9333ea"
+                                  <svg viewBox="-2 -2 28 28" className="w-9 h-9">
+                                    {/* Arcane halo ring */}
+                                    <circle
+                                      cx="12"
+                                      cy="11.5"
+                                      r="5.6"
+                                      fill="none"
                                       stroke="#e9d5ff"
-                                      strokeWidth="1.5"
-                                      strokeLinejoin="round"
+                                      strokeOpacity="0.45"
+                                      strokeWidth="1.1"
                                     />
-                                    <line
-                                      x1="12"
-                                      y1="4.8"
-                                      x2="12"
-                                      y2="20"
+                                    {/* Curved crescent-moon blade */}
+                                    <path
+                                      d="M2.6,10.5 Q12,20.2 21.4,10.5 Q12,15.2 2.6,10.5 Z"
+                                      fill="#a855f7"
                                       stroke="#f3e8ff"
                                       strokeWidth="1.2"
+                                      strokeLinejoin="round"
+                                    />
+                                    {/* Flared arcane tail plumes */}
+                                    <path
+                                      d="M12,7.8 Q17.6,5.4 16.6,2.2 Q13.6,4.8 12,3.4 Q10.4,4.8 7.4,2.2 Q6.4,5.4 12,7.8 Z"
+                                      fill="#7e22ce"
+                                      stroke="#d8b4fe"
+                                      strokeWidth="1"
+                                      strokeLinejoin="round"
+                                    />
+                                    {/* Crystal needle-lance */}
+                                    <polygon
+                                      points="12,22.2 14.5,14.8 13.3,4.2 12,5.8 10.7,4.2 9.5,14.8"
+                                      fill="#c084fc"
+                                      stroke="#f5d0fe"
+                                      strokeWidth="1.15"
+                                      strokeLinejoin="round"
+                                    />
+                                    {/* Amethyst diamond core */}
+                                    <polygon
+                                      points="12,13.8 14,11.5 12,9.2 10,11.5"
+                                      fill="#ffffff"
+                                      stroke="#9333ea"
+                                      strokeWidth="1"
                                     />
                                   </svg>
                                 ) : (
@@ -8525,16 +8746,18 @@ export default function App() {
                                       stroke="#fca5a5"
                                       strokeWidth="1.8"
                                     />
-                                    <text
-                                      x="12"
-                                      y="15.5"
-                                      textAnchor="middle"
-                                      fill="#ffffff"
-                                      fontSize="9.5"
-                                      fontWeight="800"
-                                    >
-                                      -2
-                                    </text>
+                                    {discovered && (
+                                      <text
+                                        x="12"
+                                        y="15.5"
+                                        textAnchor="middle"
+                                        fill="#ffffff"
+                                        fontSize="9.5"
+                                        fontWeight="800"
+                                      >
+                                        -2
+                                      </text>
+                                    )}
                                   </svg>
                                 )}
                               </div>
@@ -8578,15 +8801,17 @@ export default function App() {
                                 ) : (
                                   <>
                                     <div className="flex items-baseline justify-between gap-2">
-                                      <span className="text-sm sm:text-base font-bold text-slate-400">
-                                        {t.indexUnknownTitle}
+                                      <span className="text-sm sm:text-base font-bold text-slate-100 truncate">
+                                        {lang === 'ar' ? entry.nameAr : entry.nameEn}
                                       </span>
-                                      <span className="text-[11px] font-semibold text-slate-500 whitespace-nowrap shrink-0">
-                                        {t.indexLockedBadge}
+                                      <span className="text-[11px] font-semibold text-slate-400 whitespace-nowrap shrink-0">
+                                        {lang === 'ar' ? 'فائدته مقفلة' : 'Effect Locked'}
                                       </span>
                                     </div>
-                                    <p className="text-xs text-slate-500 mt-1 leading-relaxed">
-                                      {t.indexLockedDesc}
+                                    <p className="text-xs text-slate-400 mt-1 leading-relaxed">
+                                      {lang === 'ar'
+                                        ? 'الفائدة مخفية — التقطه أو المسه أثناء اللعب لفتح فائدته.'
+                                        : 'Benefit hidden — catch or touch it during play to unlock its effect.'}
                                     </p>
                                   </>
                                 )}
@@ -8605,6 +8830,7 @@ export default function App() {
             <ShopModal
               lang={lang}
               coins={coins}
+              pinkCoins={pinkCoins}
               lives={lives}
               maxLives={MAX_LIVES}
               corn={corn}
@@ -8629,12 +8855,17 @@ export default function App() {
             <div className="absolute inset-0 z-20 flex items-center justify-center p-3 sm:p-5 bg-[#060c17]/82 backdrop-blur-[4px]">
               <div className="w-full max-w-md max-h-full flex flex-col rounded-xl border border-white/14 bg-[#0f1a2e]/98 shadow-2xl overflow-hidden">
                 <div className="flex items-center justify-between gap-3 px-5 py-4 border-b border-white/10 shrink-0">
-                  <div className="flex items-center gap-2.5 min-w-0">
+                  <div className="flex items-center flex-wrap gap-x-2.5 gap-y-1 min-w-0">
                     <h2 className="text-lg sm:text-xl font-bold text-white whitespace-nowrap">
                       {t.bagTitle}
                     </h2>
                     <span className="text-xs sm:text-sm text-amber-300 font-semibold font-num whitespace-nowrap">
                       · {coins} {t.coins}
+                    </span>
+                    <span className="text-xs sm:text-sm text-pink-300 font-semibold font-num whitespace-nowrap inline-flex items-center gap-1">
+                      <span>·</span>
+                      <PinkCoinIcon className="w-3.5 h-3.5 shrink-0" />
+                      <span>{pinkCoins}</span>
                     </span>
                   </div>
                   <button
@@ -8707,9 +8938,11 @@ export default function App() {
                       },
                     ] as const
                   ).map((row) => {
+                    const isPinkRow = row.mode === 'gold';
                     const canUse = row.stored > 0 && row.active < row.max;
                     const canStore = row.active > 1;
-                    const canBuyToBag = coins >= row.cost;
+                    const canBuyToBag =
+                      (isPinkRow ? pinkCoins : coins) >= row.cost;
                     return (
                       <div
                         key={row.mode}
@@ -8793,15 +9026,27 @@ export default function App() {
                             type="button"
                             disabled={!canBuyToBag}
                             onClick={() => buyLifeToBag(row.mode)}
-                            className={`h-9 px-3 rounded-md text-xs font-bold border transition-colors whitespace-nowrap ${
+                            className={`h-9 px-3 rounded-md text-xs font-bold border transition-colors whitespace-nowrap inline-flex items-center gap-1.5 ${
                               canBuyToBag
-                                ? 'border-amber-400/45 bg-amber-500/15 text-amber-200 hover:bg-amber-500/25 cursor-pointer'
+                                ? isPinkRow
+                                  ? 'border-pink-400/50 bg-pink-500/20 text-pink-200 hover:bg-pink-500/30 cursor-pointer'
+                                  : 'border-amber-400/45 bg-amber-500/15 text-amber-200 hover:bg-amber-500/25 cursor-pointer'
                                 : 'border-white/5 bg-slate-950/60 text-slate-600 cursor-not-allowed'
                             }`}
                           >
-                            {t.bagBuyBtn}
+                            {isPinkRow && (
+                              <PinkCoinIcon className="w-3.5 h-3.5 shrink-0" />
+                            )}
+                            <span>
+                              {isPinkRow ? t.bagBuyDiamondBtn : t.bagBuyBtn}
+                            </span>
                           </button>
                         </div>
+                        {isPinkRow && (
+                          <p className="text-[11px] text-pink-200/85 leading-relaxed">
+                            {t.pinkCoinBenefitDesc}
+                          </p>
+                        )}
                       </div>
                     );
                   })}
