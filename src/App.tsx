@@ -512,7 +512,7 @@ const COPY = {
     goldUnlockBtn: `فتح مراحل الذهب (${GOLD_UNLOCK_COST} فلوس)`,
     goldNeedCoins: (need: number) => `تحتاج ${need} فلوس إضافية لفتح مراحل الذهب`,
     goldStagesModalHint:
-      `15 مرحلة ذهب وألماس — سعر الألماسة ${DIAMOND_COST_COINS} عملة وردية · مكافأة الفوز بالمرحلة (حسب الألماس المتبقي): 1 = 5 · 2 = 10 · 3+ = 15 فلوس.`,
+      `15 مرحلة ذهب وألماس — سعر الألماسة ${DIAMOND_COST_COINS} عملة وردية · مكافأة الفوز بالمرحلة (حسب الألماس المتبقي): 1–4 = 5 · 5–7 = 10 · 8–10 = 15 فلوس.`,
     noDiamondsNotice: (timer: string) => `نفد الألماس — تتجدد الألماسة القادمة خلال ${timer}`,
     waitDiamondBtn: (timer: string) => `انتظر تجدد الألماسة (${timer})`,
     buyDiamondBtn: `+1 ألماسة (${DIAMOND_COST_COINS} عملة وردية)`,
@@ -670,7 +670,7 @@ const COPY = {
     goldUnlockBtn: `Unlock Gold Stages (${GOLD_UNLOCK_COST} Coins)`,
     goldNeedCoins: (need: number) => `Need ${need} more coins to unlock Gold Stages`,
     goldStagesModalHint:
-      `15 Gold & Diamond stages — Diamond price is ${DIAMOND_COST_COINS} Pink Coins · Stage-win reward (by remaining diamonds): 1 = 5, 2 = 10, 3+ = 15 coins.`,
+      `15 Gold & Diamond stages — Diamond price is ${DIAMOND_COST_COINS} Pink Coins · Stage-win reward (by remaining diamonds): 1–4 = 5, 5–7 = 10, 8–10 = 15 coins.`,
     noDiamondsNotice: (timer: string) => `Out of diamonds — next diamond regenerates in ${timer}`,
     waitDiamondBtn: (timer: string) => `Next Diamond in ${timer}`,
     buyDiamondBtn: `Buy +1 Diamond (${DIAMOND_COST_COINS} Pink Coins)`,

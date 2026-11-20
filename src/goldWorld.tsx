@@ -58,8 +58,8 @@ export const MAX_DIAMONDS = 10;
 export const DIAMOND_COST_COINS = 40;
 
 export function getGoldStageClearCoins(remainingDiamonds: number): number {
-  if (remainingDiamonds >= 3) return 15;
-  if (remainingDiamonds === 2) return 10;
+  if (remainingDiamonds >= 8) return 15;
+  if (remainingDiamonds >= 5) return 10;
   return 5;
 }
 
