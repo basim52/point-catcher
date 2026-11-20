@@ -512,7 +512,7 @@ const COPY = {
     goldUnlockBtn: `فتح مراحل الذهب (${GOLD_UNLOCK_COST} فلوس)`,
     goldNeedCoins: (need: number) => `تحتاج ${need} فلوس إضافية لفتح مراحل الذهب`,
     goldStagesModalHint:
-      `15 مرحلة ذهب وألماس — سعر الألماسة ${DIAMOND_COST_COINS} عملة وردية · مكافأة الفوز بالمرحلة (حسب الألماس المتبقي): 1 = 10 · 2 = 20 · 3+ = 30 فلوس.`,
+      `15 مرحلة ذهب وألماس — سعر الألماسة ${DIAMOND_COST_COINS} عملة وردية · مكافأة الفوز بالمرحلة (حسب الألماس المتبقي): 1 = 5 · 2 = 10 · 3+ = 15 فلوس.`,
     noDiamondsNotice: (timer: string) => `نفد الألماس — تتجدد الألماسة القادمة خلال ${timer}`,
     waitDiamondBtn: (timer: string) => `انتظر تجدد الألماسة (${timer})`,
     buyDiamondBtn: `+1 ألماسة (${DIAMOND_COST_COINS} عملة وردية)`,
@@ -666,11 +666,11 @@ const COPY = {
     goldNextStageBtn: (n: number) => `Continue to Gold Stage ${n}`,
     goldUnlockTitle: 'Gold & Diamond Vault (15 Stages)',
     goldUnlockDesc:
-      `Unlock 15 gleaming gold & diamond stages with royal treasures (+2 to +6 pts), dedicated diamond lives (${DIAMOND_COST_COINS} Pink Coins per diamond, 10/20/30 clear rewards), and a dedicated Gold Index!`,
+      `Unlock 15 gleaming gold & diamond stages with royal treasures (+2 to +6 pts), dedicated diamond lives (${DIAMOND_COST_COINS} Pink Coins per diamond, 5/10/15 clear rewards), and a dedicated Gold Index!`,
     goldUnlockBtn: `Unlock Gold Stages (${GOLD_UNLOCK_COST} Coins)`,
     goldNeedCoins: (need: number) => `Need ${need} more coins to unlock Gold Stages`,
     goldStagesModalHint:
-      `15 Gold & Diamond stages — Diamond price is ${DIAMOND_COST_COINS} Pink Coins · Stage-win reward (by remaining diamonds): 1 = 10, 2 = 20, 3+ = 30 coins.`,
+      `15 Gold & Diamond stages — Diamond price is ${DIAMOND_COST_COINS} Pink Coins · Stage-win reward (by remaining diamonds): 1 = 5, 2 = 10, 3+ = 15 coins.`,
     noDiamondsNotice: (timer: string) => `Out of diamonds — next diamond regenerates in ${timer}`,
     waitDiamondBtn: (timer: string) => `Next Diamond in ${timer}`,
     buyDiamondBtn: `Buy +1 Diamond (${DIAMOND_COST_COINS} Pink Coins)`,
