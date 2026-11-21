@@ -1,4 +1,22 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import {
+  Neon2048Game,
+  Neon2048PreviewArt,
+  read2048Stats,
+  type Neon2048Stats,
+} from './game2048';
+import {
+  NeonSnakeGame,
+  NeonSnakePreviewArt,
+  readSnakeStats,
+  type NeonSnakeStats,
+} from './gameSnake';
+import {
+  APPLE_CATCH_TOTAL_LEVELS,
+  AppleCatchGame,
+  AppleCatchPreviewArt,
+  readAppleCatchClearedCount,
+} from './gameAppleCatch';
 
 type Dir = 'UP' | 'DOWN' | 'LEFT' | 'RIGHT';
 type TierKey = 'intro' | 'curved' | 'woven' | 'hard' | 'master';
@@ -1313,7 +1331,7 @@ function HeartIcon({ filled, pulse }: { filled: boolean; pulse: boolean }) {
   );
 }
 
-type MiniGameId = 'arrow-escape';
+type MiniGameId = 'arrow-escape' | 'neon-2048' | 'neon-snake' | 'apple-catch';
 
 const HUB_COPY = {
   ar: {
@@ -1323,10 +1341,23 @@ const HUB_COPY = {
     gamesCount: (n: number) => `${n} ${n === 1 ? 'لعبة متاحة' : 'ألعاب متاحة'}`,
     playBtn: 'العب الآن',
     progressLabel: 'التقدم',
+    bestScoreLabel: 'أعلى نقاط',
     heartsTag: '3 قلوب',
+    neonTag: '4×4 نيون',
+    snakeTag: 'نيون كلاسيك',
+    appleCatchTag: '20 مرحلة',
     arrowGameTitle: 'لغز الأسهم',
     arrowGameDesc:
       'حرّر السهم الذهبي من متاهة الأسهم المنحنية والمتشابكة عبر 20 مرحلة مقفلة بالتسلسل.',
+    neon2048Title: 'تحدي 2048 النيون',
+    neon2048Desc:
+      'ادمج الكرات المتشابهة بسحب اللوحة للوصول إلى كرة 2048 وما بعدها مع حفظ أعلى رقم ونقاط.',
+    neonSnakeTitle: 'ثعبان النيون',
+    neonSnakeDesc:
+      'التهم الفواكه والخضار المتوهجة والأناناس الذهبي ×2 في وضع الجدران أو بدون جدران بـ 3 سرعات.',
+    appleCatchTitle: 'أمسك التفاح وتجنب الخضار',
+    appleCatchDesc:
+      'التقط العدد المطلوب من التفاح المتساقط وتفادَ الخضار عبر 20 مرحلة مقفلة بالتسلسل.',
     comingSoonTitle: 'ألعاب جديدة قريباً',
     comingSoonDesc: 'هذه المساحة جاهزة لإضافة المزيد من الألعاب الممتعة.',
   },
@@ -1337,10 +1368,23 @@ const HUB_COPY = {
     gamesCount: (n: number) => `${n} ${n === 1 ? 'Game' : 'Games'}`,
     playBtn: 'Play Now',
     progressLabel: 'Progress',
+    bestScoreLabel: 'Best Score',
     heartsTag: '3 Hearts',
+    neonTag: '4×4 Neon',
+    snakeTag: 'Neon Arcade',
+    appleCatchTag: '20 Stages',
     arrowGameTitle: 'Arrow Escape',
     arrowGameDesc:
       'Free the Golden Arrow from interlocked curved arrows across 20 locked levels.',
+    neon2048Title: 'Neon 2048',
+    neon2048Desc:
+      'Slide and merge matching neon balls to reach 2048 and beyond with saved high scores.',
+    neonSnakeTitle: 'Neon Snake',
+    neonSnakeDesc:
+      'Eat glowing fruits, veggies, and golden 2x pineapples across Walls or No-Walls modes.',
+    appleCatchTitle: 'Catch Apples, Dodge Veggies',
+    appleCatchDesc:
+      'Catch the target number of falling apples while dodging veggies across 20 locked stages.',
     comingSoonTitle: 'More Games Soon',
     comingSoonDesc: 'Space ready for adding new mini-games anytime.',
   },
@@ -2328,15 +2372,57 @@ export const GamesModal: React.FC<GamesModalProps> = ({
   const [arrowSolvedCount, setArrowSolvedCount] = useState<number>(
     () => readCompletedLevels().length
   );
+  const [stats2048, setStats2048] = useState<Neon2048Stats>(() =>
+    read2048Stats()
+  );
+  const [snakeStats, setSnakeStats] = useState<NeonSnakeStats>(() =>
+    readSnakeStats()
+  );
+  const [appleCatchCleared, setAppleCatchCleared] = useState<number>(() =>
+    readAppleCatchClearedCount()
+  );
 
   const handleExitGameToHub = useCallback(() => {
     setArrowSolvedCount(readCompletedLevels().length);
+    setStats2048(read2048Stats());
+    setSnakeStats(readSnakeStats());
+    setAppleCatchCleared(readAppleCatchClearedCount());
     setActiveGame(null);
   }, []);
 
   if (activeGame === 'arrow-escape') {
     return (
       <ArrowEscapeGame
+        lang={lang}
+        sfxEnabled={sfxEnabled}
+        onExitToHub={handleExitGameToHub}
+      />
+    );
+  }
+
+  if (activeGame === 'neon-2048') {
+    return (
+      <Neon2048Game
+        lang={lang}
+        sfxEnabled={sfxEnabled}
+        onExitToHub={handleExitGameToHub}
+      />
+    );
+  }
+
+  if (activeGame === 'neon-snake') {
+    return (
+      <NeonSnakeGame
+        lang={lang}
+        sfxEnabled={sfxEnabled}
+        onExitToHub={handleExitGameToHub}
+      />
+    );
+  }
+
+  if (activeGame === 'apple-catch') {
+    return (
+      <AppleCatchGame
         lang={lang}
         sfxEnabled={sfxEnabled}
         onExitToHub={handleExitGameToHub}
@@ -2386,7 +2472,7 @@ export const GamesModal: React.FC<GamesModalProps> = ({
 
           {/* Available Games Count */}
           <div className="text-xs sm:text-sm font-semibold text-sky-300 whitespace-nowrap shrink-0">
-            {ht.gamesCount(1)}
+            {ht.gamesCount(4)}
           </div>
         </div>
       </header>
@@ -2430,6 +2516,118 @@ export const GamesModal: React.FC<GamesModalProps> = ({
                   type="button"
                   onClick={() => setActiveGame('arrow-escape')}
                   className="w-full h-11 rounded-lg bg-amber-400 hover:bg-amber-300 active:scale-[0.99] text-slate-950 font-bold text-sm sm:text-base transition-all cursor-pointer"
+                >
+                  {ht.playBtn}
+                </button>
+              </div>
+            </div>
+
+            {/* Game Card 2: Neon 2048 */}
+            <div className="group rounded-2xl border border-cyan-400/30 bg-[#0d182d] hover:border-cyan-300/60 transition-colors overflow-hidden shadow-xl flex flex-col">
+              <div className="aspect-[2/1] w-full border-b border-white/10 overflow-hidden bg-[#071123]">
+                <Neon2048PreviewArt />
+              </div>
+
+              <div className="p-4 flex-1 flex flex-col">
+                <div className="flex items-center justify-between gap-2 mb-1.5">
+                  <h2 className="text-base sm:text-lg font-bold text-white">
+                    {ht.neon2048Title}
+                  </h2>
+                  <span className="font-num text-xs font-semibold text-cyan-300 whitespace-nowrap">
+                    {ht.neonTag}
+                  </span>
+                </div>
+
+                <p className="text-xs sm:text-sm text-slate-300 leading-relaxed mb-4 flex-1">
+                  {ht.neon2048Desc}
+                </p>
+
+                <div className="flex items-center justify-between text-xs text-slate-400 mb-3 pt-2.5 border-t border-white/8">
+                  <span>{ht.bestScoreLabel}</span>
+                  <span className="font-num font-bold text-cyan-300">
+                    {stats2048.bestScore}
+                    {stats2048.bestTile > 0 ? ` · ${stats2048.bestTile}` : ''}
+                  </span>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => setActiveGame('neon-2048')}
+                  className="w-full h-11 rounded-lg bg-cyan-400 hover:bg-cyan-300 active:scale-[0.99] text-slate-950 font-bold text-sm sm:text-base transition-all cursor-pointer"
+                >
+                  {ht.playBtn}
+                </button>
+              </div>
+            </div>
+
+            {/* Game Card 3: Neon Snake */}
+            <div className="group rounded-2xl border border-emerald-400/30 bg-[#0d182d] hover:border-emerald-300/60 transition-colors overflow-hidden shadow-xl flex flex-col">
+              <div className="aspect-[2/1] w-full border-b border-white/10 overflow-hidden bg-[#071123]">
+                <NeonSnakePreviewArt />
+              </div>
+
+              <div className="p-4 flex-1 flex flex-col">
+                <div className="flex items-center justify-between gap-2 mb-1.5">
+                  <h2 className="text-base sm:text-lg font-bold text-white">
+                    {ht.neonSnakeTitle}
+                  </h2>
+                  <span className="font-num text-xs font-semibold text-emerald-300 whitespace-nowrap">
+                    {ht.snakeTag}
+                  </span>
+                </div>
+
+                <p className="text-xs sm:text-sm text-slate-300 leading-relaxed mb-4 flex-1">
+                  {ht.neonSnakeDesc}
+                </p>
+
+                <div className="flex items-center justify-between text-xs text-slate-400 mb-3 pt-2.5 border-t border-white/8">
+                  <span>{ht.bestScoreLabel}</span>
+                  <span className="font-num font-bold text-emerald-300">
+                    {snakeStats.bestScore}
+                  </span>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => setActiveGame('neon-snake')}
+                  className="w-full h-11 rounded-lg bg-emerald-400 hover:bg-emerald-300 active:scale-[0.99] text-slate-950 font-bold text-sm sm:text-base transition-all cursor-pointer"
+                >
+                  {ht.playBtn}
+                </button>
+              </div>
+            </div>
+
+            {/* Game Card 4: Catch Apples, Dodge Veggies */}
+            <div className="group rounded-2xl border border-rose-400/30 bg-[#0d182d] hover:border-rose-300/60 transition-colors overflow-hidden shadow-xl flex flex-col">
+              <div className="aspect-[2/1] w-full border-b border-white/10 overflow-hidden bg-[#071123]">
+                <AppleCatchPreviewArt />
+              </div>
+
+              <div className="p-4 flex-1 flex flex-col">
+                <div className="flex items-center justify-between gap-2 mb-1.5">
+                  <h2 className="text-base sm:text-lg font-bold text-white">
+                    {ht.appleCatchTitle}
+                  </h2>
+                  <span className="font-num text-xs font-semibold text-rose-300 whitespace-nowrap">
+                    {ht.appleCatchTag}
+                  </span>
+                </div>
+
+                <p className="text-xs sm:text-sm text-slate-300 leading-relaxed mb-4 flex-1">
+                  {ht.appleCatchDesc}
+                </p>
+
+                <div className="flex items-center justify-between text-xs text-slate-400 mb-3 pt-2.5 border-t border-white/8">
+                  <span>{ht.progressLabel}</span>
+                  <span className="font-num font-bold text-rose-300">
+                    {appleCatchCleared}/{APPLE_CATCH_TOTAL_LEVELS}
+                  </span>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => setActiveGame('apple-catch')}
+                  className="w-full h-11 rounded-lg bg-rose-500 hover:bg-rose-400 active:scale-[0.99] text-white font-bold text-sm sm:text-base transition-all cursor-pointer"
                 >
                   {ht.playBtn}
                 </button>
