@@ -68,6 +68,7 @@ import {
   SUPPLY_CATALOG,
   SupplyId,
 } from './shop';
+import { GamesModal } from './miniGames';
 
 type Lang = 'ar' | 'en';
 type GameStatus =
@@ -409,6 +410,7 @@ const COPY = {
     nextStageBtn: (n: number) => `الانتقال إلى المرحلة ${n}`,
     nextGoalText: (pts: number) => `هدف المرحلة التالية: ${pts} نقطة`,
     stagesBtn: 'المراحل',
+    gamesBtn: 'اللعاب',
     stagesModalTitle: 'المراحل',
     stagesModalHint: `سعر القلب ثابت (${HEART_COST_COINS} فلوس) · مكافأة الفوز بالمرحلة (حسب القلوب المتبقية): 1–3 = 2، 4–7 = 4، 8–10 = 8 فلوس.`,
     noHeartsNotice: (timer: string) => `نفدت القلوب — يتجدد القلب القادم خلال ${timer}`,
@@ -567,6 +569,7 @@ const COPY = {
     nextStageBtn: (n: number) => `Continue to Stage ${n}`,
     nextGoalText: (pts: number) => `Next Stage Goal: ${pts} pts`,
     stagesBtn: 'Stages',
+    gamesBtn: 'Games',
     stagesModalTitle: 'Stages',
     stagesModalHint: `Heart price is fixed (${HEART_COST_COINS} coins) · Stage-win reward (by remaining ♥): 1–3 = 2, 4–7 = 4, 8–10 = 8 coins.`,
     noHeartsNotice: (timer: string) => `Out of hearts — next heart regenerates in ${timer}`,
@@ -1492,6 +1495,7 @@ export default function App() {
   const [shopPointsSubTab, setShopPointsSubTab] = useState<PointsSubTab>('plus');
   const [shop, setShop] = useState<ShopState>(() => readStoredShopState());
   const [settingsModalOpen, setSettingsModalOpen] = useState<boolean>(false);
+  const [gamesModalOpen, setGamesModalOpen] = useState<boolean>(false);
   const [musicEnabled, setMusicEnabled] = useState<boolean>(() =>
     readStoredBoolean(MUSIC_STORAGE_KEY, true)
   );
@@ -1514,6 +1518,7 @@ export default function App() {
   const bagModalOpenRef = useRef<boolean>(false);
   const bagRef = useRef<BagState>(bag);
   const settingsModalOpenRef = useRef<boolean>(false);
+  const gamesModalOpenRef = useRef<boolean>(false);
   const shopRef = useRef<ShopState>(shop);
   const scoreRef = useRef<number>(0);
   const stagePointsRef = useRef<number>(0);
@@ -1662,7 +1667,8 @@ export default function App() {
       !indexModalOpen &&
       !shopModalOpen &&
       !bagModalOpen &&
-      !settingsModalOpen;
+      !settingsModalOpen &&
+      !gamesModalOpen;
 
     if (shouldPlayMusic) {
       audioRef.current.startMusic(stageNum);
@@ -1677,6 +1683,7 @@ export default function App() {
     shopModalOpen,
     bagModalOpen,
     settingsModalOpen,
+    gamesModalOpen,
     stageNum,
   ]);
 
@@ -2141,6 +2148,7 @@ export default function App() {
       shopModalOpenRef.current = false;
       bagModalOpenRef.current = false;
       settingsModalOpenRef.current = false;
+      gamesModalOpenRef.current = false;
       statusRef.current = 'PLAYING';
 
       setScore(0);
@@ -2151,6 +2159,7 @@ export default function App() {
       setShopModalOpen(false);
       setBagModalOpen(false);
       setSettingsModalOpen(false);
+      setGamesModalOpen(false);
       setIsNewBest(false);
       setStatus('PLAYING');
 
@@ -2205,6 +2214,7 @@ export default function App() {
       shopModalOpenRef.current = false;
       bagModalOpenRef.current = false;
       settingsModalOpenRef.current = false;
+      gamesModalOpenRef.current = false;
       statusRef.current = 'PLAYING';
 
       setScore(0);
@@ -2215,6 +2225,7 @@ export default function App() {
       setShopModalOpen(false);
       setBagModalOpen(false);
       setSettingsModalOpen(false);
+      setGamesModalOpen(false);
       setIsNewBest(false);
       setStatus('PLAYING');
 
@@ -2267,6 +2278,7 @@ export default function App() {
     shopModalOpenRef.current = false;
     bagModalOpenRef.current = false;
     settingsModalOpenRef.current = false;
+    gamesModalOpenRef.current = false;
     statusRef.current = 'PLAYING';
 
     setScore(0);
@@ -2277,6 +2289,7 @@ export default function App() {
     setShopModalOpen(false);
     setBagModalOpen(false);
     setSettingsModalOpen(false);
+    setGamesModalOpen(false);
     setIsNewBest(false);
     setStatus('PLAYING');
 
@@ -2327,7 +2340,7 @@ export default function App() {
     sim.freezeTimer = 0;
     sim.slowTimer = 0;
     sim.speedBoostTimer = 0;
-    sim.spawnTimer = 0.3;
+    sim.spawnTimer = 0.28;
     sim.lastHazardX = -999;
     sim.input.pointerActive = false;
     sim.input.pointerId = null;
@@ -2596,7 +2609,8 @@ export default function App() {
       settingsModalOpenRef.current ||
       indexModalOpenRef.current ||
       shopModalOpenRef.current ||
-      bagModalOpenRef.current;
+      bagModalOpenRef.current ||
+      gamesModalOpenRef.current;
     if (settingsModalOpenRef.current) {
       settingsModalOpenRef.current = false;
       setSettingsModalOpen(false);
@@ -2612,6 +2626,10 @@ export default function App() {
     if (bagModalOpenRef.current) {
       bagModalOpenRef.current = false;
       setBagModalOpen(false);
+    }
+    if (gamesModalOpenRef.current) {
+      gamesModalOpenRef.current = false;
+      setGamesModalOpen(false);
     }
     if (!hadModalOpen) {
       statusBeforeModalRef.current = statusRef.current;
@@ -2654,7 +2672,8 @@ export default function App() {
       stagesModalOpenRef.current ||
       indexModalOpenRef.current ||
       bagModalOpenRef.current ||
-      settingsModalOpenRef.current;
+      settingsModalOpenRef.current ||
+      gamesModalOpenRef.current;
     if (stagesModalOpenRef.current) {
       stagesModalOpenRef.current = false;
       setStagesModalOpen(false);
@@ -2670,6 +2689,10 @@ export default function App() {
     if (settingsModalOpenRef.current) {
       settingsModalOpenRef.current = false;
       setSettingsModalOpen(false);
+    }
+    if (gamesModalOpenRef.current) {
+      gamesModalOpenRef.current = false;
+      setGamesModalOpen(false);
     }
     if (!hadModalOpen) {
       statusBeforeModalRef.current = statusRef.current;
@@ -2711,7 +2734,8 @@ export default function App() {
       stagesModalOpenRef.current ||
       indexModalOpenRef.current ||
       shopModalOpenRef.current ||
-      settingsModalOpenRef.current;
+      settingsModalOpenRef.current ||
+      gamesModalOpenRef.current;
     if (stagesModalOpenRef.current) {
       stagesModalOpenRef.current = false;
       setStagesModalOpen(false);
@@ -2727,6 +2751,10 @@ export default function App() {
     if (settingsModalOpenRef.current) {
       settingsModalOpenRef.current = false;
       setSettingsModalOpen(false);
+    }
+    if (gamesModalOpenRef.current) {
+      gamesModalOpenRef.current = false;
+      setGamesModalOpen(false);
     }
     if (!hadModalOpen) {
       statusBeforeModalRef.current = statusRef.current;
@@ -2768,7 +2796,8 @@ export default function App() {
       stagesModalOpenRef.current ||
       settingsModalOpenRef.current ||
       shopModalOpenRef.current ||
-      bagModalOpenRef.current;
+      bagModalOpenRef.current ||
+      gamesModalOpenRef.current;
     if (stagesModalOpenRef.current) {
       stagesModalOpenRef.current = false;
       setStagesModalOpen(false);
@@ -2784,6 +2813,10 @@ export default function App() {
     if (bagModalOpenRef.current) {
       bagModalOpenRef.current = false;
       setBagModalOpen(false);
+    }
+    if (gamesModalOpenRef.current) {
+      gamesModalOpenRef.current = false;
+      setGamesModalOpen(false);
     }
     if (!hadModalOpen) {
       statusBeforeModalRef.current = statusRef.current;
@@ -2826,7 +2859,8 @@ export default function App() {
       stagesModalOpenRef.current ||
       indexModalOpenRef.current ||
       shopModalOpenRef.current ||
-      bagModalOpenRef.current;
+      bagModalOpenRef.current ||
+      gamesModalOpenRef.current;
     if (stagesModalOpenRef.current) {
       stagesModalOpenRef.current = false;
       setStagesModalOpen(false);
@@ -2842,6 +2876,10 @@ export default function App() {
     if (bagModalOpenRef.current) {
       bagModalOpenRef.current = false;
       setBagModalOpen(false);
+    }
+    if (gamesModalOpenRef.current) {
+      gamesModalOpenRef.current = false;
+      setGamesModalOpen(false);
     }
     if (!hadModalOpen) {
       statusBeforeModalRef.current = statusRef.current;
@@ -2868,13 +2906,76 @@ export default function App() {
     }
   }, []);
 
+  const openGamesModal = useCallback(() => {
+    if (gamesModalOpenRef.current) {
+      gamesModalOpenRef.current = false;
+      setGamesModalOpen(false);
+      if (statusBeforeModalRef.current === 'PLAYING') {
+        statusRef.current = 'PLAYING';
+        setStatus('PLAYING');
+      }
+      return;
+    }
+
+    const hadModalOpen =
+      stagesModalOpenRef.current ||
+      indexModalOpenRef.current ||
+      shopModalOpenRef.current ||
+      bagModalOpenRef.current ||
+      settingsModalOpenRef.current;
+    if (stagesModalOpenRef.current) {
+      stagesModalOpenRef.current = false;
+      setStagesModalOpen(false);
+    }
+    if (indexModalOpenRef.current) {
+      indexModalOpenRef.current = false;
+      setIndexModalOpen(false);
+    }
+    if (shopModalOpenRef.current) {
+      shopModalOpenRef.current = false;
+      setShopModalOpen(false);
+    }
+    if (bagModalOpenRef.current) {
+      bagModalOpenRef.current = false;
+      setBagModalOpen(false);
+    }
+    if (settingsModalOpenRef.current) {
+      settingsModalOpenRef.current = false;
+      setSettingsModalOpen(false);
+    }
+    if (!hadModalOpen) {
+      statusBeforeModalRef.current = statusRef.current;
+      if (statusRef.current === 'PLAYING') {
+        statusRef.current = 'PAUSED';
+        setStatus('PAUSED');
+      }
+    }
+
+    simRef.current.input.pointerActive = false;
+    simRef.current.input.leftBtn = false;
+    simRef.current.input.rightBtn = false;
+    gamesModalOpenRef.current = true;
+    setGamesModalOpen(true);
+  }, []);
+
+  const closeGamesModal = useCallback(() => {
+    if (!gamesModalOpenRef.current) return;
+    gamesModalOpenRef.current = false;
+    setGamesModalOpen(false);
+    if (statusBeforeModalRef.current === 'PLAYING') {
+      statusRef.current = 'PLAYING';
+      setStatus('PLAYING');
+    }
+  }, []);
+
   const togglePause = useCallback(() => {
     if (
       stagesModalOpenRef.current ||
       indexModalOpenRef.current ||
       shopModalOpenRef.current ||
       bagModalOpenRef.current ||
-      settingsModalOpenRef.current
+      settingsModalOpenRef.current ||
+      gamesModalOpenRef.current
     ) {
       return;
     }
@@ -2944,6 +3045,14 @@ export default function App() {
         if (code === 'Escape') {
           e.preventDefault();
           closeIndexModal();
+        }
+        return;
+      }
+
+      if (gamesModalOpenRef.current) {
+        if (code === 'Escape') {
+          e.preventDefault();
+          closeGamesModal();
         }
         return;
       }
@@ -3018,6 +3127,7 @@ export default function App() {
       window.removeEventListener('blur', onBlur);
     };
   }, [
+    closeGamesModal,
     closeIndexModal,
     closeSettingsModal,
     closeShopModal,
@@ -3662,6 +3772,7 @@ export default function App() {
 
       for (let i = sim.items.length - 1; i >= 0; i--) {
         const item = sim.items[i];
+
         item.y += item.speed * simDt;
         item.x += item.vx * simDt;
         item.rotation += item.rotSpeed * simDt;
@@ -6485,7 +6596,8 @@ export default function App() {
     indexModalOpen ||
     shopModalOpen ||
     bagModalOpen ||
-    settingsModalOpen;
+    settingsModalOpen ||
+    gamesModalOpen;
   const totalBagCount = bag.hearts + bag.corn + bag.diamonds;
   const positiveCatalog = INDEX_CATALOG.filter((e) => e.category === 'positive');
   const negativeCatalog = INDEX_CATALOG.filter((e) => e.category === 'negative');
@@ -6572,6 +6684,36 @@ export default function App() {
                   <rect x="14" y="14" width="7" height="7" rx="1" />
                 </svg>
                 <span>{t.stagesBtn}</span>
+              </button>
+
+              {/* Games Button ("اللعاب") right next to Stages */}
+              <button
+                type="button"
+                onClick={openGamesModal}
+                aria-expanded={gamesModalOpen}
+                className={`h-7 lg:h-8 px-1.5 sm:px-2.5 inline-flex items-center justify-center gap-1 rounded-md border text-[11px] sm:text-xs font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400 whitespace-nowrap shrink-0 cursor-pointer ${
+                  gamesModalOpen
+                    ? 'border-emerald-400/60 bg-emerald-500/20 text-emerald-200'
+                    : 'border-emerald-400/35 bg-emerald-500/10 text-emerald-200 hover:bg-emerald-500/20 hover:text-emerald-100'
+                }`}
+              >
+                <svg
+                  viewBox="0 0 24 24"
+                  className="w-3 h-3 sm:w-3.5 sm:h-3.5 shrink-0"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  aria-hidden="true"
+                >
+                  <rect x="2" y="6" width="20" height="12" rx="4" />
+                  <line x1="6" y1="12" x2="10" y2="12" />
+                  <line x1="8" y1="10" x2="8" y2="14" />
+                  <circle cx="15.5" cy="11" r="1" fill="currentColor" stroke="none" />
+                  <circle cx="18" cy="13" r="1" fill="currentColor" stroke="none" />
+                </svg>
+                <span>{t.gamesBtn}</span>
               </button>
 
               {/* Shop Button ("المتجر") */}
@@ -7509,7 +7651,7 @@ export default function App() {
                 </div>
 
                 <div className="px-5 pt-3.5 pb-5 overflow-y-auto">
-                  {/* World Tabs inside Stages Modal: Normal (50) | Fruit (15, 28 Coins) | Gold (15, Free) */}
+                  {/* World Tabs inside Stages Modal: Normal (50) | Fruit (15) | Gold (15) */}
                   <div
                     role="tablist"
                     aria-label={t.stagesModalTitle}
@@ -7663,7 +7805,9 @@ export default function App() {
                       <div className="grid grid-cols-4 sm:grid-cols-5 gap-2.5">
                         {STAGES.map((cfg) => {
                           const isCurrent =
-                            !isFruitMode && !isGoldMode && cfg.stage === stageNum;
+                            !isFruitMode &&
+                            !isGoldMode &&
+                            cfg.stage === stageNum;
                           const isCompleted = completedStages.includes(cfg.stage);
                           const unlocked = isStageUnlocked(cfg.stage, completedStages);
                           const canEnter = unlocked && lives > 0;
@@ -8155,7 +8299,7 @@ export default function App() {
                 </div>
 
                 <div className="px-5 pt-3.5 pb-5 overflow-y-auto">
-                  {/* World Switcher: Normal Index vs Fruit Index vs Gold Index */}
+                  {/* World Switcher: Normal vs Fruit vs Gold Index */}
                   <div
                     role="tablist"
                     aria-label={t.indexModalTitle}
@@ -9170,6 +9314,7 @@ export default function App() {
               </div>
             </div>
           )}
+
         </div>
 
         {/* Bottom Controls Bar */}
@@ -9236,6 +9381,15 @@ export default function App() {
           </div>
         </div>
       </main>
+
+      {/* Full-Screen Mini-Game ("اللعاب") — Arrow Escape Puzzle */}
+      {gamesModalOpen && (
+        <GamesModal
+          lang={lang}
+          sfxEnabled={sfxEnabled}
+          onClose={closeGamesModal}
+        />
+      )}
     </div>
   );
 }
