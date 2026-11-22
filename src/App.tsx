@@ -51,6 +51,8 @@ import {
   drawCustomPlusPoint,
   drawUfoCatcher,
   getSkinPalette,
+  MAX_HEARTS_UPGRADE_COSTS,
+  MAX_HEARTS_UPGRADE_LEVELS,
   MAX_SHIELDS,
   MINUS_POINT_CATALOG,
   MinusPointSkinId,
@@ -78,24 +80,41 @@ type GameStatus =
   | 'STAGE_CLEAR'
   | 'GAME_OVER'
   | 'VICTORY';
+type BalancedPlusKind =
+  | 'cyan_hex'
+  | 'coral_pentagon'
+  | 'lime_orb'
+  | 'indigo_octagon'
+  | 'amber_crescent';
+type BalancedMinusKind =
+  | 'minus_crimson_hex'
+  | 'minus_rust_diamond'
+  | 'minus_slate_cross'
+  | 'minus_teal_bolt'
+  | 'minus_plum_ring';
 type ItemKind =
   | 'pink_circle'
   | 'blue_triangle'
   | 'green_circle'
   | 'purple_diamond'
   | 'gold_star'
+  | 'royal_nova'
+  | BalancedPlusKind
   | 'hazard_spike'
   | 'hazard_square'
+  | 'hazard_black_square'
   | 'hazard_star'
   | 'hazard_arrow'
   | 'hazard_arrow_amber'
-  | 'hazard_arrow_violet';
+  | 'hazard_arrow_violet'
+  | BalancedMinusKind;
 type AnyItemKind = ItemKind | FruitItemKind | GoldItemKind;
 type IndexTab = 'positive' | 'negative';
 
 interface IndexEntry {
   kind: ItemKind;
   category: IndexTab;
+  minStage: number;
   nameAr: string;
   nameEn: string;
   valueAr: string;
@@ -164,12 +183,173 @@ interface AmbientStar {
 const MAX_LIVES = 10;
 const HEART_REGEN_MS = 5 * 60 * 1000;
 const HEART_COST_COINS = 5;
-const TOTAL_STAGES = 50;
+const TOTAL_STAGES = 75;
 const PINK_CIRCLE_POINTS = 3;
 const BLUE_TRIANGLE_POINTS = 4;
 const GREEN_CIRCLE_POINTS = 2;
 const PURPLE_DIAMOND_POINTS = 5;
 const GOLD_STAR_POINTS = 7;
+const ROYAL_NOVA_POINTS = 10;
+const ROYAL_NOVA_MIN_STAGE = 5;
+const ROYAL_NOVA_SPAWN_CHANCE = 0.04375; // +75% boosted from 2.5% -> 4.375%
+
+const BALANCED_PLUS_STATS: Record<
+  BalancedPlusKind,
+  {
+    points: number;
+    minStage: number;
+    color: string;
+    highlight: string;
+    shade: string;
+    stroke: string;
+    textColor: string;
+    speedMul: number;
+    clearsSlow?: boolean;
+  }
+> = {
+  cyan_hex: {
+    points: 3,
+    minStage: 2,
+    color: '#06b6d4',
+    highlight: '#a5f3fc',
+    shade: '#0e7490',
+    stroke: '#cffafe',
+    textColor: '#a5f3fc',
+    speedMul: 0.94,
+  },
+  coral_pentagon: {
+    points: 4,
+    minStage: 6,
+    color: '#fb7185',
+    highlight: '#fed7aa',
+    shade: '#be123c',
+    stroke: '#ffe4e6',
+    textColor: '#fecdd3',
+    speedMul: 0.96,
+  },
+  lime_orb: {
+    points: 3,
+    minStage: 10,
+    color: '#84cc16',
+    highlight: '#ecfccb',
+    shade: '#4d7c0f',
+    stroke: '#d9f99d',
+    textColor: '#d9f99d',
+    speedMul: 0.92,
+    clearsSlow: true,
+  },
+  indigo_octagon: {
+    points: 4,
+    minStage: 14,
+    color: '#6366f1',
+    highlight: '#e0e7ff',
+    shade: '#3730a3',
+    stroke: '#c7d2fe',
+    textColor: '#c7d2fe',
+    speedMul: 0.98,
+  },
+  amber_crescent: {
+    points: 5,
+    minStage: 18,
+    color: '#f59e0b',
+    highlight: '#fef3c7',
+    shade: '#b45309',
+    stroke: '#fde68a',
+    textColor: '#fde68a',
+    speedMul: 1.0,
+  },
+};
+
+const BALANCED_MINUS_STATS: Record<
+  BalancedMinusKind,
+  {
+    penalty: number;
+    minStage: number;
+    color: string;
+    highlight: string;
+    shade: string;
+    stroke: string;
+    textColor: string;
+    speedMul: number;
+    slowDuration?: number;
+  }
+> = {
+  minus_crimson_hex: {
+    penalty: 3,
+    minStage: 2,
+    color: '#e11d48',
+    highlight: '#fda4af',
+    shade: '#881337',
+    stroke: '#fecdd3',
+    textColor: '#fda4af',
+    speedMul: 0.96,
+  },
+  minus_rust_diamond: {
+    penalty: 4,
+    minStage: 7,
+    color: '#ea580c',
+    highlight: '#fdba74',
+    shade: '#9a3412',
+    stroke: '#fed7aa',
+    textColor: '#fed7aa',
+    speedMul: 1.02,
+  },
+  minus_slate_cross: {
+    penalty: 3,
+    minStage: 12,
+    color: '#64748b',
+    highlight: '#e2e8f0',
+    shade: '#334155',
+    stroke: '#cbd5e1',
+    textColor: '#e2e8f0',
+    speedMul: 0.98,
+    slowDuration: 2.0,
+  },
+  minus_teal_bolt: {
+    penalty: 4,
+    minStage: 16,
+    color: '#0f766e',
+    highlight: '#99f6e4',
+    shade: '#134e4a',
+    stroke: '#5eead4',
+    textColor: '#99f6e4',
+    speedMul: 1.24,
+  },
+  minus_plum_ring: {
+    penalty: 5,
+    minStage: 22,
+    color: '#a21caf',
+    highlight: '#f5d0fe',
+    shade: '#701a75',
+    stroke: '#f0abfc',
+    textColor: '#f5d0fe',
+    speedMul: 1.04,
+  },
+};
+
+const BALANCED_PLUS_KINDS = Object.keys(BALANCED_PLUS_STATS) as BalancedPlusKind[];
+const BALANCED_MINUS_KINDS = Object.keys(BALANCED_MINUS_STATS) as BalancedMinusKind[];
+
+function isBalancedPlusKind(kind: AnyItemKind): kind is BalancedPlusKind {
+  return kind in BALANCED_PLUS_STATS;
+}
+
+function isBalancedMinusKind(kind: AnyItemKind): kind is BalancedMinusKind {
+  return kind in BALANCED_MINUS_STATS;
+}
+
+function isPositiveNormalKind(kind: AnyItemKind): boolean {
+  return (
+    kind === 'pink_circle' ||
+    kind === 'blue_triangle' ||
+    kind === 'green_circle' ||
+    kind === 'purple_diamond' ||
+    kind === 'gold_star' ||
+    kind === 'royal_nova' ||
+    isBalancedPlusKind(kind)
+  );
+}
+
 const SPEED_BOOST_DURATION = 5.0;
 const SPEED_BOOST_MULTIPLIER = 2.0;
 const SPEED_BOOST_PLAYER_SLOW = 0.5;
@@ -180,14 +360,19 @@ const VIOLET_ARROW_SPEED_MULTIPLIER = 1.3;
 const VIOLET_ARROW_POINT_PENALTY = 1;
 const VIOLET_ARROW_SLOW_DURATION = 2.5;
 const VIOLET_ARROW_SLOW_FACTOR = 0.7;
+const BLACK_SQUARE_MIN_STAGE = 15;
+const BLACK_SQUARE_LIVES_DAMAGE = 3;
+const BLACK_SQUARE_POINT_PENALTY = 4;
+const BLACK_SQUARE_SLOW_DURATION = 4.0;
+const BLACK_SQUARE_SLOW_FACTOR = 1 / 3.5;
 const FREEZE_STAR_POINTS = 3;
 const FREEZE_DURATION = 4.0;
 const BEST_SCORE_STORAGE_KEY = 'point_catcher_best_score_v1';
 const COINS_STORAGE_KEY = 'point_catcher_coins_v1';
 const PINK_COINS_STORAGE_KEY = 'point_catcher_pink_coins_v1';
-const PINK_COIN_DROP_CHANCE = 0.5;
-const PINK_COIN_MIN_DROP = 1;
-const PINK_COIN_MAX_DROP = 3;
+const PINK_COIN_DROP_CHANCE = 0.85;
+const PINK_COIN_MIN_DROP = 3;
+const PINK_COIN_MAX_DROP = 7;
 const LIVES_STATE_STORAGE_KEY = 'point_catcher_lives_state_v1';
 const COMPLETED_STAGES_STORAGE_KEY = 'point_catcher_completed_stages_v1';
 const DISCOVERED_ITEMS_STORAGE_KEY = 'point_catcher_discovered_items_v2';
@@ -210,30 +395,13 @@ interface BagState {
   diamonds: number;
 }
 
+// Ordered strictly from weakest to strongest within both positive (+) and negative (-) categories
 const INDEX_CATALOG: IndexEntry[] = [
-  {
-    kind: 'pink_circle',
-    category: 'positive',
-    nameAr: 'الدائرة الوردية',
-    nameEn: 'Pink Circle',
-    valueAr: '+3 نقاط',
-    valueEn: '+3 pts',
-    benefitAr: 'تزيد نقاطك بمقدار 3 نقاط عند التقاطها لتقترب من إنهاء المرحلة.',
-    benefitEn: 'Adds 3 points to your stage score when caught.',
-  },
-  {
-    kind: 'blue_triangle',
-    category: 'positive',
-    nameAr: 'المثلث الأزرق',
-    nameEn: 'Blue Triangle',
-    valueAr: '+4 نقاط',
-    valueEn: '+4 pts',
-    benefitAr: 'يعطيك 4 نقاط دفعة واحدة لإكمال هدف المرحلة بسرعة أكبر.',
-    benefitEn: 'Grants 4 points at once to reach the stage goal faster.',
-  },
+  // ── Positive (+): Weakest → Strongest ──
   {
     kind: 'green_circle',
     category: 'positive',
+    minStage: 1,
     nameAr: 'النقطة الخضراء المسرّعة',
     nameEn: 'Green Turbo Orb',
     valueAr: '+2 نقاط · سرعة ×2 · مشية -50%',
@@ -242,48 +410,197 @@ const INDEX_CATALOG: IndexEntry[] = [
     benefitEn: 'Adds 2 points and speeds up everything by 100% for 5 seconds, while slowing your movement by 50%.',
   },
   {
+    kind: 'pink_circle',
+    category: 'positive',
+    minStage: 1,
+    nameAr: 'الدائرة الوردية',
+    nameEn: 'Pink Circle',
+    valueAr: '+3 نقاط',
+    valueEn: '+3 pts',
+    benefitAr: 'تزيد نقاطك بمقدار 3 نقاط عند التقاطها لتقترب من إنهاء المرحلة.',
+    benefitEn: 'Adds 3 points to your stage score when caught.',
+  },
+  {
+    kind: 'cyan_hex',
+    category: 'positive',
+    minStage: 2,
+    nameAr: 'السداسي الفيروزي',
+    nameEn: 'Cyan Hexagon',
+    valueAr: '+3 نقاط',
+    valueEn: '+3 pts',
+    benefitAr: 'نقطة متوازنة سداسية الشكل تمنحك 3 نقاط ثابتة بسرعة سقوط معتدلة (من المرحلة 2).',
+    benefitEn: 'Balanced hexagonal point granting a steady 3 points at moderate speed (Stage 2+).',
+  },
+  {
+    kind: 'lime_orb',
+    category: 'positive',
+    minStage: 10,
+    nameAr: 'الكرة الليمونية',
+    nameEn: 'Lime Ring Orb',
+    valueAr: '+3 نقاط · تزيل التبطيء',
+    valueEn: '+3 pts · Clears Slow',
+    benefitAr: 'تزيد نقاطك بمقدار 3 نقاط وتزيل أي تبطيء نشط على حركتك فوراً (من المرحلة 10).',
+    benefitEn: 'Adds 3 points and immediately clears any active movement slow effect (Stage 10+).',
+  },
+  {
+    kind: 'blue_triangle',
+    category: 'positive',
+    minStage: 1,
+    nameAr: 'المثلث الأزرق',
+    nameEn: 'Blue Triangle',
+    valueAr: '+4 نقاط',
+    valueEn: '+4 pts',
+    benefitAr: 'يعطيك 4 نقاط دفعة واحدة لإكمال هدف المرحلة بسرعة أكبر.',
+    benefitEn: 'Grants 4 points at once to reach the stage goal faster.',
+  },
+  {
+    kind: 'coral_pentagon',
+    category: 'positive',
+    minStage: 6,
+    nameAr: 'الخماسي المرجاني',
+    nameEn: 'Coral Pentagon',
+    valueAr: '+4 نقاط',
+    valueEn: '+4 pts',
+    benefitAr: 'نقطة خماسية مرجانية متوازنة تزيد رصيدك بمقدار 4 نقاط (تبدأ من المرحلة 6).',
+    benefitEn: 'Balanced coral pentagon that adds 4 points to your stage total (Stage 6+).',
+  },
+  {
+    kind: 'indigo_octagon',
+    category: 'positive',
+    minStage: 14,
+    nameAr: 'الثماني النيلي',
+    nameEn: 'Indigo Octagon',
+    valueAr: '+4 نقاط',
+    valueEn: '+4 pts',
+    benefitAr: 'جوهرة ثمانية نيلية متوازنة تعطيك 4 نقاط بسقوط سلس وثابت (من المرحلة 14).',
+    benefitEn: 'Steady indigo octagon gem worth 4 points with smooth fall speed (Stage 14+).',
+  },
+  {
+    kind: 'amber_crescent',
+    category: 'positive',
+    minStage: 18,
+    nameAr: 'الهلال العنبري',
+    nameEn: 'Amber Crescent',
+    valueAr: '+5 نقاط',
+    valueEn: '+5 pts',
+    benefitAr: 'هلال عنبري متوازن يمنحك 5 نقاط عند التقاطه للمساعدة في إنهاء المراحل المتقدمة (من المرحلة 18).',
+    benefitEn: 'Balanced glowing amber crescent awarding 5 points to push through higher stages (Stage 18+).',
+  },
+  {
     kind: 'purple_diamond',
     category: 'positive',
+    minStage: 20,
     nameAr: 'المعيّن البنفسجي',
     nameEn: 'Purple Diamond',
-    valueAr: '+5 نقاط · مرحلة 20+ · 5%',
-    valueEn: '+5 pts · Stage 20+ · 5%',
+    valueAr: '+5 نقاط · 5%',
+    valueEn: '+5 pts · 5%',
     benefitAr: 'نقطة كريستالية نادرة تبدأ بالظهور من المرحلة 20 بنسبة ظهور 5% وتمنحك 5 نقاط دفعة واحدة.',
     benefitEn: 'Rare crystal point starting at Stage 20 with a 5% spawn rate that grants 5 points at once.',
   },
   {
     kind: 'gold_star',
     category: 'positive',
+    minStage: 20,
     nameAr: 'النجمة الذهبية',
     nameEn: 'Golden Star',
-    valueAr: '+7 نقاط · مرحلة 20+ · 5%',
-    valueEn: '+7 pts · Stage 20+ · 5%',
-    benefitAr: 'أقوى نقطة في المراحل العادية — تبدأ بالظهور من المرحلة 20 بنسبة ظهور 5% وتزيد نقاطك بمقدار 7 نقاط!',
-    benefitEn: 'Highest-value Normal point — starts at Stage 20 with a 5% spawn rate and awards 7 points on catch!',
+    valueAr: '+7 نقاط · 5%',
+    valueEn: '+7 pts · 5%',
+    benefitAr: 'نقطة ذهبية نادرة تبدأ بالظهور من المرحلة 20 بنسبة ظهور 5% وتزيد نقاطك بمقدار 7 نقاط!',
+    benefitEn: 'Rare golden point starting at Stage 20 with a 5% spawn rate that awards 7 points on catch!',
   },
   {
-    kind: 'hazard_spike',
+    kind: 'royal_nova',
+    category: 'positive',
+    minStage: 5,
+    nameAr: 'الجوهرة الملكية النادرة',
+    nameEn: 'Royal Prism Gem',
+    valueAr: '+10 نقاط · 4.4%',
+    valueEn: '+10 pts · 4.4%',
+    benefitAr: 'أقوى نقطة في المراحل العادية — تبدأ بالظهور من المرحلة 5 بنسبة ظهور 4.4% وتمنحك 10 نقاط دفعة واحدة!',
+    benefitEn: 'Strongest Normal point — starts at Stage 5 with a 4.4% spawn rate and awards 10 points at once!',
+  },
+  // ── Negative (-): Weakest → Strongest ──
+  {
+    kind: 'hazard_arrow_amber',
     category: 'negative',
-    nameAr: 'العائق الأحمر الشائك',
-    nameEn: 'Red Spike',
-    valueAr: '-1 روح',
-    valueEn: '-1 Life',
-    benefitAr: 'ينقص قلباً واحداً عند الاصطدام به، تجنّبه للحفاظ على القلوب الكاملة.',
-    benefitEn: 'Removes 1 heart on impact; dodge it to preserve your lives.',
+    minStage: 3,
+    nameAr: 'السهم الذهبي المائل',
+    nameEn: 'Golden Slant Arrow',
+    valueAr: '-2 نقاط',
+    valueEn: '-2 pts',
+    benefitAr: 'سهم ذهبي خفيف ينزل بزاوية مائلة وبسرعة معتدلة؛ لا ينقص القلوب بل يخصم نقطتين فقط من رصيد المرحلة (من المرحلة 3).',
+    benefitEn: 'Mild golden slanted dart at moderate speed; spares your hearts and only deducts 2 stage points (Stage 3+).',
   },
   {
-    kind: 'hazard_square',
+    kind: 'hazard_arrow_violet',
     category: 'negative',
-    nameAr: 'المربع الأحمر',
-    nameEn: 'Red Square',
-    valueAr: '-2 أرواح',
-    valueEn: '-2 Lives',
-    benefitAr: 'عائق ثقيل ينقص قلبَين دفعة واحدة عند لمسه (يبدأ من المرحلة 5).',
-    benefitEn: 'Heavy hazard that removes 2 hearts on impact (starts at Stage 5).',
+    minStage: 6,
+    nameAr: 'السهم البنفسجي المبطّئ',
+    nameEn: 'Violet Slow Arrow',
+    valueAr: 'تبطيء 2.5ث · -1 نقطة',
+    valueEn: 'Slow 2.5s · -1 pt',
+    benefitAr: 'سهم بنفسجي معتدل السرعة لا ينقص القلوب؛ يخصم نقطة واحدة ويبطّئ حركتك قليلاً (-30%) لمدة 2.5 ثانية (من المرحلة 6).',
+    benefitEn: 'Moderate-speed violet bolt that spares your hearts; deducts 1 point and gently slows movement (-30%) for 2.5s (Stage 6+).',
+  },
+  {
+    kind: 'minus_crimson_hex',
+    category: 'negative',
+    minStage: 2,
+    nameAr: 'السداسي القرمزي',
+    nameEn: 'Crimson Hex',
+    valueAr: '-3 نقاط',
+    valueEn: '-3 pts',
+    benefitAr: 'نقطة سلبية متوازنة لا تنقص القلوب؛ تخصم 3 نقاط من رصيد المرحلة عند لمسها (من المرحلة 2).',
+    benefitEn: 'Balanced minus hex that spares your hearts and deducts 3 stage points on hit (Stage 2+).',
+  },
+  {
+    kind: 'minus_slate_cross',
+    category: 'negative',
+    minStage: 12,
+    nameAr: 'الترس الرمادي',
+    nameEn: 'Steel Gear',
+    valueAr: '-3 نقاط · تبطيء 2ث',
+    valueEn: '-3 pts · Slow 2s',
+    benefitAr: 'ترس فولاذي دوّار لا ينقص القلوب؛ يخصم 3 نقاط ويبطّئ حركتك قليلاً لمدة ثانيتين (من المرحلة 12).',
+    benefitEn: 'Spinning steel gear that spares hearts; deducts 3 points and mildly slows you for 2s (Stage 12+).',
+  },
+  {
+    kind: 'minus_rust_diamond',
+    category: 'negative',
+    minStage: 7,
+    nameAr: 'المعيّن الصدئ',
+    nameEn: 'Rust Diamond',
+    valueAr: '-4 نقاط',
+    valueEn: '-4 pts',
+    benefitAr: 'معيّن برتقالي صدئ متوسط الخطورة؛ لا ينقص القلوب بل يخصم 4 نقاط من رصيدك (من المرحلة 7).',
+    benefitEn: 'Mid-tier rusted diamond that spares hearts and deducts 4 stage points (Stage 7+).',
+  },
+  {
+    kind: 'minus_teal_bolt',
+    category: 'negative',
+    minStage: 16,
+    nameAr: 'شرارة الظل',
+    nameEn: 'Shadow Bolt',
+    valueAr: '-4 نقاط · سرعة متوسطة',
+    valueEn: '-4 pts · Medium Speed',
+    benefitAr: 'شرارة فيروزية داكنة تنزل بسرعة متوسطة (+24%)؛ لا تنقص القلوب وتخصم 4 نقاط (من المرحلة 16).',
+    benefitEn: 'Dark teal shard falling at moderate speed (+24%); spares hearts and deducts 4 points (Stage 16+).',
+  },
+  {
+    kind: 'minus_plum_ring',
+    category: 'negative',
+    minStage: 22,
+    nameAr: 'الحلقة الداكنة',
+    nameEn: 'Dark Plum Ring',
+    valueAr: '-5 نقاط',
+    valueEn: '-5 pts',
+    benefitAr: 'حلقة بنفسجية داكنة متوازنة لا تنقص القلوب؛ تخصم 5 نقاط من تقدم المرحلة (من المرحلة 22).',
+    benefitEn: 'Balanced dark plum ring that spares hearts and deducts 5 stage points (Stage 22+).',
   },
   {
     kind: 'hazard_star',
     category: 'negative',
+    minStage: 10,
     nameAr: 'النجمة الحمراء المجمّدة',
     nameEn: 'Red Freeze Star',
     valueAr: 'تجميد 4ث · +3 نقاط',
@@ -292,8 +609,20 @@ const INDEX_CATALOG: IndexEntry[] = [
     benefitEn: 'Freezes your movement for 4 seconds on catch while awarding 3 points (Stage 10+).',
   },
   {
+    kind: 'hazard_spike',
+    category: 'negative',
+    minStage: 1,
+    nameAr: 'العائق الأحمر الشائك',
+    nameEn: 'Red Spike',
+    valueAr: '-1 روح',
+    valueEn: '-1 Life',
+    benefitAr: 'ينقص قلباً واحداً عند الاصطدام به، تجنّبه للحفاظ على القلوب الكاملة.',
+    benefitEn: 'Removes 1 heart on impact; dodge it to preserve your lives.',
+  },
+  {
     kind: 'hazard_arrow',
     category: 'negative',
+    minStage: 1,
     nameAr: 'السهم الأحمر السريع',
     nameEn: 'Red Fast Arrow',
     valueAr: '-1 روح · سرعة +150%',
@@ -302,24 +631,26 @@ const INDEX_CATALOG: IndexEntry[] = [
     benefitEn: 'Blazing red arrow falling 150% faster (2.5x) than normal items; removes 1 heart on impact.',
   },
   {
-    kind: 'hazard_arrow_amber',
+    kind: 'hazard_square',
     category: 'negative',
-    nameAr: 'السهم الذهبي المائل',
-    nameEn: 'Golden Slant Arrow',
-    valueAr: '-2 نقاط · مرحلة 3+',
-    valueEn: '-2 pts · Stage 3+',
-    benefitAr: 'سهم ذهبي خفيف ينزل بزاوية مائلة وبسرعة معتدلة؛ لا ينقص القلوب بل يخصم نقطتين فقط من رصيد المرحلة (من المرحلة 3).',
-    benefitEn: 'Mild golden slanted dart at moderate speed; spares your hearts and only deducts 2 stage points (Stage 3+).',
+    minStage: 5,
+    nameAr: 'المربع الأحمر',
+    nameEn: 'Red Square',
+    valueAr: '-2 أرواح',
+    valueEn: '-2 Lives',
+    benefitAr: 'عائق ثقيل ينقص قلبَين دفعة واحدة عند لمسه (يبدأ من المرحلة 5).',
+    benefitEn: 'Heavy hazard that removes 2 hearts on impact (starts at Stage 5).',
   },
   {
-    kind: 'hazard_arrow_violet',
+    kind: 'hazard_black_square',
     category: 'negative',
-    nameAr: 'السهم البنفسجي المبطّئ',
-    nameEn: 'Violet Slow Arrow',
-    valueAr: 'تبطيء 2.5ث · -1 نقطة · مرحلة 6+',
-    valueEn: 'Slow 2.5s · -1 pt · Stage 6+',
-    benefitAr: 'سهم بنفسجي معتدل السرعة لا ينقص القلوب؛ يخصم نقطة واحدة ويبطّئ حركتك قليلاً (-30%) لمدة 2.5 ثانية (من المرحلة 6).',
-    benefitEn: 'Moderate-speed violet bolt that spares your hearts; deducts 1 point and gently slows movement (-30%) for 2.5s (Stage 6+).',
+    minStage: 15,
+    nameAr: 'المربع الأسود العملاق',
+    nameEn: 'Giant Black Square',
+    valueAr: '-3 أرواح · -4 نقاط · تبطيء 250%',
+    valueEn: '-3 Lives · -4 pts · -250% Slow',
+    benefitAr: 'مربع أسود ضخم أكبر من الباقين بنسبة 100% يبدأ بالظهور من المرحلة 15 وما فوق؛ ينقصك 3 أرواح ويخصم 4 نقاط ويبطّئ حركتك بنسبة 250% لمدة 4 ثوانٍ.',
+    benefitEn: 'Colossal black square 100% larger than standard hazards starting at Stage 15+; removes 3 hearts, deducts 4 points, and slows you by 250% for 4 seconds.',
   },
 ];
 
@@ -331,34 +662,35 @@ function getStageClearCoins(remainingLives: number): number {
   return 2;
 }
 
-// Build 50 stages with smooth difficulty progression:
-// Stage 1+: Red Spike (-1) & Red Fast Arrow (-1, +150% speed); Stage 5+: Red Square (-2); Stage 10+: Red Freeze Star (4s freeze + 3 pts).
+// Build 75 stages with smooth difficulty progression:
+// Stage 1+: Red Spike (-1) & Red Fast Arrow (-1, +150% speed); Stage 2+: balanced medium plus & minus points;
+// Stage 5+: Red Square (-2); Stage 10+: Red Freeze Star (4s freeze + 3 pts); Stages 51–75 extend smoothly.
 const STAGES: StageConfig[] = (() => {
   const list: StageConfig[] = [];
   let cumulative = 0;
   for (let s = 1; s <= TOTAL_STAGES; s++) {
     const t = (s - 1) / (TOTAL_STAGES - 1);
     const tCurve = Math.pow(t, 0.85);
-    const pointsNeeded = Math.round((45 + s * 14) * 0.95);
+    const pointsNeeded = Math.round((45 + s * 13.5) * 0.95);
     const startScore = cumulative;
     cumulative += pointsNeeded;
     const rawSquareRatio =
-      s < 5 ? 0 : 0.28 + ((s - 5) / (TOTAL_STAGES - 5)) * 0.34;
+      s < 5 ? 0 : Math.min(0.62, 0.28 + ((s - 5) / (TOTAL_STAGES - 5)) * 0.34);
     const starHazardRatio =
-      s < 10 ? 0 : 0.16 + ((s - 10) / (TOTAL_STAGES - 10)) * 0.1;
+      s < 10 ? 0 : Math.min(0.26, 0.16 + ((s - 10) / (TOTAL_STAGES - 10)) * 0.1);
     const arrowHazardRatio = 0.16 + tCurve * 0.12;
     list.push({
       stage: s,
       startScore,
       targetScore: cumulative,
       pointsNeeded,
-      baseSpeed: (220 + tCurve * 365) * 0.95,
-      spawnInterval: Math.max(0.16, (0.68 - tCurve * 0.5) * 1.05),
-      hazardChance: Math.min(0.62, (0.34 + tCurve * 0.28) * 0.95),
+      baseSpeed: Math.min(640, (220 + tCurve * 420) * 0.95),
+      spawnInterval: Math.max(0.15, (0.68 - tCurve * 0.52) * 1.05),
+      hazardChance: Math.min(0.62, (0.34 + tCurve * 0.29) * 0.95),
       squareHazardRatio: rawSquareRatio * 0.95,
       starHazardRatio,
       arrowHazardRatio,
-      lateralDrift: (26 + tCurve * 115) * 0.95,
+      lateralDrift: (26 + tCurve * 130) * 0.95,
     });
   }
   return list;
@@ -374,7 +706,7 @@ function isStageUnlocked(stage: number, completed: number[]): boolean {
 const COPY = {
   ar: {
     title: 'صياد النقاط',
-    rule: 'اجتز 50 مرحلة بالتقاط النقاط وتجنّب العوائق والسهام الحمراء السريعة (10 قلوب تتجدد كل 5 دقائق).',
+    rule: `اجتز ${TOTAL_STAGES} مرحلة بالتقاط النقاط وتجنّب العوائق والسهام الحمراء السريعة (10 قلوب تتجدد كل 5 دقائق).`,
     startBtn: 'ابدأ اللعب',
     playAgainBtn: 'العب مرة أخرى',
     resumeBtn: 'استئناف اللعب',
@@ -387,7 +719,7 @@ const COPY = {
     stageReached: 'المرحلة التي وصلت إليها',
     gameOver: 'انتهت اللعبة',
     victoryTitle: 'مبروك! أنهيت جميع المراحل',
-    victorySubtitle: 'أكملت المراحل الـ 50 بنجاح!',
+    victorySubtitle: `أكملت المراحل الـ ${TOTAL_STAGES} بنجاح!`,
     finalScore: 'النتيجة النهائية',
     newBest: 'رقم قياسي جديد!',
     paused: 'إيقاف مؤقت',
@@ -423,7 +755,7 @@ const COPY = {
     lockedStageAria: (n: number) => `المرحلة ${n} مقفلة`,
     indexBtn: 'الاندكس',
     indexModalTitle: 'الاندكس',
-    indexModalHint: 'جميع النقاط والعوائق — كل عنصر يبقى مقفلاً ولا تظهر فائدته إلا عندما تلتقطه أو تلمسه.',
+    indexModalHint: 'مرتّبة من الأضعف إلى الأقوى — كل عنصر يبقى مقفلاً ولا تظهر فائدته إلا عندما تلتقطه أو تلمسه.',
     indexPlusTab: 'الزائد (+)',
     indexMinusTab: 'السالب (-)',
     indexDiscoveredCount: (found: number, total: number) => `${found}/${total} مكتشف`,
@@ -461,7 +793,7 @@ const COPY = {
     pinkCoins: 'عملات وردية',
     pinkCoinShortBenefit: 'لشراء الألماس',
     pinkCoinBenefitTitle: 'فائدة العملة الوردية',
-    pinkCoinBenefitDesc: `تُستخدم لشراء الألماس لمراحل الذهب (${DIAMOND_COST_COINS} عملة وردية = +1 ألماسة). مع كل نقطة تمسكها احتمال 50% أن تعطيك من 1 إلى 3 عملات وردية (فقط في المراحل التي لم تفز بها بعد).`,
+    pinkCoinBenefitDesc: `تُستخدم لشراء الألماس لمراحل الذهب (${DIAMOND_COST_COINS} عملة وردية = +1 ألماسة) ولشراء تطويرات زيادة عدد القلوب في المتجر (حتى 15 قلباً). مع كل نقطة تمسكها احتمال 85% أن تعطيك من 3 إلى 7 عملات وردية (فقط في المراحل التي لم تفز بها بعد).`,
     coinsEarned: (earned: number, remainingLives: number) =>
       earned <= 0
         ? 'تم استلام مكافأة هذه المرحلة مسبقاً (بدون فلوس إضافية)'
@@ -474,17 +806,17 @@ const COPY = {
     fruitWorldLabel: 'مراحل الفواكه',
     cornLabel: 'الذرة',
     fruitVictoryTitle: 'مبروك! أنهيت مراحل الفواكه',
-    fruitVictorySubtitle: 'أكملت مراحل الفواكه الـ 15 بنجاح!',
+    fruitVictorySubtitle: `أكملت مراحل الفواكه الـ ${TOTAL_FRUIT_STAGES} بنجاح!`,
     fruitStageBanner: (n: number) => `الفواكه · المرحلة ${n}`,
     fruitStageCompleteTitle: (n: number) => `أكملت مرحلة الفواكه ${n}!`,
     fruitNextStageBtn: (n: number) => `الانتقال إلى مرحلة الفواكه ${n}`,
-    fruitUnlockTitle: 'عالم الفواكه (15 مرحلة)',
+    fruitUnlockTitle: `عالم الفواكه (${TOTAL_FRUIT_STAGES} مرحلة)`,
     fruitUnlockDesc:
-      'افتح 15 مرحلة بخلفية بستان الفواكه مع فواكه تزيد النقاط (+2 إلى +5) وخضار تنقص النقاط والذرة (10 ذرة خاصة)، بالإضافة إلى اندكس خاص بالفواكه.',
+      `افتح ${TOTAL_FRUIT_STAGES} مرحلة بخلفية بستان الفواكه مع فواكه تزيد النقاط (+2 إلى +5) وخضار تنقص النقاط والذرة (10 ذرة خاصة)، بالإضافة إلى اندكس خاص بالفواكه.`,
     fruitUnlockBtn: `فتح مراحل الفواكه (${FRUIT_UNLOCK_COST} فلوس)`,
     fruitNeedCoins: (need: number) => `تحتاج ${need} فلوس إضافية لفتح مراحل الفواكه`,
     fruitStagesModalHint:
-      `15 مرحلة للفواكه — سعر الذرة ثابت (${HEART_COST_COINS} فلوس) · مكافأة الفوز بالمرحلة (حسب الذرة المتبقية): 1 = 6 · 2 = 12 · 3+ = 18 فلوس.`,
+      `${TOTAL_FRUIT_STAGES} مرحلة للفواكه — سعر الذرة ثابت (${HEART_COST_COINS} فلوس) · مكافأة الفوز بالمرحلة (حسب الذرة المتبقية): 1 = 6 · 2 = 12 · 3+ = 18 فلوس.`,
     noCornNotice: (timer: string) => `نفدت الذرة — تتجدد الذرة القادمة خلال ${timer}`,
     waitCornBtn: (timer: string) => `انتظر تجدد الذرة (${timer})`,
     buyCornBtn: `+1 ذرة (${HEART_COST_COINS} فلوس)`,
@@ -494,7 +826,7 @@ const COPY = {
     fruitIndexWorldBtn: 'اندكس الفواكه',
     normalIndexWorldBtn: 'الاندكس العادي',
     fruitIndexModalHint:
-      'جميع الفواكه والخضار — كل عنصر يبقى مقفلاً ولا تظهر فائدته إلا عندما تلتقطه أو تلمسه في مراحل الفواكه.',
+      'الفواكه والخضار مرتّبة من الأضعف إلى الأقوى — كل عنصر يبقى مقفلاً ولا تظهر فائدته إلا عند التقاطه في مراحل الفواكه.',
     fruitIndexPlusTab: 'الفواكه (+)',
     fruitIndexMinusTab: 'الخضار (-)',
     fruitCoinsEarned: (earned: number, remainingCorn: number) =>
@@ -504,17 +836,17 @@ const COPY = {
     goldWorldLabel: 'مراحل الذهب',
     diamondsLabel: 'الألماس',
     goldVictoryTitle: 'مبروك! أنهيت مراحل الذهب',
-    goldVictorySubtitle: 'أكملت مراحل الذهب الـ 15 وجمعت كنوز الخزنة بنجاح!',
+    goldVictorySubtitle: `أكملت مراحل الذهب الـ ${TOTAL_GOLD_STAGES} وجمعت كنوز الخزنة بنجاح!`,
     goldStageBanner: (n: number) => `الذهب · المرحلة ${n}`,
     goldStageCompleteTitle: (n: number) => `أكملت مرحلة الذهب ${n}!`,
     goldNextStageBtn: (n: number) => `الانتقال إلى مرحلة الذهب ${n}`,
-    goldUnlockTitle: 'عالم الذهب والألماس (15 مرحلة)',
+    goldUnlockTitle: `عالم الذهب والألماس (${TOTAL_GOLD_STAGES} مرحلة)`,
     goldUnlockDesc:
-      `افتح 15 مرحلة بخلفية ذهب وألماس لامعة، كنوز ذهبية وألماس نادر (+2 إلى +6 نقاط)، نظام الألماس الخاص (${DIAMOND_COST_COINS} عملة وردية لكل ألماسة)، واندكس ذهب مستقل!`,
+      `افتح ${TOTAL_GOLD_STAGES} مرحلة بخلفية ذهب وألماس لامعة، كنوز ذهبية وألماس نادر (+2 إلى +6 نقاط)، نظام الألماس الخاص (${DIAMOND_COST_COINS} عملة وردية لكل ألماسة)، واندكس ذهب مستقل!`,
     goldUnlockBtn: `فتح مراحل الذهب (${GOLD_UNLOCK_COST} فلوس)`,
     goldNeedCoins: (need: number) => `تحتاج ${need} فلوس إضافية لفتح مراحل الذهب`,
     goldStagesModalHint:
-      `15 مرحلة ذهب وألماس — سعر الألماسة ${DIAMOND_COST_COINS} عملة وردية · مكافأة الفوز بالمرحلة (حسب الألماس المتبقي): 1–4 = 5 · 5–7 = 10 · 8–10 = 15 فلوس.`,
+      `${TOTAL_GOLD_STAGES} مرحلة ذهب وألماس — سعر الألماسة ${DIAMOND_COST_COINS} عملة وردية · مكافأة الفوز بالمرحلة (حسب الألماس المتبقي): 1–4 = 5 · 5–7 = 10 · 8–10 = 15 فلوس.`,
     noDiamondsNotice: (timer: string) => `نفد الألماس — تتجدد الألماسة القادمة خلال ${timer}`,
     waitDiamondBtn: (timer: string) => `انتظر تجدد الألماسة (${timer})`,
     buyDiamondBtn: `+1 ألماسة (${DIAMOND_COST_COINS} عملة وردية)`,
@@ -523,7 +855,7 @@ const COPY = {
     needCoinsDiamondTip: `تحتاج ${DIAMOND_COST_COINS} عملة وردية لشراء ألماسة`,
     goldIndexWorldBtn: 'اندكس الذهب',
     goldIndexModalHint:
-      'جميع كنوز الذهب والألماس وعوائق الخزنة — كل عنصر يبقى مقفلاً حتى تلتقطه أو تلمسه في مراحل الذهب.',
+      'كنوز الذهب والألماس وعوائق الخزنة مرتّبة من الأضعف إلى الأقوى — كل عنصر يبقى مقفلاً حتى تلتقطه في مراحل الذهب.',
     goldIndexPlusTab: 'الكنوز (+)',
     goldIndexMinusTab: 'العوائق (-)',
     goldCoinsEarned: (earned: number, remainingDiamonds: number) =>
@@ -533,7 +865,7 @@ const COPY = {
   },
   en: {
     title: 'Point Catcher',
-    rule: 'Clear 50 stages by catching points while dodging red hazards and fast arrows (10 hearts, +1 every 5 min).',
+    rule: `Clear ${TOTAL_STAGES} stages by catching points while dodging red hazards and fast arrows (10 hearts, +1 every 5 min).`,
     startBtn: 'Start Game',
     playAgainBtn: 'Play Again',
     resumeBtn: 'Resume',
@@ -545,8 +877,8 @@ const COPY = {
     stage: 'Stage',
     stageReached: 'Stage Reached',
     gameOver: 'Game Over',
-    victoryTitle: 'Victory! All 50 Stages Cleared',
-    victorySubtitle: 'You mastered all 50 stages!',
+    victoryTitle: `Victory! All ${TOTAL_STAGES} Stages Cleared`,
+    victorySubtitle: `You mastered all ${TOTAL_STAGES} stages!`,
     finalScore: 'Final Score',
     newBest: 'New Best Score!',
     paused: 'Paused',
@@ -582,7 +914,7 @@ const COPY = {
     lockedStageAria: (n: number) => `Stage ${n} locked`,
     indexBtn: 'Index',
     indexModalTitle: 'Index',
-    indexModalHint: 'All points & hazards — each entry stays locked with hidden details until you catch or touch it.',
+    indexModalHint: 'Ordered from weakest to strongest — each entry stays locked until you catch or touch it.',
     indexPlusTab: 'Plus (+)',
     indexMinusTab: 'Minus (-)',
     indexDiscoveredCount: (found: number, total: number) => `${found}/${total} Discovered`,
@@ -620,7 +952,7 @@ const COPY = {
     pinkCoins: 'Pink Coins',
     pinkCoinShortBenefit: 'For Diamonds',
     pinkCoinBenefitTitle: 'Pink Coin Benefit',
-    pinkCoinBenefitDesc: `Used to buy Diamonds for Gold Stages (${DIAMOND_COST_COINS} Pink Coins = +1 Diamond). Every point you catch has a 50% chance to drop 1–3 Pink Coins (only in stages you haven't cleared yet).`,
+    pinkCoinBenefitDesc: `Used to buy Diamonds for Gold Stages (${DIAMOND_COST_COINS} Pink Coins = +1 Diamond) and permanent Max Hearts Upgrades in the Shop (up to 15 hearts). Every point you catch has an 85% chance to drop 3–7 Pink Coins (only in stages you haven't cleared yet).`,
     coinsEarned: (earned: number, remainingLives: number) =>
       earned <= 0
         ? 'Stage coin reward already claimed (no extra coins)'
@@ -632,18 +964,18 @@ const COPY = {
     normalWorldLabel: 'Normal Stages',
     fruitWorldLabel: 'Fruit Stages',
     cornLabel: 'Corn',
-    fruitVictoryTitle: 'Victory! All 15 Fruit Stages Cleared',
-    fruitVictorySubtitle: 'You mastered all 15 fruit orchard stages!',
+    fruitVictoryTitle: `Victory! All ${TOTAL_FRUIT_STAGES} Fruit Stages Cleared`,
+    fruitVictorySubtitle: `You mastered all ${TOTAL_FRUIT_STAGES} fruit orchard stages!`,
     fruitStageBanner: (n: number) => `Fruit · Stage ${n}`,
     fruitStageCompleteTitle: (n: number) => `Fruit Stage ${n} Complete!`,
     fruitNextStageBtn: (n: number) => `Continue to Fruit Stage ${n}`,
-    fruitUnlockTitle: 'Fruit World (15 Stages)',
+    fruitUnlockTitle: `Fruit World (${TOTAL_FRUIT_STAGES} Stages)`,
     fruitUnlockDesc:
-      'Unlock 15 stages with an orchard fruit background, juicy fruits (+2 to +5 pts), vegetables that subtract points & corn lives (10 corn pool), plus a dedicated Fruit Index.',
+      `Unlock ${TOTAL_FRUIT_STAGES} stages with an orchard fruit background, juicy fruits (+2 to +5 pts), vegetables that subtract points & corn lives (10 corn pool), plus a dedicated Fruit Index.`,
     fruitUnlockBtn: `Unlock Fruit Stages (${FRUIT_UNLOCK_COST} Coins)`,
     fruitNeedCoins: (need: number) => `Need ${need} more coins to unlock Fruit Stages`,
     fruitStagesModalHint:
-      `15 Fruit stages — Corn price is fixed (${HEART_COST_COINS} coins) · Stage-win reward (by remaining corn): 1 = 6, 2 = 12, 3+ = 18 coins.`,
+      `${TOTAL_FRUIT_STAGES} Fruit stages — Corn price is fixed (${HEART_COST_COINS} coins) · Stage-win reward (by remaining corn): 1 = 6, 2 = 12, 3+ = 18 coins.`,
     noCornNotice: (timer: string) => `Out of corn — next corn regenerates in ${timer}`,
     waitCornBtn: (timer: string) => `Next Corn in ${timer}`,
     buyCornBtn: `Buy +1 Corn (${HEART_COST_COINS} Coins)`,
@@ -653,7 +985,7 @@ const COPY = {
     fruitIndexWorldBtn: 'Fruit Index',
     normalIndexWorldBtn: 'Normal Index',
     fruitIndexModalHint:
-      'All fruits & vegetables — each entry stays locked until you catch or touch it in Fruit Stages.',
+      'Fruits & vegetables ordered from weakest to strongest — each entry stays locked until you catch or touch it in Fruit Stages.',
     fruitIndexPlusTab: 'Fruits (+)',
     fruitIndexMinusTab: 'Vegetables (-)',
     fruitCoinsEarned: (earned: number, remainingCorn: number) =>
@@ -662,18 +994,18 @@ const COPY = {
         : `+${earned} ${earned === 1 ? 'Coin' : 'Coins'} Reward (${remainingCorn} Corn)!`,
     goldWorldLabel: 'Gold Stages',
     diamondsLabel: 'Diamonds',
-    goldVictoryTitle: 'Victory! All 15 Gold Stages Cleared',
-    goldVictorySubtitle: 'You mastered all 15 gold & diamond vault stages!',
+    goldVictoryTitle: `Victory! All ${TOTAL_GOLD_STAGES} Gold Stages Cleared`,
+    goldVictorySubtitle: `You mastered all ${TOTAL_GOLD_STAGES} gold & diamond vault stages!`,
     goldStageBanner: (n: number) => `Gold · Stage ${n}`,
     goldStageCompleteTitle: (n: number) => `Gold Stage ${n} Complete!`,
     goldNextStageBtn: (n: number) => `Continue to Gold Stage ${n}`,
-    goldUnlockTitle: 'Gold & Diamond Vault (15 Stages)',
+    goldUnlockTitle: `Gold & Diamond Vault (${TOTAL_GOLD_STAGES} Stages)`,
     goldUnlockDesc:
-      `Unlock 15 gleaming gold & diamond stages with royal treasures (+2 to +6 pts), dedicated diamond lives (${DIAMOND_COST_COINS} Pink Coins per diamond, 5/10/15 clear rewards), and a dedicated Gold Index!`,
+      `Unlock ${TOTAL_GOLD_STAGES} gleaming gold & diamond stages with royal treasures (+2 to +6 pts), dedicated diamond lives (${DIAMOND_COST_COINS} Pink Coins per diamond, 5/10/15 clear rewards), and a dedicated Gold Index!`,
     goldUnlockBtn: `Unlock Gold Stages (${GOLD_UNLOCK_COST} Coins)`,
     goldNeedCoins: (need: number) => `Need ${need} more coins to unlock Gold Stages`,
     goldStagesModalHint:
-      `15 Gold & Diamond stages — Diamond price is ${DIAMOND_COST_COINS} Pink Coins · Stage-win reward (by remaining diamonds): 1–4 = 5, 5–7 = 10, 8–10 = 15 coins.`,
+      `${TOTAL_GOLD_STAGES} Gold & Diamond stages — Diamond price is ${DIAMOND_COST_COINS} Pink Coins · Stage-win reward (by remaining diamonds): 1–4 = 5, 5–7 = 10, 8–10 = 15 coins.`,
     noDiamondsNotice: (timer: string) => `Out of diamonds — next diamond regenerates in ${timer}`,
     waitDiamondBtn: (timer: string) => `Next Diamond in ${timer}`,
     buyDiamondBtn: `Buy +1 Diamond (${DIAMOND_COST_COINS} Pink Coins)`,
@@ -682,7 +1014,7 @@ const COPY = {
     needCoinsDiamondTip: `Need ${DIAMOND_COST_COINS} Pink Coins to buy a diamond`,
     goldIndexWorldBtn: 'Gold Index',
     goldIndexModalHint:
-      'All gold treasures, diamonds & vault hazards — each entry stays locked until you catch or touch it in Gold Stages.',
+      'Treasures & vault hazards ordered from weakest to strongest — each entry stays locked until you catch or touch it in Gold Stages.',
     goldIndexPlusTab: 'Treasures (+)',
     goldIndexMinusTab: 'Hazards (-)',
     goldCoinsEarned: (earned: number, remainingDiamonds: number) =>
@@ -1185,19 +1517,20 @@ interface StoredLivesState {
 function computeSyncedLivesState(
   rawLives: number,
   rawLastRegenAt: number,
-  now: number
+  now: number,
+  maxLives: number = MAX_LIVES
 ): StoredLivesState {
-  const clampedLives = Math.max(0, Math.min(MAX_LIVES, Math.floor(rawLives)));
-  if (clampedLives >= MAX_LIVES) {
-    return { lives: MAX_LIVES, lastRegenAt: 0 };
+  const clampedLives = Math.max(0, Math.min(maxLives, Math.floor(rawLives)));
+  if (clampedLives >= maxLives) {
+    return { lives: maxLives, lastRegenAt: 0 };
   }
   const baseTime =
     rawLastRegenAt > 0 && rawLastRegenAt <= now ? rawLastRegenAt : now;
   const elapsed = now - baseTime;
   const gained = Math.floor(elapsed / HEART_REGEN_MS);
-  const nextLives = Math.min(MAX_LIVES, clampedLives + gained);
-  if (nextLives >= MAX_LIVES) {
-    return { lives: MAX_LIVES, lastRegenAt: 0 };
+  const nextLives = Math.min(maxLives, clampedLives + gained);
+  if (nextLives >= maxLives) {
+    return { lives: maxLives, lastRegenAt: 0 };
   }
   return {
     lives: nextLives,
@@ -1205,22 +1538,22 @@ function computeSyncedLivesState(
   };
 }
 
-function readStoredLivesState(): StoredLivesState {
+function readStoredLivesState(maxLives: number = MAX_LIVES): StoredLivesState {
   const now = Date.now();
   try {
     const raw = window.localStorage.getItem(LIVES_STATE_STORAGE_KEY);
-    if (!raw) return { lives: MAX_LIVES, lastRegenAt: 0 };
+    if (!raw) return { lives: maxLives, lastRegenAt: 0 };
     const parsed = JSON.parse(raw);
     if (
       parsed &&
       typeof parsed.lives === 'number' &&
       typeof parsed.lastRegenAt === 'number'
     ) {
-      return computeSyncedLivesState(parsed.lives, parsed.lastRegenAt, now);
+      return computeSyncedLivesState(parsed.lives, parsed.lastRegenAt, now, maxLives);
     }
-    return { lives: MAX_LIVES, lastRegenAt: 0 };
+    return { lives: maxLives, lastRegenAt: 0 };
   } catch {
-    return { lives: MAX_LIVES, lastRegenAt: 0 };
+    return { lives: maxLives, lastRegenAt: 0 };
   }
 }
 
@@ -1401,9 +1734,16 @@ function formatCountdown(ms: number): string {
 }
 
 export default function App() {
+  const initialShopRef = useRef<ShopState | null>(null);
+  if (initialShopRef.current === null) {
+    initialShopRef.current = readStoredShopState();
+  }
+  const initialShopState = initialShopRef.current;
+  const initialMaxLives = MAX_LIVES + initialShopState.maxHeartsUpgrade;
+
   const initialLivesRef = useRef<StoredLivesState | null>(null);
   if (initialLivesRef.current === null) {
-    initialLivesRef.current = readStoredLivesState();
+    initialLivesRef.current = readStoredLivesState(initialMaxLives);
   }
   const initialLivesState = initialLivesRef.current;
 
@@ -1463,7 +1803,7 @@ export default function App() {
   );
   const [lives, setLives] = useState<number>(initialLivesState.lives);
   const [nextHeartInMs, setNextHeartInMs] = useState<number>(() =>
-    initialLivesState.lives < MAX_LIVES
+    initialLivesState.lives < initialMaxLives
       ? Math.max(0, HEART_REGEN_MS - (Date.now() - initialLivesState.lastRegenAt))
       : 0
   );
@@ -1493,7 +1833,7 @@ export default function App() {
   const [bag, setBag] = useState<BagState>(() => readStoredBagState());
   const [shopTab, setShopTab] = useState<ShopTab>('skins');
   const [shopPointsSubTab, setShopPointsSubTab] = useState<PointsSubTab>('plus');
-  const [shop, setShop] = useState<ShopState>(() => readStoredShopState());
+  const [shop, setShop] = useState<ShopState>(initialShopState);
   const [settingsModalOpen, setSettingsModalOpen] = useState<boolean>(false);
   const [gamesModalOpen, setGamesModalOpen] = useState<boolean>(false);
   const [musicEnabled, setMusicEnabled] = useState<boolean>(() =>
@@ -1557,6 +1897,7 @@ export default function App() {
     shieldTimer: 0,
     freezeTimer: 0,
     slowTimer: 0,
+    heavySlowTimer: 0,
     speedBoostTimer: 0,
     shakeTimer: 0,
     shakeIntensity: 0,
@@ -1592,12 +1933,13 @@ export default function App() {
     : isGoldMode
     ? TOTAL_GOLD_STAGES
     : TOTAL_STAGES;
+  const effectiveMaxLives = MAX_LIVES + shop.maxHeartsUpgrade;
   const activeLives = isFruitMode ? corn : isGoldMode ? diamonds : lives;
   const activeMaxLives = isFruitMode
     ? MAX_CORN
     : isGoldMode
     ? MAX_DIAMONDS
-    : MAX_LIVES;
+    : effectiveMaxLives;
   const activeNextRegenMs = isFruitMode
     ? nextCornInMs
     : isGoldMode
@@ -1716,18 +2058,20 @@ export default function App() {
     const syncPools = () => {
       const now = Date.now();
 
-      // Normal hearts pool
-      if (livesRef.current >= MAX_LIVES) {
+      // Normal hearts pool (scales up to 15 with Max Hearts upgrades)
+      const currentMaxLives = MAX_LIVES + shopRef.current.maxHeartsUpgrade;
+      if (livesRef.current >= currentMaxLives) {
         if (lastHeartRegenAtRef.current !== 0) {
           lastHeartRegenAtRef.current = 0;
-          persistLivesState(MAX_LIVES, 0);
+          persistLivesState(currentMaxLives, 0);
         }
         setNextHeartInMs(0);
       } else {
         const synced = computeSyncedLivesState(
           livesRef.current,
           lastHeartRegenAtRef.current,
-          now
+          now,
+          currentMaxLives
         );
         if (
           synced.lives !== livesRef.current ||
@@ -1739,7 +2083,7 @@ export default function App() {
           persistLivesState(synced.lives, synced.lastRegenAt);
         }
         setNextHeartInMs(
-          synced.lives < MAX_LIVES
+          synced.lives < currentMaxLives
             ? Math.max(0, HEART_REGEN_MS - (now - synced.lastRegenAt))
             : 0
         );
@@ -1862,7 +2206,8 @@ export default function App() {
       return;
     }
 
-    if (livesRef.current >= MAX_LIVES) return;
+    const currentMaxLives = MAX_LIVES + shopRef.current.maxHeartsUpgrade;
+    if (livesRef.current >= currentMaxLives) return;
     const nextCoins = coinsRef.current - HEART_COST_COINS;
     coinsRef.current = nextCoins;
     setCoins(nextCoins);
@@ -1872,10 +2217,10 @@ export default function App() {
       // Ignore storage errors
     }
 
-    const nextLives = Math.min(MAX_LIVES, livesRef.current + 1);
+    const nextLives = Math.min(currentMaxLives, livesRef.current + 1);
     livesRef.current = nextLives;
     setLives(nextLives);
-    if (nextLives >= MAX_LIVES) {
+    if (nextLives >= currentMaxLives) {
       lastHeartRegenAtRef.current = 0;
       setNextHeartInMs(0);
     }
@@ -1933,8 +2278,9 @@ export default function App() {
       return;
     }
 
+    const currentMaxLives = MAX_LIVES + shopRef.current.maxHeartsUpgrade;
     if (livesRef.current <= 1) return;
-    const wasFull = livesRef.current >= MAX_LIVES;
+    const wasFull = livesRef.current >= currentMaxLives;
     const nextLives = livesRef.current - 1;
     livesRef.current = nextLives;
     setLives(nextLives);
@@ -2044,7 +2390,8 @@ export default function App() {
       return;
     }
 
-    if (bagRef.current.hearts <= 0 || livesRef.current >= MAX_LIVES) return;
+    const currentMaxLives = MAX_LIVES + shopRef.current.maxHeartsUpgrade;
+    if (bagRef.current.hearts <= 0 || livesRef.current >= currentMaxLives) return;
     const nextBag: BagState = {
       ...bagRef.current,
       hearts: bagRef.current.hearts - 1,
@@ -2053,10 +2400,10 @@ export default function App() {
     setBag(nextBag);
     persistBagState(nextBag);
 
-    const nextLives = Math.min(MAX_LIVES, livesRef.current + 1);
+    const nextLives = Math.min(currentMaxLives, livesRef.current + 1);
     livesRef.current = nextLives;
     setLives(nextLives);
-    if (nextLives >= MAX_LIVES) {
+    if (nextLives >= currentMaxLives) {
       lastHeartRegenAtRef.current = 0;
       setNextHeartInMs(0);
     }
@@ -2126,6 +2473,7 @@ export default function App() {
       sim.shieldTimer = 0;
       sim.freezeTimer = 0;
       sim.slowTimer = 0;
+      sim.heavySlowTimer = 0;
       sim.speedBoostTimer = 0;
       sim.shakeTimer = 0;
       sim.hitFlashAlpha = 0;
@@ -2192,6 +2540,7 @@ export default function App() {
       sim.shieldTimer = 0;
       sim.freezeTimer = 0;
       sim.slowTimer = 0;
+      sim.heavySlowTimer = 0;
       sim.speedBoostTimer = 0;
       sim.shakeTimer = 0;
       sim.hitFlashAlpha = 0;
@@ -2256,6 +2605,7 @@ export default function App() {
     sim.shieldTimer = 0;
     sim.freezeTimer = 0;
     sim.slowTimer = 0;
+    sim.heavySlowTimer = 0;
     sim.speedBoostTimer = 0;
     sim.shakeTimer = 0;
     sim.hitFlashAlpha = 0;
@@ -2339,6 +2689,7 @@ export default function App() {
     sim.shieldTimer = 0;
     sim.freezeTimer = 0;
     sim.slowTimer = 0;
+    sim.heavySlowTimer = 0;
     sim.speedBoostTimer = 0;
     sim.spawnTimer = 0.28;
     sim.lastHazardX = -999;
@@ -2482,7 +2833,8 @@ export default function App() {
       if (!def) return;
 
       if (id === 'one_heart') {
-        if (livesRef.current < MAX_LIVES) {
+        const currentMaxLives = MAX_LIVES + shopRef.current.maxHeartsUpgrade;
+        if (livesRef.current < currentMaxLives) {
           buyLifeForMode('normal');
         } else {
           buyLifeToBag('normal');
@@ -2554,7 +2906,8 @@ export default function App() {
       }
 
       if (id === 'full_hearts') {
-        if (livesRef.current >= MAX_LIVES) return;
+        const currentMaxLives = MAX_LIVES + shopRef.current.maxHeartsUpgrade;
+        if (livesRef.current >= currentMaxLives) return;
         const nextCoins = coinsRef.current - def.price;
         coinsRef.current = nextCoins;
         setCoins(nextCoins);
@@ -2563,11 +2916,11 @@ export default function App() {
         } catch {
           // Ignore storage errors
         }
-        livesRef.current = MAX_LIVES;
+        livesRef.current = currentMaxLives;
         lastHeartRegenAtRef.current = 0;
-        setLives(MAX_LIVES);
+        setLives(currentMaxLives);
         setNextHeartInMs(0);
-        persistLivesState(MAX_LIVES, 0);
+        persistLivesState(currentMaxLives, 0);
         audioRef.current.playStageUp();
         return;
       }
@@ -2593,6 +2946,46 @@ export default function App() {
     },
     [buyLifeForMode, buyLifeToBag]
   );
+
+  const buyMaxHeartsUpgrade = useCallback(() => {
+    const cur = shopRef.current;
+    if (cur.maxHeartsUpgrade >= MAX_HEARTS_UPGRADE_LEVELS) return;
+    const cost = MAX_HEARTS_UPGRADE_COSTS[cur.maxHeartsUpgrade];
+    if (pinkCoinsRef.current < cost) return;
+
+    const nextPinkCoins = pinkCoinsRef.current - cost;
+    pinkCoinsRef.current = nextPinkCoins;
+    setPinkCoins(nextPinkCoins);
+    try {
+      window.localStorage.setItem(PINK_COINS_STORAGE_KEY, String(nextPinkCoins));
+    } catch {
+      // Ignore storage errors
+    }
+
+    const nextLevel = cur.maxHeartsUpgrade + 1;
+    const nextShop: ShopState = {
+      ...cur,
+      maxHeartsUpgrade: nextLevel,
+    };
+    shopRef.current = nextShop;
+    setShop(nextShop);
+    persistShopState(nextShop);
+
+    const newMaxLives = MAX_LIVES + nextLevel;
+    const nextLives = Math.min(newMaxLives, livesRef.current + 1);
+    livesRef.current = nextLives;
+    setLives(nextLives);
+    if (nextLives >= newMaxLives) {
+      lastHeartRegenAtRef.current = 0;
+      setNextHeartInMs(0);
+    } else if (lastHeartRegenAtRef.current === 0) {
+      const now = Date.now();
+      lastHeartRegenAtRef.current = now;
+      setNextHeartInMs(HEART_REGEN_MS);
+    }
+    persistLivesState(nextLives, lastHeartRegenAtRef.current);
+    audioRef.current.playStageUp();
+  }, []);
 
   const openStagesModal = useCallback(() => {
     if (stagesModalOpenRef.current) {
@@ -3446,72 +3839,106 @@ export default function App() {
       const cfg = STAGES[Math.min(stageNumRef.current - 1, TOTAL_STAGES - 1)];
 
       const isHazard = Math.random() < cfg.hazardChance;
+      const stage = stageNumRef.current;
       let kind: ItemKind;
       if (isHazard) {
-        const roll = Math.random();
-        const stage = stageNumRef.current;
-        const arrowPoolRatio =
-          stage >= 6
-            ? Math.min(0.42, cfg.arrowHazardRatio + 0.1)
-            : stage >= 3
-            ? Math.min(0.36, cfg.arrowHazardRatio + 0.06)
-            : cfg.arrowHazardRatio;
-        if (roll < arrowPoolRatio) {
-          if (stage >= 6) {
-            const subRoll = Math.random();
-            if (subRoll < 0.46) {
-              kind = 'hazard_arrow';
-            } else if (subRoll < 0.73) {
-              kind = 'hazard_arrow_amber';
-            } else {
-              kind = 'hazard_arrow_violet';
-            }
-          } else if (stage >= 3) {
-            kind = Math.random() < 0.6 ? 'hazard_arrow' : 'hazard_arrow_amber';
-          } else {
-            kind = 'hazard_arrow';
-          }
+        const unlockedBalancedMinus = BALANCED_MINUS_KINDS.filter(
+          (k) => stage >= BALANCED_MINUS_STATS[k].minStage
+        );
+        // Mix in the 5 balanced medium minus types smoothly (~30% of hazard spawns once unlocked)
+        if (unlockedBalancedMinus.length > 0 && Math.random() < 0.3) {
+          kind =
+            unlockedBalancedMinus[
+              Math.floor(Math.random() * unlockedBalancedMinus.length)
+            ];
+        } else if (
+          stage >= BLACK_SQUARE_MIN_STAGE &&
+          Math.random() < Math.min(0.18, 0.11 + (stage - BLACK_SQUARE_MIN_STAGE) * 0.002)
+        ) {
+          kind = 'hazard_black_square';
         } else {
-          const remRoll =
-            (roll - arrowPoolRatio) /
-            Math.max(0.01, 1 - arrowPoolRatio);
-          if (remRoll < cfg.starHazardRatio) {
-            kind = 'hazard_star';
-          } else if (
-            remRoll <
-            cfg.starHazardRatio +
-              (1 - cfg.starHazardRatio) * cfg.squareHazardRatio
-          ) {
-            kind = 'hazard_square';
+          const roll = Math.random();
+          const arrowPoolRatio =
+            stage >= 6
+              ? Math.min(0.42, cfg.arrowHazardRatio + 0.1)
+              : stage >= 3
+              ? Math.min(0.36, cfg.arrowHazardRatio + 0.06)
+              : cfg.arrowHazardRatio;
+          if (roll < arrowPoolRatio) {
+            if (stage >= 6) {
+              const subRoll = Math.random();
+              if (subRoll < 0.46) {
+                kind = 'hazard_arrow';
+              } else if (subRoll < 0.73) {
+                kind = 'hazard_arrow_amber';
+              } else {
+                kind = 'hazard_arrow_violet';
+              }
+            } else if (stage >= 3) {
+              kind = Math.random() < 0.6 ? 'hazard_arrow' : 'hazard_arrow_amber';
+            } else {
+              kind = 'hazard_arrow';
+            }
           } else {
-            kind = 'hazard_spike';
+            const remRoll =
+              (roll - arrowPoolRatio) /
+              Math.max(0.01, 1 - arrowPoolRatio);
+            if (remRoll < cfg.starHazardRatio) {
+              kind = 'hazard_star';
+            } else if (
+              remRoll <
+              cfg.starHazardRatio +
+                (1 - cfg.starHazardRatio) * cfg.squareHazardRatio
+            ) {
+              kind = 'hazard_square';
+            } else {
+              kind = 'hazard_spike';
+            }
           }
         }
       } else {
-        // Collectible types: Stage 1–19 (Green +2, Pink +3, Blue +4); Stage 20+ adds Purple Diamond (+5, 5%) & Golden Star (+7, 5%)
-        const roll = Math.random();
-        if (stageNumRef.current >= 20) {
-          if (roll < 0.15) {
-            kind = 'green_circle';
-          } else if (roll < 0.56) {
-            kind = 'pink_circle';
-          } else if (roll < 0.9) {
-            kind = 'blue_triangle';
-          } else if (roll < 0.95) {
-            kind = 'purple_diamond';
-          } else {
-            kind = 'gold_star';
-          }
-        } else if (roll < 0.17) {
-          kind = 'green_circle';
-        } else if (roll < 0.62) {
-          kind = 'pink_circle';
+        // Collectible types: +10 Royal Prism Gem (Stage 5+, 4.375% chance), classic points, and 5 balanced medium plus points
+        const unlockedBalancedPlus = BALANCED_PLUS_KINDS.filter(
+          (k) => stage >= BALANCED_PLUS_STATS[k].minStage
+        );
+        if (
+          stage >= ROYAL_NOVA_MIN_STAGE &&
+          Math.random() < ROYAL_NOVA_SPAWN_CHANCE
+        ) {
+          kind = 'royal_nova';
+        } else if (unlockedBalancedPlus.length > 0 && Math.random() < 0.34) {
+          kind =
+            unlockedBalancedPlus[
+              Math.floor(Math.random() * unlockedBalancedPlus.length)
+            ];
         } else {
-          kind = 'blue_triangle';
+          const roll = Math.random();
+          if (stage >= 20) {
+            if (roll < 0.15) {
+              kind = 'green_circle';
+            } else if (roll < 0.56) {
+              kind = 'pink_circle';
+            } else if (roll < 0.9) {
+              kind = 'blue_triangle';
+            } else if (roll < 0.95) {
+              kind = 'purple_diamond';
+            } else {
+              kind = 'gold_star';
+            }
+          } else if (roll < 0.17) {
+            kind = 'green_circle';
+          } else if (roll < 0.62) {
+            kind = 'pink_circle';
+          } else {
+            kind = 'blue_triangle';
+          }
         }
       }
 
-      const margin = Math.max(30, sim.playerWidth * 0.42);
+      const margin = Math.max(
+        kind === 'hazard_black_square' ? 48 : 30,
+        sim.playerWidth * 0.42
+      );
       const usableW = Math.max(80, sim.width - margin * 2);
 
       let spawnX = margin + Math.random() * usableW;
@@ -3532,36 +3959,47 @@ export default function App() {
         sim.lastHazardX = spawnX;
       }
 
-      const speedVariance =
-        kind === 'hazard_arrow'
-          ? ARROW_SPEED_MULTIPLIER
-          : kind === 'hazard_arrow_amber'
-          ? AMBER_ARROW_SPEED_MULTIPLIER
-          : kind === 'hazard_arrow_violet'
-          ? VIOLET_ARROW_SPEED_MULTIPLIER
-          : kind === 'hazard_square'
-          ? 0.96 + Math.random() * 0.3
-          : kind === 'hazard_star'
-          ? 0.88 + Math.random() * 0.28
-          : kind === 'hazard_spike'
-          ? 0.9 + Math.random() * 0.34
-          : kind === 'gold_star'
-          ? 1.04 + Math.random() * 0.3
-          : kind === 'purple_diamond'
-          ? 0.96 + Math.random() * 0.32
-          : kind === 'green_circle'
-          ? 0.9 + Math.random() * 0.3
-          : kind === 'blue_triangle'
-          ? 0.92 + Math.random() * 0.34
-          : 0.84 + Math.random() * 0.36;
+      const speedVariance = isBalancedPlusKind(kind)
+        ? BALANCED_PLUS_STATS[kind].speedMul + Math.random() * 0.24
+        : isBalancedMinusKind(kind)
+        ? BALANCED_MINUS_STATS[kind].speedMul + Math.random() * 0.22
+        : kind === 'hazard_arrow'
+        ? ARROW_SPEED_MULTIPLIER
+        : kind === 'hazard_arrow_amber'
+        ? AMBER_ARROW_SPEED_MULTIPLIER
+        : kind === 'hazard_arrow_violet'
+        ? VIOLET_ARROW_SPEED_MULTIPLIER
+        : kind === 'hazard_black_square'
+        ? 0.78 + Math.random() * 0.22
+        : kind === 'hazard_square'
+        ? 0.96 + Math.random() * 0.3
+        : kind === 'hazard_star'
+        ? 0.88 + Math.random() * 0.28
+        : kind === 'hazard_spike'
+        ? 0.9 + Math.random() * 0.34
+        : kind === 'royal_nova'
+        ? 1.06 + Math.random() * 0.24
+        : kind === 'gold_star'
+        ? 1.04 + Math.random() * 0.3
+        : kind === 'purple_diamond'
+        ? 0.96 + Math.random() * 0.32
+        : kind === 'green_circle'
+        ? 0.9 + Math.random() * 0.3
+        : kind === 'blue_triangle'
+        ? 0.92 + Math.random() * 0.34
+        : 0.84 + Math.random() * 0.36;
 
       const heightFactor = Math.max(0.82, Math.min(1.22, sim.height / 540));
       const speed = cfg.baseSpeed * speedVariance * heightFactor;
 
       const radius =
-        kind === 'hazard_arrow' ||
-        kind === 'hazard_arrow_amber' ||
-        kind === 'hazard_arrow_violet'
+        kind === 'hazard_black_square'
+          ? Math.max(32, Math.min(40, sim.width * 0.05))
+          : kind === 'royal_nova'
+          ? Math.max(16, Math.min(20, sim.width * 0.025))
+          : kind === 'hazard_arrow' ||
+            kind === 'hazard_arrow_amber' ||
+            kind === 'hazard_arrow_violet'
           ? Math.max(12, Math.min(15, sim.width * 0.02))
           : kind === 'hazard_square' || kind === 'hazard_star'
           ? Math.max(16, Math.min(20, sim.width * 0.025))
@@ -3572,7 +4010,7 @@ export default function App() {
       const driftRange =
         kind === 'hazard_arrow'
           ? 0
-          : kind === 'hazard_arrow_violet'
+          : kind === 'hazard_arrow_violet' || kind === 'minus_teal_bolt'
           ? cfg.lateralDrift * 0.35
           : isHazard
           ? cfg.lateralDrift
@@ -3594,14 +4032,16 @@ export default function App() {
         vx: amberSlantVx,
         rotation: 0,
         rotSpeed:
-          kind === 'hazard_spike'
+          kind === 'hazard_spike' || kind === 'minus_slate_cross'
             ? (Math.random() > 0.5 ? 1 : -1) * 2.4
             : kind === 'green_circle'
             ? (Math.random() > 0.5 ? 1 : -1) * 2.2
-            : kind === 'gold_star'
+            : kind === 'royal_nova'
             ? (Math.random() > 0.5 ? 1 : -1) * 1.9
-            : kind === 'hazard_star'
-            ? (Math.random() > 0.5 ? 1 : -1) * 1.4
+            : kind === 'gold_star' || kind === 'indigo_octagon'
+            ? (Math.random() > 0.5 ? 1 : -1) * 1.6
+            : kind === 'hazard_star' || kind === 'cyan_hex' || kind === 'minus_crimson_hex'
+            ? (Math.random() > 0.5 ? 1 : -1) * 1.2
             : 0,
         pulsePhase: Math.random() * Math.PI * 2,
       });
@@ -3683,12 +4123,20 @@ export default function App() {
       if (sim.slowTimer > 0) {
         sim.slowTimer = Math.max(0, sim.slowTimer - dt);
       }
+      if (sim.heavySlowTimer > 0) {
+        sim.heavySlowTimer = Math.max(0, sim.heavySlowTimer - dt);
+      }
 
       // Smooth player horizontal movement (locked in place while frozen by Red Freeze Star)
       const halfW = sim.playerWidth / 2;
       const minX = halfW + 10;
       const maxX = sim.width - halfW - 10;
-      const slowMul = sim.slowTimer > 0 ? VIOLET_ARROW_SLOW_FACTOR : 1;
+      const slowMul =
+        sim.heavySlowTimer > 0
+          ? BLACK_SQUARE_SLOW_FACTOR
+          : sim.slowTimer > 0
+          ? VIOLET_ARROW_SLOW_FACTOR
+          : 1;
       const maxSpeed =
         Math.max(580, sim.width * 1.02) *
         (gameSpeedMul > 1 ? SPEED_BOOST_PLAYER_SLOW : 1) *
@@ -3792,11 +4240,7 @@ export default function App() {
           ? FRUIT_ITEM_STATS[item.kind as FruitItemKind]?.isFruit ?? false
           : isGoldWorld
           ? GOLD_ITEM_STATS[item.kind as GoldItemKind]?.isTreasure ?? false
-          : item.kind === 'pink_circle' ||
-            item.kind === 'blue_triangle' ||
-            item.kind === 'green_circle' ||
-            item.kind === 'purple_diamond' ||
-            item.kind === 'gold_star';
+          : isPositiveNormalKind(item.kind);
 
         if (item.y - item.radius > sim.height + 24) {
           if (isPoint) {
@@ -4325,7 +4769,15 @@ export default function App() {
             const isTriangle = item.kind === 'blue_triangle';
             const isPurple = item.kind === 'purple_diamond';
             const isGoldStar = item.kind === 'gold_star';
-            const value = isGoldStar
+            const isRoyalNova = item.kind === 'royal_nova';
+            const balancedPlus = isBalancedPlusKind(item.kind)
+              ? BALANCED_PLUS_STATS[item.kind]
+              : null;
+            const value = balancedPlus
+              ? balancedPlus.points
+              : isRoyalNova
+              ? ROYAL_NOVA_POINTS
+              : isGoldStar
               ? GOLD_STAR_POINTS
               : isPurple
               ? PURPLE_DIAMOND_POINTS
@@ -4334,7 +4786,11 @@ export default function App() {
               : isTriangle
               ? BLUE_TRIANGLE_POINTS
               : PINK_CIRCLE_POINTS;
-            const color = isGoldStar
+            const color = balancedPlus
+              ? balancedPlus.color
+              : isRoyalNova
+              ? '#e879f9'
+              : isGoldStar
               ? '#fbbf24'
               : isPurple
               ? '#c084fc'
@@ -4343,7 +4799,11 @@ export default function App() {
               : isTriangle
               ? '#38bdf8'
               : '#f472b6';
-            const textColor = isGoldStar
+            const textColor = balancedPlus
+              ? balancedPlus.textColor
+              : isRoyalNova
+              ? '#fdf4ff'
+              : isGoldStar
               ? '#fef08a'
               : isPurple
               ? '#f3e8ff'
@@ -4378,25 +4838,47 @@ export default function App() {
             if (isGreen) {
               sim.speedBoostTimer = SPEED_BOOST_DURATION;
             }
+            const clearedSlow = Boolean(
+              balancedPlus?.clearsSlow && (sim.slowTimer > 0 || sim.heavySlowTimer > 0)
+            );
+            if (balancedPlus?.clearsSlow) {
+              sim.slowTimer = 0;
+              sim.heavySlowTimer = 0;
+            }
 
             sim.playerBounce = 1;
             sim.playerGlowColor = color;
             sim.playerGlowAlpha = 1;
 
-            spawnBurst(item.x, item.y, color, isGreen ? 18 : 14, isGreen ? 1.2 : 1);
-            spawnBurst(item.x, item.y, '#ffffff', 5, 0.7);
+            spawnBurst(
+              item.x,
+              item.y,
+              color,
+              isRoyalNova ? 24 : isGreen ? 18 : 14,
+              isRoyalNova ? 1.35 : isGreen ? 1.2 : 1
+            );
+            if (isRoyalNova) {
+              spawnBurst(item.x, item.y, '#fde047', 12, 1.05);
+            }
+            spawnBurst(item.x, item.y, '#ffffff', isRoyalNova ? 8 : 5, 0.75);
             sim.floatingTexts.push({
               x: item.x,
               y: item.y - 10,
               vy: -56,
-              text: isGreen
+              text: isRoyalNova
+                ? `✦ +${value}`
+                : isGreen
                 ? langRef.current === 'ar'
                   ? `⚡ سرعة ×2 · مشية -50% · +${value}`
                   : `⚡ 2x World · -50% Move · +${value}`
+                : clearedSlow
+                ? langRef.current === 'ar'
+                  ? `✦ بلا تبطيء · +${value}`
+                  : `✦ Slow Cleared · +${value}`
                 : `+${value}`,
               color: textColor,
-              life: isGreen ? 0.95 : 0.65,
-              maxLife: isGreen ? 0.95 : 0.65,
+              life: isRoyalNova || isGreen || clearedSlow ? 1.0 : 0.65,
+              maxLife: isRoyalNova || isGreen || clearedSlow ? 1.0 : 0.65,
             });
             tryAwardPinkCoins(item.x, item.y);
 
@@ -4441,6 +4923,7 @@ export default function App() {
               }
 
               sim.slowTimer = 0;
+              sim.heavySlowTimer = 0;
               sim.speedBoostTimer = 0;
               sim.input.pointerActive = false;
               sim.input.pointerId = null;
@@ -4559,6 +5042,7 @@ export default function App() {
 
               sim.freezeTimer = 0;
               sim.slowTimer = 0;
+              sim.heavySlowTimer = 0;
               sim.speedBoostTimer = 0;
               sim.input.pointerActive = false;
               sim.input.pointerId = null;
@@ -4691,12 +5175,75 @@ export default function App() {
               maxLife: 0.92,
             });
             audioRef.current.playHazardHit(false);
-          } else {
-            // Red hazard hit: spike = -1 life, red square = -2 lives
-            const isHeavySquare = item.kind === 'hazard_square';
-            const damage = isHeavySquare ? 2 : 1;
+          } else if (isBalancedMinusKind(item.kind)) {
+            // Balanced medium minus points: shield blocks cleanly; otherwise deduct 3–5 points without losing hearts
+            if (sim.shieldTimer > 0) {
+              sim.playerGlowColor = '#38bdf8';
+              sim.playerGlowAlpha = 0.85;
+              spawnBurst(item.x, item.y, '#7dd3fc', 14, 1.0);
+              sim.floatingTexts.push({
+                x: item.x,
+                y: item.y - 12,
+                vy: -50,
+                text: langRef.current === 'ar' ? 'محمي!' : 'Shielded!',
+                color: '#bae6fd',
+                life: 0.72,
+                maxLife: 0.72,
+              });
+              audioRef.current.playBuyHeart();
+              continue;
+            }
+            const mStats = BALANCED_MINUS_STATS[item.kind];
+            const nextScore = Math.max(0, scoreRef.current - mStats.penalty);
+            scoreRef.current = nextScore;
+            setScore(nextScore);
 
-            // Active 2-second shield barrier blocks all red hazards cleanly without losing hearts
+            const nextStagePoints = Math.max(
+              0,
+              stagePointsRef.current - mStats.penalty
+            );
+            stagePointsRef.current = nextStagePoints;
+            setStagePoints(nextStagePoints);
+
+            streakRef.current = 0;
+            if (mStats.slowDuration) {
+              sim.slowTimer = Math.max(sim.slowTimer, mStats.slowDuration);
+            }
+            sim.playerBounce = 0.55;
+            sim.playerGlowColor = mStats.color;
+            sim.playerGlowAlpha = 0.88;
+            sim.shakeTimer = 0.15;
+            sim.shakeIntensity = 4;
+
+            spawnBurst(item.x, item.y, mStats.color, 14, 0.95);
+            spawnBurst(item.x, item.y, mStats.highlight, 6, 0.7);
+            sim.floatingTexts.push({
+              x: item.x,
+              y: item.y - 12,
+              vy: -50,
+              text: mStats.slowDuration
+                ? langRef.current === 'ar'
+                  ? `تبطيء ${mStats.slowDuration}ث · -${mStats.penalty}`
+                  : `Slow ${mStats.slowDuration}s · -${mStats.penalty}`
+                : langRef.current === 'ar'
+                ? `-${mStats.penalty} نقاط`
+                : `-${mStats.penalty} pts`,
+              color: mStats.textColor,
+              life: 0.88,
+              maxLife: 0.88,
+            });
+            audioRef.current.playHazardHit(false);
+          } else {
+            // Red/Black hazard hit: spike/arrow = -1 life, red square = -2 lives, giant black square = -3 lives & -4 pts & -250% slow
+            const isGiantBlackSquare = item.kind === 'hazard_black_square';
+            const isHeavySquare = item.kind === 'hazard_square';
+            const damage = isGiantBlackSquare
+              ? BLACK_SQUARE_LIVES_DAMAGE
+              : isHeavySquare
+              ? 2
+              : 1;
+
+            // Active 2-second shield barrier blocks all heavy hazards cleanly without losing hearts
             if (sim.shieldTimer > 0) {
               sim.playerGlowColor = '#38bdf8';
               sim.playerGlowAlpha = 0.9;
@@ -4749,44 +5296,71 @@ export default function App() {
               livesRef.current = nextLives;
               streakRef.current = 0;
               setLives(nextLives);
-              if (prevLives >= MAX_LIVES && nextLives < MAX_LIVES) {
+              const currentMaxLives = MAX_LIVES + shopRef.current.maxHeartsUpgrade;
+              if (prevLives >= currentMaxLives && nextLives < currentMaxLives) {
                 lastHeartRegenAtRef.current = Date.now();
                 setNextHeartInMs(HEART_REGEN_MS);
               }
               persistLivesState(nextLives, lastHeartRegenAtRef.current);
 
-              sim.shakeTimer = isHeavySquare ? 0.32 : 0.24;
-              sim.shakeIntensity = isHeavySquare ? 10 : 7;
-              sim.hitFlashAlpha = isHeavySquare ? 0.44 : 0.32;
+              if (isGiantBlackSquare) {
+                const nextScore = Math.max(0, scoreRef.current - BLACK_SQUARE_POINT_PENALTY);
+                scoreRef.current = nextScore;
+                setScore(nextScore);
+
+                const nextStagePoints = Math.max(
+                  0,
+                  stagePointsRef.current - BLACK_SQUARE_POINT_PENALTY
+                );
+                stagePointsRef.current = nextStagePoints;
+                setStagePoints(nextStagePoints);
+
+                sim.heavySlowTimer = BLACK_SQUARE_SLOW_DURATION;
+              }
+
+              sim.shakeTimer = isGiantBlackSquare ? 0.42 : isHeavySquare ? 0.32 : 0.24;
+              sim.shakeIntensity = isGiantBlackSquare ? 13 : isHeavySquare ? 10 : 7;
+              sim.hitFlashAlpha = isGiantBlackSquare ? 0.54 : isHeavySquare ? 0.44 : 0.32;
               sim.invulnTimer = 0.75;
 
               spawnBurst(
                 item.x,
                 item.y,
-                isHeavySquare ? '#dc2626' : '#ef4444',
-                isHeavySquare ? 24 : 18,
-                isHeavySquare ? 1.35 : 1.15
+                isGiantBlackSquare ? '#18181b' : isHeavySquare ? '#dc2626' : '#ef4444',
+                isGiantBlackSquare ? 30 : isHeavySquare ? 24 : 18,
+                isGiantBlackSquare ? 1.55 : isHeavySquare ? 1.35 : 1.15
               );
-              spawnBurst(item.x, item.y, '#fca5a5', 8, 0.85);
+              spawnBurst(
+                item.x,
+                item.y,
+                isGiantBlackSquare ? '#f87171' : '#fca5a5',
+                isGiantBlackSquare ? 14 : 8,
+                isGiantBlackSquare ? 1.1 : 0.85
+              );
               sim.floatingTexts.push({
                 x: item.x,
                 y: item.y - 12,
                 vy: -50,
-                text: `-${damage}`,
-                color: '#fecaca',
-                life: 0.82,
-                maxLife: 0.82,
+                text: isGiantBlackSquare
+                  ? langRef.current === 'ar'
+                    ? `-3 أرواح · -4 نقاط · تبطيء 250%`
+                    : `-3 Lives · -4 pts · -250% Slow`
+                  : `-${damage}`,
+                color: isGiantBlackSquare ? '#fca5a5' : '#fecaca',
+                life: isGiantBlackSquare ? 1.15 : 0.82,
+                maxLife: isGiantBlackSquare ? 1.15 : 0.82,
               });
 
               if (nextLives <= 0) {
                 sim.slowTimer = 0;
+                sim.heavySlowTimer = 0;
                 sim.speedBoostTimer = 0;
                 statusRef.current = 'GAME_OVER';
                 setStatus('GAME_OVER');
                 audioRef.current.playGameOver();
                 break;
               } else {
-                audioRef.current.playHazardHit(isHeavySquare);
+                audioRef.current.playHazardHit(isHeavySquare || isGiantBlackSquare);
               }
             }
           }
@@ -5281,6 +5855,340 @@ export default function App() {
       ctx.restore();
     };
 
+    const drawRoyalNova = (item: FallingItem) => {
+      const r = item.radius * 1.12;
+      const pulse = 1 + Math.sin(item.pulsePhase * 2.1) * 0.08;
+
+      ctx.save();
+      ctx.translate(item.x, item.y);
+      ctx.scale(pulse, pulse);
+
+      // Prismatic royal aura
+      const aura = ctx.createRadialGradient(0, 0, r * 0.2, 0, 0, r * 2.15);
+      aura.addColorStop(0, 'rgba(245, 208, 254, 0.85)');
+      aura.addColorStop(0.42, 'rgba(232, 121, 249, 0.45)');
+      aura.addColorStop(0.75, 'rgba(56, 189, 248, 0.22)');
+      aura.addColorStop(1, 'rgba(232, 121, 249, 0)');
+      ctx.fillStyle = aura;
+      ctx.beginPath();
+      ctx.arc(0, 0, r * 2.15, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Orbiting celestial ring
+      ctx.save();
+      ctx.rotate(-item.rotation * 0.85);
+      ctx.strokeStyle = 'rgba(253, 224, 71, 0.65)';
+      ctx.lineWidth = 1.3;
+      ctx.setLineDash([4, 4]);
+      ctx.beginPath();
+      ctx.arc(0, 0, r * 1.32, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.restore();
+
+      // 8-pointed radiant prism star
+      ctx.save();
+      ctx.rotate(item.rotation);
+      const spikes = 8;
+      const outerR = r * 1.24;
+      const innerR = r * 0.68;
+      const verts: { x: number; y: number }[] = [];
+      for (let i = 0; i < spikes * 2; i++) {
+        const rad = i % 2 === 0 ? outerR : innerR;
+        const ang = (i * Math.PI) / spikes - Math.PI / 2;
+        verts.push({ x: Math.cos(ang) * rad, y: Math.sin(ang) * rad });
+      }
+
+      for (let i = 0; i < verts.length; i++) {
+        const curr = verts[i];
+        const next = verts[(i + 1) % verts.length];
+        const grad = ctx.createLinearGradient(0, 0, curr.x, curr.y);
+        if (i % 4 === 0) {
+          grad.addColorStop(0, '#ffffff');
+          grad.addColorStop(0.45, '#f0abfc');
+          grad.addColorStop(1, '#c026d3');
+        } else if (i % 4 === 1) {
+          grad.addColorStop(0, '#fef08a');
+          grad.addColorStop(0.5, '#e879f9');
+          grad.addColorStop(1, '#7e22ce');
+        } else if (i % 4 === 2) {
+          grad.addColorStop(0, '#e0f2fe');
+          grad.addColorStop(0.5, '#38bdf8');
+          grad.addColorStop(1, '#6d28d9');
+        } else {
+          grad.addColorStop(0, '#fbcfe8');
+          grad.addColorStop(0.5, '#d946ef');
+          grad.addColorStop(1, '#581c87');
+        }
+        ctx.beginPath();
+        ctx.moveTo(0, 0);
+        ctx.lineTo(curr.x, curr.y);
+        ctx.lineTo(next.x, next.y);
+        ctx.closePath();
+        ctx.fillStyle = grad;
+        ctx.fill();
+      }
+
+      ctx.beginPath();
+      verts.forEach((v, idx) => {
+        if (idx === 0) ctx.moveTo(v.x, v.y);
+        else ctx.lineTo(v.x, v.y);
+      });
+      ctx.closePath();
+      ctx.strokeStyle = '#fdf4ff';
+      ctx.lineWidth = 1.65;
+      ctx.lineJoin = 'round';
+      ctx.stroke();
+
+      // Inner crystal core
+      ctx.beginPath();
+      ctx.arc(0, 0, r * 0.62, 0, Math.PI * 2);
+      ctx.fillStyle = 'rgba(88, 28, 135, 0.72)';
+      ctx.fill();
+      ctx.strokeStyle = 'rgba(253, 224, 71, 0.8)';
+      ctx.lineWidth = 1.1;
+      ctx.stroke();
+      ctx.restore();
+
+      ctx.font = `900 ${Math.round(r * 0.72)}px "Segoe UI", system-ui, sans-serif`;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillStyle = 'rgba(59, 7, 100, 0.95)';
+      ctx.fillText('10', 1, 2);
+      ctx.fillStyle = '#ffffff';
+      ctx.fillText('10', 0, 1);
+
+      ctx.restore();
+    };
+
+    const drawRegularPoly = (sides: number, rad: number, offsetAng = -Math.PI / 2) => {
+      ctx.beginPath();
+      for (let i = 0; i < sides; i++) {
+        const ang = offsetAng + (i * Math.PI * 2) / sides;
+        const px = Math.cos(ang) * rad;
+        const py = Math.sin(ang) * rad;
+        if (i === 0) ctx.moveTo(px, py);
+        else ctx.lineTo(px, py);
+      }
+      ctx.closePath();
+    };
+
+    const drawBalancedPlusItem = (item: FallingItem) => {
+      if (!isBalancedPlusKind(item.kind)) return;
+      const spec = BALANCED_PLUS_STATS[item.kind];
+      const r = item.radius * 1.08;
+      const pulse = 1 + Math.sin(item.pulsePhase * 1.3) * 0.055;
+
+      ctx.save();
+      ctx.translate(item.x, item.y);
+      ctx.scale(pulse, pulse);
+
+      // Soft radiant aura
+      const aura = ctx.createRadialGradient(0, 0, r * 0.2, 0, 0, r * 1.75);
+      aura.addColorStop(0, `${spec.color}88`);
+      aura.addColorStop(0.6, `${spec.color}28`);
+      aura.addColorStop(1, `${spec.color}00`);
+      ctx.fillStyle = aura;
+      ctx.beginPath();
+      ctx.arc(0, 0, r * 1.75, 0, Math.PI * 2);
+      ctx.fill();
+
+      const bodyGrad = ctx.createLinearGradient(-r, -r, r, r);
+      bodyGrad.addColorStop(0, spec.highlight);
+      bodyGrad.addColorStop(0.42, spec.color);
+      bodyGrad.addColorStop(1, spec.shade);
+
+      ctx.save();
+      ctx.rotate(item.rotation);
+      if (item.kind === 'cyan_hex') {
+        drawRegularPoly(6, r * 1.06, Math.PI / 6);
+        ctx.fillStyle = bodyGrad;
+        ctx.fill();
+        ctx.strokeStyle = spec.stroke;
+        ctx.lineWidth = 1.8;
+        ctx.stroke();
+      } else if (item.kind === 'coral_pentagon') {
+        drawRegularPoly(5, r * 1.1, -Math.PI / 2);
+        ctx.fillStyle = bodyGrad;
+        ctx.fill();
+        ctx.strokeStyle = spec.stroke;
+        ctx.lineWidth = 1.8;
+        ctx.stroke();
+      } else if (item.kind === 'lime_orb') {
+        ctx.beginPath();
+        ctx.arc(0, 0, r * 1.02, 0, Math.PI * 2);
+        ctx.fillStyle = bodyGrad;
+        ctx.fill();
+        ctx.strokeStyle = spec.stroke;
+        ctx.lineWidth = 1.8;
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.arc(0, 0, r * 0.66, 0, Math.PI * 2);
+        ctx.strokeStyle = 'rgba(255,255,255,0.65)';
+        ctx.lineWidth = 1.4;
+        ctx.stroke();
+      } else if (item.kind === 'indigo_octagon') {
+        drawRegularPoly(8, r * 1.06, Math.PI / 8);
+        ctx.fillStyle = bodyGrad;
+        ctx.fill();
+        ctx.strokeStyle = spec.stroke;
+        ctx.lineWidth = 1.8;
+        ctx.stroke();
+      } else {
+        // amber_crescent: warm golden crescent moon badge
+        ctx.beginPath();
+        ctx.arc(0, 0, r * 1.04, 0, Math.PI * 2);
+        ctx.fillStyle = '#451a03';
+        ctx.fill();
+        ctx.strokeStyle = spec.stroke;
+        ctx.lineWidth = 1.6;
+        ctx.stroke();
+
+        ctx.beginPath();
+        ctx.arc(0, 0, r * 0.84, 0.35 * Math.PI, 1.85 * Math.PI);
+        ctx.arc(r * 0.28, -r * 0.12, r * 0.62, 1.75 * Math.PI, 0.45 * Math.PI, true);
+        ctx.closePath();
+        ctx.fillStyle = bodyGrad;
+        ctx.fill();
+      }
+      ctx.restore();
+
+      // Embossed numeric value
+      ctx.font = `800 ${Math.round(r * 0.82)}px "Segoe UI", system-ui, sans-serif`;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillStyle = 'rgba(15, 23, 42, 0.85)';
+      ctx.fillText(`+${spec.points}`, 1, 2);
+      ctx.fillStyle = '#ffffff';
+      ctx.fillText(`+${spec.points}`, 0, 1);
+
+      ctx.restore();
+    };
+
+    const drawBalancedMinusItem = (item: FallingItem) => {
+      if (!isBalancedMinusKind(item.kind)) return;
+      const spec = BALANCED_MINUS_STATS[item.kind];
+      const r = item.radius * 1.06;
+      const pulse = 1 + Math.sin(item.pulsePhase * 1.5) * 0.06;
+
+      ctx.save();
+      ctx.translate(item.x, item.y);
+      ctx.scale(pulse, pulse);
+
+      const aura = ctx.createRadialGradient(0, 0, r * 0.2, 0, 0, r * 1.65);
+      aura.addColorStop(0, `${spec.color}7a`);
+      aura.addColorStop(1, `${spec.color}00`);
+      ctx.fillStyle = aura;
+      ctx.beginPath();
+      ctx.arc(0, 0, r * 1.65, 0, Math.PI * 2);
+      ctx.fill();
+
+      const bodyGrad = ctx.createLinearGradient(-r, -r, r, r);
+      bodyGrad.addColorStop(0, spec.highlight);
+      bodyGrad.addColorStop(0.42, spec.color);
+      bodyGrad.addColorStop(1, spec.shade);
+
+      ctx.save();
+      ctx.rotate(item.rotation);
+      if (item.kind === 'minus_crimson_hex') {
+        drawRegularPoly(6, r * 1.06, 0);
+        ctx.fillStyle = bodyGrad;
+        ctx.fill();
+        ctx.strokeStyle = spec.stroke;
+        ctx.lineWidth = 1.7;
+        ctx.stroke();
+      } else if (item.kind === 'minus_rust_diamond') {
+        ctx.beginPath();
+        ctx.moveTo(0, -r * 1.12);
+        ctx.lineTo(r * 0.95, 0);
+        ctx.lineTo(0, r * 1.12);
+        ctx.lineTo(-r * 0.95, 0);
+        ctx.closePath();
+        ctx.fillStyle = bodyGrad;
+        ctx.fill();
+        ctx.strokeStyle = spec.stroke;
+        ctx.lineWidth = 1.7;
+        ctx.stroke();
+      } else if (item.kind === 'minus_slate_cross') {
+        // 6-tooth rotating steel gear
+        const teeth = 6;
+        const outerR = r * 1.1;
+        const innerR = r * 0.78;
+        ctx.beginPath();
+        for (let i = 0; i < teeth; i++) {
+          const base = (i * Math.PI * 2) / teeth;
+          const step = (Math.PI * 2) / teeth;
+          const a0 = base;
+          const a1 = base + step * 0.22;
+          const a2 = base + step * 0.56;
+          const a3 = base + step * 0.78;
+          if (i === 0) ctx.moveTo(Math.cos(a0) * innerR, Math.sin(a0) * innerR);
+          else ctx.lineTo(Math.cos(a0) * innerR, Math.sin(a0) * innerR);
+          ctx.lineTo(Math.cos(a1) * outerR, Math.sin(a1) * outerR);
+          ctx.lineTo(Math.cos(a2) * outerR, Math.sin(a2) * outerR);
+          ctx.lineTo(Math.cos(a3) * innerR, Math.sin(a3) * innerR);
+        }
+        ctx.closePath();
+        ctx.fillStyle = bodyGrad;
+        ctx.fill();
+        ctx.strokeStyle = spec.stroke;
+        ctx.lineWidth = 1.5;
+        ctx.lineJoin = 'round';
+        ctx.stroke();
+
+        ctx.beginPath();
+        ctx.arc(0, 0, r * 0.45, 0, Math.PI * 2);
+        ctx.fillStyle = '#1e293b';
+        ctx.fill();
+        ctx.strokeStyle = 'rgba(226, 232, 240, 0.7)';
+        ctx.lineWidth = 1.2;
+        ctx.stroke();
+      } else if (item.kind === 'minus_teal_bolt') {
+        ctx.beginPath();
+        ctx.moveTo(r * 0.15, -r * 1.18);
+        ctx.lineTo(r * 0.78, -r * 0.15);
+        ctx.lineTo(r * 0.22, -r * 0.12);
+        ctx.lineTo(r * 0.46, r * 1.18);
+        ctx.lineTo(-r * 0.75, r * 0.12);
+        ctx.lineTo(-r * 0.18, r * 0.08);
+        ctx.closePath();
+        ctx.fillStyle = bodyGrad;
+        ctx.fill();
+        ctx.strokeStyle = spec.stroke;
+        ctx.lineWidth = 1.6;
+        ctx.lineJoin = 'round';
+        ctx.stroke();
+      } else {
+        // minus_plum_ring: hollow heavy plum ring with inner dark core
+        ctx.beginPath();
+        ctx.arc(0, 0, r * 1.06, 0, Math.PI * 2);
+        ctx.fillStyle = bodyGrad;
+        ctx.fill();
+        ctx.strokeStyle = spec.stroke;
+        ctx.lineWidth = 1.8;
+        ctx.stroke();
+
+        ctx.beginPath();
+        ctx.arc(0, 0, r * 0.56, 0, Math.PI * 2);
+        ctx.fillStyle = '#2e1065';
+        ctx.fill();
+        ctx.strokeStyle = 'rgba(245, 208, 254, 0.75)';
+        ctx.lineWidth = 1.2;
+        ctx.stroke();
+      }
+      ctx.restore();
+
+      ctx.font = `800 ${Math.round(r * 0.78)}px "Segoe UI", system-ui, sans-serif`;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillStyle = 'rgba(15, 23, 42, 0.9)';
+      ctx.fillText(`-${spec.penalty}`, 1, 2);
+      ctx.fillStyle = '#ffffff';
+      ctx.fillText(`-${spec.penalty}`, 0, 1);
+
+      ctx.restore();
+    };
+
     const drawHazardSpike = (item: FallingItem) => {
       const r = item.radius * 1.04;
       const pulse = 1 + Math.sin(item.pulsePhase * 1.4) * 0.07;
@@ -5461,6 +6369,115 @@ export default function App() {
       ctx.fillText('-2', 1, 2.2);
       ctx.fillStyle = '#ffffff';
       ctx.fillText('-2', 0, 1);
+
+      ctx.restore();
+    };
+
+    const drawHazardBlackSquare = (item: FallingItem) => {
+      const r = item.radius;
+      const size = r * 1.96;
+      const half = size / 2;
+      const bevel = size * 0.16;
+      const pulse = 1 + Math.sin(item.pulsePhase * 1.3) * 0.04;
+
+      ctx.save();
+      ctx.translate(item.x, item.y);
+
+      // Menacing dark obsidian + subtle crimson danger aura so the black cube stands out cleanly
+      const aura = ctx.createRadialGradient(0, 0, r * 0.35, 0, 0, r * 1.75);
+      aura.addColorStop(0, 'rgba(239, 68, 68, 0.34)');
+      aura.addColorStop(0.58, 'rgba(15, 23, 42, 0.45)');
+      aura.addColorStop(1, 'rgba(0, 0, 0, 0)');
+      ctx.fillStyle = aura;
+      ctx.beginPath();
+      ctx.arc(0, 0, r * 1.75, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.scale(pulse, pulse);
+
+      // Heavy 3D drop shadow behind giant black block
+      drawRoundedRectPath(ctx, -half + 5, -half + 7, size, size, 6);
+      ctx.fillStyle = 'rgba(0, 0, 0, 0.72)';
+      ctx.fill();
+
+      // Top bevel (charcoal metallic highlight)
+      ctx.beginPath();
+      ctx.moveTo(-half, -half);
+      ctx.lineTo(half, -half);
+      ctx.lineTo(half - bevel, -half + bevel);
+      ctx.lineTo(-half + bevel, -half + bevel);
+      ctx.closePath();
+      ctx.fillStyle = '#3f3f46';
+      ctx.fill();
+
+      // Left bevel (dark graphite)
+      ctx.beginPath();
+      ctx.moveTo(-half, -half);
+      ctx.lineTo(-half + bevel, -half + bevel);
+      ctx.lineTo(-half + bevel, half - bevel);
+      ctx.lineTo(-half, half);
+      ctx.closePath();
+      ctx.fillStyle = '#27272a';
+      ctx.fill();
+
+      // Right bevel (obsidian shadow)
+      ctx.beginPath();
+      ctx.moveTo(half, -half);
+      ctx.lineTo(half, half);
+      ctx.lineTo(half - bevel, half - bevel);
+      ctx.lineTo(half - bevel, -half + bevel);
+      ctx.closePath();
+      ctx.fillStyle = '#09090b';
+      ctx.fill();
+
+      // Bottom bevel (pure pitch black)
+      ctx.beginPath();
+      ctx.moveTo(-half, half);
+      ctx.lineTo(-half + bevel, half - bevel);
+      ctx.lineTo(half - bevel, half - bevel);
+      ctx.lineTo(half, half);
+      ctx.closePath();
+      ctx.fillStyle = '#000000';
+      ctx.fill();
+
+      // Raised jet-black center face with subtle metallic sheen
+      const innerSize = size - bevel * 2;
+      const faceGrad = ctx.createLinearGradient(
+        -innerSize / 2,
+        -innerSize / 2,
+        innerSize / 2,
+        innerSize / 2
+      );
+      faceGrad.addColorStop(0, '#18181b');
+      faceGrad.addColorStop(0.55, '#09090b');
+      faceGrad.addColorStop(1, '#000000');
+      ctx.fillStyle = faceGrad;
+      ctx.fillRect(-innerSize / 2, -innerSize / 2, innerSize, innerSize);
+
+      // Sharp outer warning rim (silver-crimson glow so it never disappears on dark bg)
+      drawRoundedRectPath(ctx, -half, -half, size, size, 5);
+      ctx.strokeStyle = 'rgba(248, 113, 113, 0.85)';
+      ctx.lineWidth = 2.4;
+      ctx.stroke();
+
+      // Subtle inner metallic rim
+      drawRoundedRectPath(ctx, -innerSize / 2, -innerSize / 2, innerSize, innerSize, 3);
+      ctx.strokeStyle = 'rgba(161, 161, 170, 0.35)';
+      ctx.lineWidth = 1.2;
+      ctx.stroke();
+
+      // Bold embossed -3 badge + sub-label
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.font = `900 ${Math.round(r * 0.68)}px "Segoe UI", system-ui, sans-serif`;
+      ctx.fillStyle = 'rgba(220, 38, 38, 0.9)';
+      ctx.fillText('-3', 1.5, -r * 0.08 + 1.5);
+      ctx.fillStyle = '#ffffff';
+      ctx.fillText('-3', 0, -r * 0.08);
+
+      ctx.font = `800 ${Math.max(10, Math.round(r * 0.28))}px "Segoe UI", system-ui, sans-serif`;
+      ctx.fillStyle = '#fca5a5';
+      ctx.fillText('-4 · ▼250%', 0, r * 0.42);
 
       ctx.restore();
     };
@@ -6016,6 +7033,27 @@ export default function App() {
           ctx.textBaseline = 'bottom';
           ctx.fillText(`❄ ${sim.freezeTimer.toFixed(1)}s`, 0, meterY - 3);
           ctx.restore();
+        } else if (sim.heavySlowTimer > 0) {
+          ctx.save();
+          ctx.translate(sim.playerX, sim.playerY);
+          const slowFrac = Math.max(
+            0,
+            Math.min(1, sim.heavySlowTimer / BLACK_SQUARE_SLOW_DURATION)
+          );
+          const meterW = w * 0.92;
+          const meterY = -halfH - 20;
+          drawRoundedRectPath(ctx, -meterW / 2, meterY, meterW, 5, 2.5);
+          ctx.fillStyle = 'rgba(9, 9, 11, 0.88)';
+          ctx.fill();
+          drawRoundedRectPath(ctx, -meterW / 2, meterY, meterW * slowFrac, 5, 2.5);
+          ctx.fillStyle = '#ef4444';
+          ctx.fill();
+          ctx.fillStyle = '#fecaca';
+          ctx.font = '800 11px "Segoe UI", system-ui, sans-serif';
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'bottom';
+          ctx.fillText(`▼ 250% · ${sim.heavySlowTimer.toFixed(1)}s`, 0, meterY - 3);
+          ctx.restore();
         } else if (sim.slowTimer > 0) {
           ctx.save();
           ctx.translate(sim.playerX, sim.playerY);
@@ -6220,6 +7258,24 @@ export default function App() {
         ctx.textAlign = 'center';
         ctx.textBaseline = 'bottom';
         ctx.fillText(`❄ ${sim.freezeTimer.toFixed(1)}s`, 0, meterY - 3);
+      } else if (sim.heavySlowTimer > 0) {
+        const slowFrac = Math.max(
+          0,
+          Math.min(1, sim.heavySlowTimer / BLACK_SQUARE_SLOW_DURATION)
+        );
+        const meterW = w * 0.92;
+        const meterY = -halfH - 20;
+        drawRoundedRectPath(ctx, -meterW / 2, meterY, meterW, 5, 2.5);
+        ctx.fillStyle = 'rgba(9, 9, 11, 0.88)';
+        ctx.fill();
+        drawRoundedRectPath(ctx, -meterW / 2, meterY, meterW * slowFrac, 5, 2.5);
+        ctx.fillStyle = '#ef4444';
+        ctx.fill();
+        ctx.fillStyle = '#fecaca';
+        ctx.font = '800 11px "Segoe UI", system-ui, sans-serif';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'bottom';
+        ctx.fillText(`▼ 250% · ${sim.heavySlowTimer.toFixed(1)}s`, 0, meterY - 3);
       } else if (sim.slowTimer > 0) {
         const slowFrac = Math.max(
           0,
@@ -6392,15 +7448,11 @@ export default function App() {
           drawFruitCanvasItem(ctx, item as FruitRenderItem);
         } else if (isGoldRender) {
           drawGoldCanvasItem(ctx, item as GoldRenderItem);
-        } else if (
-          item.kind === 'pink_circle' ||
-          item.kind === 'green_circle' ||
-          item.kind === 'blue_triangle' ||
-          item.kind === 'purple_diamond' ||
-          item.kind === 'gold_star'
-        ) {
+        } else if (isPositiveNormalKind(item.kind)) {
           if (activePlusSkin !== 'classic') {
             drawCustomPlusPoint(ctx, item, activePlusSkin);
+          } else if (isBalancedPlusKind(item.kind)) {
+            drawBalancedPlusItem(item);
           } else if (item.kind === 'pink_circle') {
             drawPinkCircle(item);
           } else if (item.kind === 'green_circle') {
@@ -6409,11 +7461,17 @@ export default function App() {
             drawPurpleDiamond(item);
           } else if (item.kind === 'gold_star') {
             drawGoldStar(item);
+          } else if (item.kind === 'royal_nova') {
+            drawRoyalNova(item);
           } else {
             drawBlueTriangle(item);
           }
+        } else if (item.kind === 'hazard_black_square') {
+          drawHazardBlackSquare(item);
         } else if (activeMinusSkin !== 'classic') {
           drawCustomMinusPoint(ctx, item, activeMinusSkin);
+        } else if (isBalancedMinusKind(item.kind)) {
+          drawBalancedMinusItem(item);
         } else if (item.kind === 'hazard_square') {
           drawHazardSquare(item);
         } else if (item.kind === 'hazard_star') {
@@ -7086,7 +8144,9 @@ export default function App() {
                       ? t.diamondsFullTip
                       : isFruitMode
                       ? t.cornFullTip
-                      : t.heartsFullTip
+                      : lang === 'ar'
+                      ? `القلوب ممتلئة (${effectiveMaxLives}/${effectiveMaxLives})`
+                      : `Hearts full (${effectiveMaxLives}/${effectiveMaxLives})`
                     : activeLifeCurrencyBalance < activeLifeBuyCost
                     ? isGoldMode
                       ? t.needCoinsDiamondTip
@@ -8503,6 +9563,11 @@ export default function App() {
                                         {lang === 'ar' ? entry.valueAr : entry.valueEn}
                                       </span>
                                     </div>
+                                    <div className="font-num text-[11px] font-semibold text-amber-300/90 mt-0.5">
+                                      {lang === 'ar'
+                                        ? `تظهر من المرحلة ${entry.minStage}`
+                                        : `Appears from Stage ${entry.minStage}`}
+                                    </div>
                                     <p className="text-xs text-slate-300 mt-1 leading-relaxed">
                                       {lang === 'ar'
                                         ? entry.benefitAr
@@ -8518,6 +9583,11 @@ export default function App() {
                                       <span className="text-[11px] font-semibold text-slate-400 whitespace-nowrap shrink-0">
                                         {lang === 'ar' ? 'فائدته مقفلة' : 'Effect Locked'}
                                       </span>
+                                    </div>
+                                    <div className="font-num text-[11px] font-semibold text-amber-300/85 mt-0.5">
+                                      {lang === 'ar'
+                                        ? `تظهر من المرحلة ${entry.minStage}`
+                                        : `Appears from Stage ${entry.minStage}`}
                                     </div>
                                     <p className="text-xs text-slate-400 mt-1 leading-relaxed">
                                       {lang === 'ar'
@@ -8573,6 +9643,11 @@ export default function App() {
                                         {lang === 'ar' ? entry.valueAr : entry.valueEn}
                                       </span>
                                     </div>
+                                    <div className="font-num text-[11px] font-semibold text-emerald-300/90 mt-0.5">
+                                      {lang === 'ar'
+                                        ? `تظهر من المرحلة ${entry.minStage}`
+                                        : `Appears from Stage ${entry.minStage}`}
+                                    </div>
                                     <p className="text-xs text-slate-300 mt-1 leading-relaxed">
                                       {lang === 'ar'
                                         ? entry.benefitAr
@@ -8588,6 +9663,11 @@ export default function App() {
                                       <span className="text-[11px] font-semibold text-slate-400 whitespace-nowrap shrink-0">
                                         {lang === 'ar' ? 'فائدته مقفلة' : 'Effect Locked'}
                                       </span>
+                                    </div>
+                                    <div className="font-num text-[11px] font-semibold text-emerald-300/85 mt-0.5">
+                                      {lang === 'ar'
+                                        ? `تظهر من المرحلة ${entry.minStage}`
+                                        : `Appears from Stage ${entry.minStage}`}
                                     </div>
                                     <p className="text-xs text-slate-400 mt-1 leading-relaxed">
                                       {lang === 'ar'
@@ -8735,6 +9815,29 @@ export default function App() {
                                       </text>
                                     )}
                                   </svg>
+                                ) : entry.kind === 'royal_nova' ? (
+                                  <svg viewBox="0 0 24 24" className="w-8 h-8">
+                                    <polygon
+                                      points="12,1.5 14.4,6.4 19.6,4.4 17.6,9.6 22.5,12 17.6,14.4 19.6,19.6 14.4,17.6 12,22.5 9.6,17.6 4.4,19.6 6.4,14.4 1.5,12 6.4,9.6 4.4,4.4 9.6,6.4"
+                                      fill="#d946ef"
+                                      stroke="#fde047"
+                                      strokeWidth="1.4"
+                                      strokeLinejoin="round"
+                                    />
+                                    <circle cx="12" cy="12" r="5.8" fill="#581c87" stroke="#f5d0fe" strokeWidth="1" />
+                                    {discovered && (
+                                      <text
+                                        x="12"
+                                        y="15.2"
+                                        textAnchor="middle"
+                                        fill="#ffffff"
+                                        fontSize="8.5"
+                                        fontWeight="900"
+                                      >
+                                        10
+                                      </text>
+                                    )}
+                                  </svg>
                                 ) : entry.kind === 'hazard_spike' ? (
                                   <svg viewBox="-1 -1 26 26" className="w-8 h-8">
                                     <polygon
@@ -8878,6 +9981,157 @@ export default function App() {
                                       strokeWidth="1"
                                     />
                                   </svg>
+                                ) : entry.kind === 'cyan_hex' ? (
+                                  <svg viewBox="0 0 24 24" className="w-8 h-8">
+                                    <polygon
+                                      points="12,2 21,7 21,17 12,22 3,17 3,7"
+                                      fill="#06b6d4"
+                                      stroke="#cffafe"
+                                      strokeWidth="1.6"
+                                      strokeLinejoin="round"
+                                    />
+                                    {discovered && (
+                                      <text x="12" y="15.5" textAnchor="middle" fill="#ffffff" fontSize="9.5" fontWeight="800">+3</text>
+                                    )}
+                                  </svg>
+                                ) : entry.kind === 'coral_pentagon' ? (
+                                  <svg viewBox="0 0 24 24" className="w-8 h-8">
+                                    <polygon
+                                      points="12,2 22,9.4 18.2,21 5.8,21 2,9.4"
+                                      fill="#fb7185"
+                                      stroke="#ffe4e6"
+                                      strokeWidth="1.6"
+                                      strokeLinejoin="round"
+                                    />
+                                    {discovered && (
+                                      <text x="12" y="15.8" textAnchor="middle" fill="#ffffff" fontSize="9.5" fontWeight="800">+4</text>
+                                    )}
+                                  </svg>
+                                ) : entry.kind === 'lime_orb' ? (
+                                  <svg viewBox="0 0 24 24" className="w-8 h-8">
+                                    <circle cx="12" cy="12" r="9.5" fill="#84cc16" stroke="#ecfccb" strokeWidth="1.6" />
+                                    <circle cx="12" cy="12" r="6.2" fill="none" stroke="#ffffff" strokeOpacity="0.65" strokeWidth="1.2" />
+                                    {discovered && (
+                                      <text x="12" y="15.5" textAnchor="middle" fill="#ffffff" fontSize="9.5" fontWeight="800">+3</text>
+                                    )}
+                                  </svg>
+                                ) : entry.kind === 'indigo_octagon' ? (
+                                  <svg viewBox="0 0 24 24" className="w-8 h-8">
+                                    <polygon
+                                      points="8.2,2.5 15.8,2.5 21.5,8.2 21.5,15.8 15.8,21.5 8.2,21.5 2.5,15.8 2.5,8.2"
+                                      fill="#6366f1"
+                                      stroke="#c7d2fe"
+                                      strokeWidth="1.6"
+                                      strokeLinejoin="round"
+                                    />
+                                    {discovered && (
+                                      <text x="12" y="15.5" textAnchor="middle" fill="#ffffff" fontSize="9.5" fontWeight="800">+4</text>
+                                    )}
+                                  </svg>
+                                ) : entry.kind === 'amber_crescent' ? (
+                                  <svg viewBox="0 0 24 24" className="w-8 h-8">
+                                    <circle cx="12" cy="12" r="9.5" fill="#451a03" stroke="#fde68a" strokeWidth="1.5" />
+                                    <path d="M14.8,5.2 A7,7 0 1,0 18.4,15.6 A5.4,5.4 0 1,1 14.8,5.2 Z" fill="#f59e0b" />
+                                    {discovered && (
+                                      <text x="12" y="15.5" textAnchor="middle" fill="#ffffff" fontSize="9.5" fontWeight="800">+5</text>
+                                    )}
+                                  </svg>
+                                ) : entry.kind === 'minus_crimson_hex' ? (
+                                  <svg viewBox="0 0 24 24" className="w-8 h-8">
+                                    <polygon
+                                      points="21.5,12 16.8,20.2 7.2,20.2 2.5,12 7.2,3.8 16.8,3.8"
+                                      fill="#e11d48"
+                                      stroke="#fecdd3"
+                                      strokeWidth="1.6"
+                                      strokeLinejoin="round"
+                                    />
+                                    {discovered && (
+                                      <text x="12" y="15.5" textAnchor="middle" fill="#ffffff" fontSize="9.5" fontWeight="800">-3</text>
+                                    )}
+                                  </svg>
+                                ) : entry.kind === 'minus_rust_diamond' ? (
+                                  <svg viewBox="0 0 24 24" className="w-8 h-8">
+                                    <polygon
+                                      points="12,2 21,12 12,22 3,12"
+                                      fill="#ea580c"
+                                      stroke="#fed7aa"
+                                      strokeWidth="1.6"
+                                      strokeLinejoin="round"
+                                    />
+                                    {discovered && (
+                                      <text x="12" y="15.5" textAnchor="middle" fill="#ffffff" fontSize="9.5" fontWeight="800">-4</text>
+                                    )}
+                                  </svg>
+                                ) : entry.kind === 'minus_slate_cross' ? (
+                                  <svg viewBox="0 0 24 24" className="w-8 h-8">
+                                    <path
+                                      d="M10.2,2.2 L13.8,2.2 L14.5,4.9 A7.4,7.4 0 0,1 16.8,6.2 L19.4,5.4 L21.2,8.5 L19.2,10.5 A7.4,7.4 0 0,1 19.2,13.5 L21.2,15.5 L19.4,18.6 L16.8,17.8 A7.4,7.4 0 0,1 14.5,19.1 L13.8,21.8 L10.2,21.8 L9.5,19.1 A7.4,7.4 0 0,1 7.2,17.8 L4.6,18.6 L2.8,15.5 L4.8,13.5 A7.4,7.4 0 0,1 4.8,10.5 L2.8,8.5 L4.6,5.4 L7.2,6.2 A7.4,7.4 0 0,1 9.5,4.9 Z"
+                                      fill="#64748b"
+                                      stroke="#e2e8f0"
+                                      strokeWidth="1.3"
+                                      strokeLinejoin="round"
+                                    />
+                                    <circle cx="12" cy="12" r="4.2" fill="#1e293b" stroke="#cbd5e1" strokeWidth="1" />
+                                    {discovered && (
+                                      <text x="12" y="15.3" textAnchor="middle" fill="#ffffff" fontSize="8.5" fontWeight="800">-3</text>
+                                    )}
+                                  </svg>
+                                ) : entry.kind === 'minus_teal_bolt' ? (
+                                  <svg viewBox="0 0 24 24" className="w-8 h-8">
+                                    <polygon
+                                      points="13.5,2 19.5,10.5 14,11 16,22 5.5,13 10.5,12.5"
+                                      fill="#0f766e"
+                                      stroke="#5eead4"
+                                      strokeWidth="1.5"
+                                      strokeLinejoin="round"
+                                    />
+                                    {discovered && (
+                                      <text x="12" y="15.5" textAnchor="middle" fill="#ffffff" fontSize="9" fontWeight="800">-4</text>
+                                    )}
+                                  </svg>
+                                ) : entry.kind === 'minus_plum_ring' ? (
+                                  <svg viewBox="0 0 24 24" className="w-8 h-8">
+                                    <circle cx="12" cy="12" r="9.5" fill="#a21caf" stroke="#f0abfc" strokeWidth="1.6" />
+                                    <circle cx="12" cy="12" r="5" fill="#2e1065" stroke="#f5d0fe" strokeWidth="1.2" />
+                                    {discovered && (
+                                      <text x="12" y="15.5" textAnchor="middle" fill="#ffffff" fontSize="9" fontWeight="800">-5</text>
+                                    )}
+                                  </svg>
+                                ) : entry.kind === 'hazard_black_square' ? (
+                                  <svg viewBox="0 0 24 24" className="w-10 h-10">
+                                    <rect
+                                      x="1.5"
+                                      y="1.5"
+                                      width="21"
+                                      height="21"
+                                      rx="3"
+                                      fill="#09090b"
+                                      stroke="#f87171"
+                                      strokeWidth="2"
+                                    />
+                                    <rect
+                                      x="4.5"
+                                      y="4.5"
+                                      width="15"
+                                      height="15"
+                                      rx="1.5"
+                                      fill="#18181b"
+                                      stroke="#52525b"
+                                      strokeWidth="0.9"
+                                    />
+                                    {discovered && (
+                                      <text
+                                        x="12"
+                                        y="15.5"
+                                        textAnchor="middle"
+                                        fill="#ffffff"
+                                        fontSize="10"
+                                        fontWeight="900"
+                                      >
+                                        -3
+                                      </text>
+                                    )}
+                                  </svg>
                                 ) : (
                                   <svg viewBox="0 0 24 24" className="w-8 h-8">
                                     <rect
@@ -8924,17 +10178,36 @@ export default function App() {
                                             ? 'text-emerald-300'
                                             : entry.kind === 'purple_diamond'
                                             ? 'text-purple-300'
-                                            : entry.kind === 'gold_star'
+                                            : entry.kind === 'royal_nova'
+                                            ? 'text-fuchsia-300'
+                                            : entry.kind === 'gold_star' || entry.kind === 'amber_crescent'
                                             ? 'text-yellow-300'
-                                            : entry.kind === 'hazard_arrow_amber'
+                                            : entry.kind === 'cyan_hex'
+                                            ? 'text-cyan-300'
+                                            : entry.kind === 'coral_pentagon'
+                                            ? 'text-rose-300'
+                                            : entry.kind === 'lime_orb'
+                                            ? 'text-lime-300'
+                                            : entry.kind === 'indigo_octagon'
+                                            ? 'text-indigo-300'
+                                            : entry.kind === 'hazard_arrow_amber' || entry.kind === 'minus_rust_diamond'
                                             ? 'text-amber-300'
-                                            : entry.kind === 'hazard_arrow_violet'
+                                            : entry.kind === 'hazard_arrow_violet' || entry.kind === 'minus_plum_ring'
                                             ? 'text-violet-300'
+                                            : entry.kind === 'minus_slate_cross'
+                                            ? 'text-slate-300'
+                                            : entry.kind === 'minus_teal_bolt'
+                                            ? 'text-teal-300'
                                             : 'text-rose-400'
                                         }`}
                                       >
                                         {lang === 'ar' ? entry.valueAr : entry.valueEn}
                                       </span>
+                                    </div>
+                                    <div className="font-num text-[11px] font-semibold text-sky-300/90 mt-0.5">
+                                      {lang === 'ar'
+                                        ? `تظهر من المرحلة ${entry.minStage}`
+                                        : `Appears from Stage ${entry.minStage}`}
                                     </div>
                                     <p className="text-xs text-slate-300 mt-1 leading-relaxed">
                                       {lang === 'ar'
@@ -8951,6 +10224,11 @@ export default function App() {
                                       <span className="text-[11px] font-semibold text-slate-400 whitespace-nowrap shrink-0">
                                         {lang === 'ar' ? 'فائدته مقفلة' : 'Effect Locked'}
                                       </span>
+                                    </div>
+                                    <div className="font-num text-[11px] font-semibold text-sky-300/85 mt-0.5">
+                                      {lang === 'ar'
+                                        ? `تظهر من المرحلة ${entry.minStage}`
+                                        : `Appears from Stage ${entry.minStage}`}
                                     </div>
                                     <p className="text-xs text-slate-400 mt-1 leading-relaxed">
                                       {lang === 'ar'
@@ -8976,7 +10254,7 @@ export default function App() {
               coins={coins}
               pinkCoins={pinkCoins}
               lives={lives}
-              maxLives={MAX_LIVES}
+              maxLives={effectiveMaxLives}
               corn={corn}
               maxCorn={MAX_CORN}
               diamonds={diamonds}
@@ -8991,6 +10269,7 @@ export default function App() {
               onSelectOrBuyPlusSkin={selectOrBuyPlusSkin}
               onSelectOrBuyMinusSkin={selectOrBuyMinusSkin}
               onBuySupply={buySupply}
+              onBuyMaxHeartsUpgrade={buyMaxHeartsUpgrade}
             />
           )}
 
@@ -9047,7 +10326,7 @@ export default function App() {
                         sub: t.bagHeartsSub,
                         stored: bag.hearts,
                         active: lives,
-                        max: MAX_LIVES,
+                        max: effectiveMaxLives,
                         cost: HEART_COST_COINS,
                         borderClass: 'border-rose-400/25 bg-rose-950/20',
                         countClass: 'text-rose-300',
@@ -9149,7 +10428,9 @@ export default function App() {
                             }`}
                           >
                             {row.active >= row.max
-                              ? t.bagFullBadge
+                              ? lang === 'ar'
+                                ? `ممتلئ ${row.max}/${row.max}`
+                                : `Full ${row.max}/${row.max}`
                               : t.bagUseBtn}
                           </button>
 
@@ -9382,11 +10663,13 @@ export default function App() {
         </div>
       </main>
 
-      {/* Full-Screen Mini-Game ("اللعاب") — Arrow Escape Puzzle */}
+      {/* Full-Screen Mini-Games Hub ("صالة اللعاب") */}
       {gamesModalOpen && (
         <GamesModal
           lang={lang}
           sfxEnabled={sfxEnabled}
+          musicEnabled={musicEnabled}
+          onToggleMusic={() => setMusicEnabled((prev) => !prev)}
           onClose={closeGamesModal}
         />
       )}

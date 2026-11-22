@@ -22,6 +22,7 @@ export interface GoldStageConfig {
 export interface GoldIndexEntry {
   kind: GoldItemKind;
   category: 'positive' | 'negative';
+  minStage: number;
   nameAr: string;
   nameEn: string;
   valueAr: string;
@@ -52,7 +53,7 @@ export interface GoldRenderItem {
   pulsePhase: number;
 }
 
-export const TOTAL_GOLD_STAGES = 15;
+export const TOTAL_GOLD_STAGES = 30;
 export const GOLD_UNLOCK_COST = 40;
 export const MAX_DIAMONDS = 10;
 export const DIAMOND_COST_COINS = 40;
@@ -128,6 +129,7 @@ export const GOLD_INDEX_CATALOG: GoldIndexEntry[] = [
   {
     kind: 'gold_coin',
     category: 'positive',
+    minStage: 1,
     nameAr: 'العملة الذهبية',
     nameEn: 'Gold Coin',
     valueAr: '+2 نقاط',
@@ -138,6 +140,7 @@ export const GOLD_INDEX_CATALOG: GoldIndexEntry[] = [
   {
     kind: 'gold_bar',
     category: 'positive',
+    minStage: 1,
     nameAr: 'سبيكة الذهب',
     nameEn: 'Gold Ingot',
     valueAr: '+3 نقاط',
@@ -148,6 +151,7 @@ export const GOLD_INDEX_CATALOG: GoldIndexEntry[] = [
   {
     kind: 'gold_crown',
     category: 'positive',
+    minStage: 1,
     nameAr: 'التاج الملكي',
     nameEn: 'Royal Crown',
     valueAr: '+4 نقاط',
@@ -158,6 +162,7 @@ export const GOLD_INDEX_CATALOG: GoldIndexEntry[] = [
   {
     kind: 'blue_diamond',
     category: 'positive',
+    minStage: 1,
     nameAr: 'الألماسة النادرة',
     nameEn: 'Rare Diamond',
     valueAr: '+6 نقاط',
@@ -168,6 +173,7 @@ export const GOLD_INDEX_CATALOG: GoldIndexEntry[] = [
   {
     kind: 'rust_anvil',
     category: 'negative',
+    minStage: 1,
     nameAr: 'السندان الصدئ',
     nameEn: 'Rusty Anvil',
     valueAr: '-2 نقاط · -1 ألماسة',
@@ -178,6 +184,7 @@ export const GOLD_INDEX_CATALOG: GoldIndexEntry[] = [
   {
     kind: 'cursed_rock',
     category: 'negative',
+    minStage: 1,
     nameAr: 'حجر الفحم الناري',
     nameEn: 'Fiery Coal',
     valueAr: '-3 نقاط · -1 ألماسة',
@@ -188,6 +195,7 @@ export const GOLD_INDEX_CATALOG: GoldIndexEntry[] = [
   {
     kind: 'mimic_bomb',
     category: 'negative',
+    minStage: 4,
     nameAr: 'قنبلة الخزنة',
     nameEn: 'Vault Bomb',
     valueAr: '-4 نقاط · -2 ألماسة',
@@ -205,15 +213,17 @@ export const GOLD_STAGES: GoldStageConfig[] = (() => {
   const list: GoldStageConfig[] = [];
   for (let s = 1; s <= TOTAL_GOLD_STAGES; s++) {
     const t = (s - 1) / (TOTAL_GOLD_STAGES - 1);
-    const pointsNeeded = Math.round(58 + s * 18);
+    const tCurve = Math.pow(t, 0.88);
+    const pointsNeeded = Math.round(58 + s * 17);
     list.push({
       stage: s,
       pointsNeeded,
-      baseSpeed: 225 + t * 270,
-      spawnInterval: Math.max(0.23, 0.65 - t * 0.38),
-      hazardChance: 0.31 + t * 0.22,
-      bombRatio: s < 4 ? 0 : 0.22 + ((s - 4) / (TOTAL_GOLD_STAGES - 4)) * 0.25,
-      lateralDrift: 24 + t * 90,
+      baseSpeed: 225 + tCurve * 325,
+      spawnInterval: Math.max(0.2, 0.65 - tCurve * 0.42),
+      hazardChance: Math.min(0.56, 0.31 + tCurve * 0.25),
+      bombRatio:
+        s < 4 ? 0 : Math.min(0.49, 0.22 + ((s - 4) / (TOTAL_GOLD_STAGES - 4)) * 0.27),
+      lateralDrift: 24 + tCurve * 106,
     });
   }
   return list;

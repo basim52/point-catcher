@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { MusicToggleButton, useGameMusic } from './gameMusic';
 
 type GamePhase = 'READY' | 'PLAYING' | 'PAUSED' | 'STAGE_CLEAR' | 'GAME_OVER';
 type FallKind =
@@ -66,6 +67,8 @@ interface StageSpec {
 export interface AppleCatchGameProps {
   lang: 'ar' | 'en';
   sfxEnabled: boolean;
+  musicEnabled: boolean;
+  onToggleMusic: () => void;
   onExitToHub: () => void;
 }
 
@@ -405,7 +408,7 @@ function drawFallingSprite(
 
       if (isGold || isPurple || isGreen) {
         ctx.fillStyle = isPurple ? '#ffffff' : isGreen ? '#052e16' : '#451a03';
-        ctx.font = '800 10px system-ui, sans-serif';
+        ctx.font = '800 13.5px system-ui, sans-serif';
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
         ctx.fillText(isPurple ? '+4' : '+2', 0, r * 0.14);
@@ -1113,6 +1116,8 @@ interface CatchEngine {
 export const AppleCatchGame: React.FC<AppleCatchGameProps> = ({
   lang,
   sfxEnabled,
+  musicEnabled,
+  onToggleMusic,
   onExitToHub,
 }) => {
   const t = COPY_APPLE[lang];
@@ -1135,6 +1140,11 @@ export const AppleCatchGame: React.FC<AppleCatchGameProps> = ({
   const [hearts, setHearts] = useState<number>(MAX_HEARTS);
   const [levelsModalOpen, setLevelsModalOpen] = useState<boolean>(false);
   const [indexModalOpen, setIndexModalOpen] = useState<boolean>(false);
+
+  useGameMusic(
+    'apple-catch',
+    musicEnabled && phase !== 'PAUSED' && phase !== 'GAME_OVER'
+  );
 
   const spec = STAGE_SPECS[currentLevel - 1] ?? STAGE_SPECS[0];
   const specRef = useRef<StageSpec>(spec);
@@ -1319,8 +1329,8 @@ export const AppleCatchGame: React.FC<AppleCatchGameProps> = ({
         }
       }
 
-      const radius = 16;
-      const margin = isVeggie ? 30 : 38;
+      const radius = isVeggie ? 16 : 24; // Apples enlarged by +50% (16 -> 24)
+      const margin = isVeggie ? 30 : 44;
 
       // Pick a readable lane: rare apples seek clearance from top veggies; veggies avoid clumping right onto new apples
       let baseX = margin + Math.random() * (CANVAS_W - margin * 2);
@@ -1767,28 +1777,35 @@ export const AppleCatchGame: React.FC<AppleCatchGameProps> = ({
             </span>
           </div>
 
-          {/* 3 Hearts Indicator */}
-          <div className="flex items-center gap-1 shrink-0" aria-label="Hearts">
-            {Array.from({ length: MAX_HEARTS }).map((_, idx) => {
-              const filled = idx < hearts;
-              return (
-                <svg
-                  key={idx}
-                  viewBox="0 0 24 24"
-                  className={`w-4 h-4 sm:w-5 sm:h-5 transition-transform ${
-                    filled ? 'text-rose-500 scale-100' : 'text-slate-700 scale-90'
-                  }`}
-                  fill={filled ? 'currentColor' : 'none'}
-                  stroke="currentColor"
-                  strokeWidth={filled ? '1.6' : '2'}
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  aria-hidden="true"
-                >
-                  <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
-                </svg>
-              );
-            })}
+          {/* 3 Hearts Indicator + Music Toggle */}
+          <div className="flex items-center gap-2 shrink-0">
+            <div className="flex items-center gap-1 shrink-0" aria-label="Hearts">
+              {Array.from({ length: MAX_HEARTS }).map((_, idx) => {
+                const filled = idx < hearts;
+                return (
+                  <svg
+                    key={idx}
+                    viewBox="0 0 24 24"
+                    className={`w-4 h-4 sm:w-5 sm:h-5 transition-transform ${
+                      filled ? 'text-rose-500 scale-100' : 'text-slate-700 scale-90'
+                    }`}
+                    fill={filled ? 'currentColor' : 'none'}
+                    stroke="currentColor"
+                    strokeWidth={filled ? '1.6' : '2'}
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    aria-hidden="true"
+                  >
+                    <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
+                  </svg>
+                );
+              })}
+            </div>
+            <MusicToggleButton
+              enabled={musicEnabled}
+              onToggle={onToggleMusic}
+              lang={lang}
+            />
           </div>
         </div>
       </header>

@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { MusicToggleButton, useGameMusic } from './gameMusic';
 
 type MoveDir = 'UP' | 'DOWN' | 'LEFT' | 'RIGHT';
 
@@ -24,6 +25,8 @@ export interface Neon2048Stats {
 export interface Neon2048GameProps {
   lang: 'ar' | 'en';
   sfxEnabled: boolean;
+  musicEnabled: boolean;
+  onToggleMusic: () => void;
   onExitToHub: () => void;
 }
 
@@ -548,6 +551,8 @@ export function Neon2048PreviewArt() {
 export const Neon2048Game: React.FC<Neon2048GameProps> = ({
   lang,
   sfxEnabled,
+  musicEnabled,
+  onToggleMusic,
   onExitToHub,
 }) => {
   const t = COPY_2048[lang];
@@ -563,6 +568,8 @@ export const Neon2048Game: React.FC<Neon2048GameProps> = ({
   const [lastGain, setLastGain] = useState<{ id: number; amount: number } | null>(
     null
   );
+
+  useGameMusic('neon-2048', musicEnabled && !gameOver);
 
   const swipeStartRef = useRef<{ x: number; y: number } | null>(null);
   const gainCounterRef = useRef<number>(1);
@@ -772,6 +779,11 @@ export const Neon2048Game: React.FC<Neon2048GameProps> = ({
                 {Math.max(currentMaxTile, stats.bestTile)}
               </span>
             </div>
+            <MusicToggleButton
+              enabled={musicEnabled}
+              onToggle={onToggleMusic}
+              lang={lang}
+            />
           </div>
         </div>
       </header>

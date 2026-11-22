@@ -30,6 +30,7 @@ export interface FruitStageConfig {
 export interface FruitIndexEntry {
   kind: FruitItemKind;
   category: 'positive' | 'negative';
+  minStage: number;
   nameAr: string;
   nameEn: string;
   valueAr: string;
@@ -58,7 +59,7 @@ export interface FruitRenderItem {
   pulsePhase: number;
 }
 
-export const TOTAL_FRUIT_STAGES = 15;
+export const TOTAL_FRUIT_STAGES = 30;
 export const FRUIT_UNLOCK_COST = 28;
 export const MAX_CORN = 10;
 
@@ -127,6 +128,7 @@ export const FRUIT_INDEX_CATALOG: FruitIndexEntry[] = [
   {
     kind: 'fruit_apple',
     category: 'positive',
+    minStage: 1,
     nameAr: 'التفاحة الحمراء',
     nameEn: 'Red Apple',
     valueAr: '+2 نقاط',
@@ -137,6 +139,7 @@ export const FRUIT_INDEX_CATALOG: FruitIndexEntry[] = [
   {
     kind: 'fruit_orange',
     category: 'positive',
+    minStage: 1,
     nameAr: 'البرتقالة',
     nameEn: 'Sunny Orange',
     valueAr: '+3 نقاط',
@@ -147,6 +150,7 @@ export const FRUIT_INDEX_CATALOG: FruitIndexEntry[] = [
   {
     kind: 'fruit_strawberry',
     category: 'positive',
+    minStage: 1,
     nameAr: 'الفراولة',
     nameEn: 'Strawberry',
     valueAr: '+4 نقاط',
@@ -157,6 +161,7 @@ export const FRUIT_INDEX_CATALOG: FruitIndexEntry[] = [
   {
     kind: 'fruit_watermelon',
     category: 'positive',
+    minStage: 1,
     nameAr: 'البطيخة',
     nameEn: 'Watermelon',
     valueAr: '+5 نقاط',
@@ -167,6 +172,7 @@ export const FRUIT_INDEX_CATALOG: FruitIndexEntry[] = [
   {
     kind: 'veg_broccoli',
     category: 'negative',
+    minStage: 1,
     nameAr: 'البروكلي',
     nameEn: 'Broccoli',
     valueAr: '-3 نقاط · -1 ذرة',
@@ -177,6 +183,7 @@ export const FRUIT_INDEX_CATALOG: FruitIndexEntry[] = [
   {
     kind: 'veg_carrot',
     category: 'negative',
+    minStage: 1,
     nameAr: 'الجزرة',
     nameEn: 'Carrot',
     valueAr: '-4 نقاط · -1 ذرة',
@@ -187,6 +194,7 @@ export const FRUIT_INDEX_CATALOG: FruitIndexEntry[] = [
   {
     kind: 'veg_pepper',
     category: 'negative',
+    minStage: 4,
     nameAr: 'الفلفل الحار',
     nameEn: 'Chili Pepper',
     valueAr: '-6 نقاط · -2 ذرة',
@@ -204,15 +212,17 @@ export const FRUIT_STAGES: FruitStageConfig[] = (() => {
   const list: FruitStageConfig[] = [];
   for (let s = 1; s <= TOTAL_FRUIT_STAGES; s++) {
     const t = (s - 1) / (TOTAL_FRUIT_STAGES - 1);
-    const pointsNeeded = Math.round(52 + s * 16);
+    const tCurve = Math.pow(t, 0.88);
+    const pointsNeeded = Math.round(52 + s * 15);
     list.push({
       stage: s,
       pointsNeeded,
-      baseSpeed: 220 + t * 265,
-      spawnInterval: Math.max(0.24, 0.66 - t * 0.38),
-      vegChance: 0.31 + t * 0.22,
-      pepperRatio: s < 4 ? 0 : 0.22 + ((s - 4) / (TOTAL_FRUIT_STAGES - 4)) * 0.24,
-      lateralDrift: 24 + t * 88,
+      baseSpeed: 220 + tCurve * 315,
+      spawnInterval: Math.max(0.21, 0.66 - tCurve * 0.42),
+      vegChance: Math.min(0.56, 0.31 + tCurve * 0.25),
+      pepperRatio:
+        s < 4 ? 0 : Math.min(0.48, 0.22 + ((s - 4) / (TOTAL_FRUIT_STAGES - 4)) * 0.26),
+      lateralDrift: 24 + tCurve * 102,
     });
   }
   return list;

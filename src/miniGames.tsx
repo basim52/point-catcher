@@ -17,9 +17,30 @@ import {
   AppleCatchPreviewArt,
   readAppleCatchClearedCount,
 } from './gameAppleCatch';
+import {
+  ARROW_MOSAIC_TOTAL_LEVELS,
+  ArrowMosaicGame,
+  ArrowMosaicPreviewArt,
+  readArrowMosaicClearedCount,
+} from './gameArrowMosaic';
+import {
+  FRUIT_TIERS,
+  FruitMergeGame,
+  FruitMergePreviewArt,
+  readFruitMergeStats,
+  type FruitMergeStats,
+} from './gameFruitMerge';
+import {
+  BRICK_BREAKER_TOTAL_LEVELS,
+  BrickBreakerGame,
+  BrickBreakerPreviewArt,
+  readBrickBreakerStats,
+  type BrickBreakerStats,
+} from './gameBrickBreaker';
+import { MusicToggleButton, useGameMusic } from './gameMusic';
 
 type Dir = 'UP' | 'DOWN' | 'LEFT' | 'RIGHT';
-type TierKey = 'intro' | 'curved' | 'woven' | 'hard' | 'master';
+type TierKey = 'intro' | 'curved' | 'woven' | 'hard' | 'master' | 'legend';
 
 interface GridPt {
   x: number;
@@ -73,6 +94,8 @@ interface BlockedImpact {
 export interface GamesModalProps {
   lang: 'ar' | 'en';
   sfxEnabled: boolean;
+  musicEnabled: boolean;
+  onToggleMusic: () => void;
   onClose: () => void;
 }
 
@@ -80,7 +103,7 @@ const BOARD_SIZE = 640;
 const BOARD_PAD = 24;
 const MAX_HEARTS = 3;
 const COMPLETED_LEVELS_KEY = 'point_catcher_arrow_puzzle_v6_braided';
-const TOTAL_LEVELS = 20;
+const TOTAL_LEVELS = 25;
 
 const ALL_DIRS: Dir[] = ['UP', 'DOWN', 'LEFT', 'RIGHT'];
 
@@ -167,16 +190,30 @@ const LEVEL_SPECS: LevelSpec[] = Array.from({ length: TOTAL_LEVELS }, (_, i) => 
     };
   }
   // Levels 17-20: Master Braided Labyrinth — extreme sinuous ⤴️⤵️ interlocks, 100% solvable
+  if (level <= 20) {
+    return {
+      level,
+      tierKey: 'master',
+      gridSize: 12,
+      targetFill: 0.94,
+      minLen: 6,
+      maxLen: 14,
+      bendProb: 0.96,
+      minBendsWanted: 4,
+      seed: 9973 + level * 3571,
+    };
+  }
+  // Levels 21-25: Legendary Labyrinth — 5 brand-new ultra-dense 13×13 curved mazes, 100% solvable
   return {
     level,
-    tierKey: 'master',
-    gridSize: 12,
+    tierKey: 'legend',
+    gridSize: 13,
     targetFill: 0.94,
     minLen: 6,
-    maxLen: 14,
-    bendProb: 0.96,
+    maxLen: 15,
+    bendProb: 0.97,
     minBendsWanted: 4,
-    seed: 9973 + level * 3571,
+    seed: 12503 + level * 4127,
   };
 });
 
@@ -711,9 +748,14 @@ function generatePuzzleLevel(spec: LevelSpec): ArrowPiece[] {
   let bestPieces: ArrowPiece[] = [];
   let bestQuality = -1;
 
-  for (let attempt = 0; attempt < 3; attempt++) {
+  for (let attempt = 0; attempt < 12; attempt++) {
     const candidate = generateAttempt(spec, attempt);
-    if (!verifyCompletelySolvable(candidate, spec.gridSize)) continue;
+    if (
+      candidate.length < 2 ||
+      !verifyCompletelySolvable(candidate, spec.gridSize)
+    ) {
+      continue;
+    }
     const { depCount, maxDepth } = computeGoldDependencyStats(
       candidate,
       spec.gridSize
@@ -726,6 +768,13 @@ function generatePuzzleLevel(spec: LevelSpec): ArrowPiece[] {
       bestQuality = quality;
       bestPieces = candidate;
     }
+    // Once we have evaluated 3 solid attempts and found a rich solvable board, stop early for speed
+    if (attempt >= 2 && bestPieces.length >= 2) break;
+  }
+
+  // Guaranteed safe fallback so a level can never render empty
+  if (bestPieces.length === 0) {
+    bestPieces = generateAttempt({ ...spec, targetFill: 0.72 }, 99);
   }
 
   LEVEL_CACHE.set(spec.level, bestPieces);
@@ -1003,6 +1052,7 @@ const PUZZLE_COPY = {
       woven: 'تشابك متعرج',
       hard: 'متاهة صعبة',
       master: 'متاهة الخبراء',
+      legend: 'متاهة الأساطير (21–25)',
     },
     heartsAria: (n: number) => `القلوب المتبقية: ${n} من ${MAX_HEARTS}`,
     undoBtn: 'تراجع',
@@ -1010,7 +1060,7 @@ const PUZZLE_COPY = {
     restartBtn: 'إعادة',
     levelsBtn: 'المراحل',
     winTitle: (lvl: number) => `عبقري! حرّرت السهم الذهبي في المرحلة ${lvl}`,
-    allClearTitle: 'أسطورة الألغاز! أنهيت جميع الـ 20 متاهة بنجاح',
+    allClearTitle: 'أسطورة الألغاز! أنهيت جميع الـ 25 متاهة بنجاح',
     winSummary: (moves: number, hearts: number) =>
       `الحركات: ${moves} · القلوب المتبقية: ${hearts}/${MAX_HEARTS}`,
     loseTitle: 'انتهت القلوب!',
@@ -1020,7 +1070,7 @@ const PUZZLE_COPY = {
     nextLevelBtn: (lvl: number) => `المرحلة ${lvl}`,
     replayAllBtn: 'العب من المرحلة 1',
     replayLevelBtn: 'إعادة المرحلة',
-    levelsModalTitle: 'اختر المرحلة (20 لغز أسهم منحنية)',
+    levelsModalTitle: 'اختر المرحلة (25 لغز أسهم منحنية)',
     levelsModalSub: 'المراحل مقفلة — فُز بكل مرحلة لفتح المرحلة التالية.',
     lockedAria: (lvl: number) => `المرحلة ${lvl} مقفلة`,
     close: 'إغلاق',
@@ -1045,6 +1095,7 @@ const PUZZLE_COPY = {
       woven: 'Woven Tangle',
       hard: 'Hard Maze',
       master: 'Master Maze',
+      legend: 'Legendary Maze (21–25)',
     },
     heartsAria: (n: number) => `Hearts remaining: ${n} of ${MAX_HEARTS}`,
     undoBtn: 'Undo',
@@ -1052,7 +1103,7 @@ const PUZZLE_COPY = {
     restartBtn: 'Restart',
     levelsBtn: 'Levels',
     winTitle: (lvl: number) => `Brilliant! Golden Arrow Freed (Level ${lvl})`,
-    allClearTitle: 'Grandmaster! All 20 Curved Mazes Cleared',
+    allClearTitle: 'Grandmaster! All 25 Curved Mazes Cleared',
     winSummary: (moves: number, hearts: number) =>
       `Moves: ${moves} · Hearts left: ${hearts}/${MAX_HEARTS}`,
     loseTitle: 'Out of Hearts!',
@@ -1062,7 +1113,7 @@ const PUZZLE_COPY = {
     nextLevelBtn: (lvl: number) => `Level ${lvl}`,
     replayAllBtn: 'Play from Level 1',
     replayLevelBtn: 'Replay Level',
-    levelsModalTitle: 'Choose Level (20 Curved Mazes)',
+    levelsModalTitle: 'Choose Level (25 Curved Mazes)',
     levelsModalSub: 'Levels are locked — beat each level to unlock the next.',
     lockedAria: (lvl: number) => `Level ${lvl} locked`,
     close: 'Close',
@@ -1140,11 +1191,11 @@ function CurvedArrowGraphic({
   const fullPath = buildRoundedSvgPath(extendedPts, cornerRadius);
 
   // Sharp barbed chevron/triangle arrowhead centered at tip pointing along +X
-  const headPath = `M 0 0 L ${(-headLen).toFixed(2)} ${(-headHalfW).toFixed(
-    2
-  )} L ${(-headLen * 0.72).toFixed(2)} 0 L ${(-headLen).toFixed(
-    2
-  )} ${headHalfW.toFixed(2)} Z`;
+  const noseR = Math.max(2.2, headHalfW * 0.36);
+  const wingX = -headLen * 0.86;
+  const wingY = headHalfW * 0.88;
+  const notchX = -headLen * 0.58;
+  const headPath = `M ${wingX.toFixed(2)} ${(-wingY).toFixed(2)} Q ${(noseR * 0.35).toFixed(2)} ${(-noseR).toFixed(2)} ${(noseR * 0.35).toFixed(2)} 0 Q ${(noseR * 0.35).toFixed(2)} ${noseR.toFixed(2)} ${wingX.toFixed(2)} ${wingY.toFixed(2)} Q ${notchX.toFixed(2)} ${(wingY * 0.35).toFixed(2)} ${notchX.toFixed(2)} 0 Q ${notchX.toFixed(2)} ${(-wingY * 0.35).toFixed(2)} ${wingX.toFixed(2)} ${(-wingY).toFixed(2)} Z`;
 
   const mainFill = isBlockerFlash ? '#f43f5e' : pal.main;
   const darkStroke = isBlockerFlash ? '#ffe4e6' : pal.dark;
@@ -1331,7 +1382,14 @@ function HeartIcon({ filled, pulse }: { filled: boolean; pulse: boolean }) {
   );
 }
 
-type MiniGameId = 'arrow-escape' | 'neon-2048' | 'neon-snake' | 'apple-catch';
+type MiniGameId =
+  | 'arrow-escape'
+  | 'arrow-mosaic'
+  | 'fruit-merge'
+  | 'neon-2048'
+  | 'neon-snake'
+  | 'apple-catch'
+  | 'brick-breaker';
 
 const HUB_COPY = {
   ar: {
@@ -1343,12 +1401,21 @@ const HUB_COPY = {
     progressLabel: 'التقدم',
     bestScoreLabel: 'أعلى نقاط',
     heartsTag: '3 قلوب',
+    arrowMosaicTag: '300–760 سهم',
+    fruitMergeTag: '11 فاكهة',
     neonTag: '4×4 نيون',
     snakeTag: 'نيون كلاسيك',
     appleCatchTag: '20 مرحلة',
+    brickBreakerTag: '3 قلوب · 15 مرحلة',
     arrowGameTitle: 'لغز الأسهم',
     arrowGameDesc:
-      'حرّر السهم الذهبي من متاهة الأسهم المنحنية والمتشابكة عبر 20 مرحلة مقفلة بالتسلسل.',
+      'حرّر السهم الذهبي من متاهة الأسهم المنحنية والمتشابكة عبر 25 مرحلة مقفلة بالتسلسل.',
+    arrowMosaicTitle: 'فسيفساء الأسهم',
+    arrowMosaicDesc:
+      'فكّك أشكالاً عملاقة من مئات الأسهم الناعمة المتشابكة عبر 10 مراحل من 300 إلى 760 سهماً مع متجر الذهب والأدوات.',
+    fruitMergeTitle: 'دمج الفواكه',
+    fruitMergeDesc:
+      'أسقط الفواكه وادمج المتشابه منها بفيزياء واقعية لتصل إلى البطيخ الذهبي وتحقق أعلى النقاط.',
     neon2048Title: 'تحدي 2048 النيون',
     neon2048Desc:
       'ادمج الكرات المتشابهة بسحب اللوحة للوصول إلى كرة 2048 وما بعدها مع حفظ أعلى رقم ونقاط.',
@@ -1358,6 +1425,9 @@ const HUB_COPY = {
     appleCatchTitle: 'أمسك التفاح وتجنب الخضار',
     appleCatchDesc:
       'التقط العدد المطلوب من التفاح المتساقط وتفادَ الخضار عبر 20 مرحلة مقفلة بالتسلسل.',
+    brickBreakerTitle: 'تكسير النيون',
+    brickBreakerDesc:
+      'كسّر طوب النيون والفولاذ والقنابل المتفجرة مع قدرات الكرة النارية وتعدد الكرات ×3 عبر 15 مرحلة مشوقة.',
     comingSoonTitle: 'ألعاب جديدة قريباً',
     comingSoonDesc: 'هذه المساحة جاهزة لإضافة المزيد من الألعاب الممتعة.',
   },
@@ -1370,12 +1440,21 @@ const HUB_COPY = {
     progressLabel: 'Progress',
     bestScoreLabel: 'Best Score',
     heartsTag: '3 Hearts',
+    arrowMosaicTag: '300–760 Arrows',
+    fruitMergeTag: '11 Fruits',
     neonTag: '4×4 Neon',
     snakeTag: 'Neon Arcade',
     appleCatchTag: '20 Stages',
+    brickBreakerTag: '3 Hearts · 15 Stages',
     arrowGameTitle: 'Arrow Escape',
     arrowGameDesc:
-      'Free the Golden Arrow from interlocked curved arrows across 20 locked levels.',
+      'Free the Golden Arrow from interlocked curved arrows across 25 locked levels.',
+    arrowMosaicTitle: 'Arrow Mosaic',
+    arrowMosaicDesc:
+      'Untangle 10 giant silhouette shapes made of 300 to 760 smooth curved arrows with a gold power-up shop.',
+    fruitMergeTitle: 'Fruit Merge',
+    fruitMergeDesc:
+      'Drop and merge matching fruits with smooth physics all the way to the Golden Watermelon.',
     neon2048Title: 'Neon 2048',
     neon2048Desc:
       'Slide and merge matching neon balls to reach 2048 and beyond with saved high scores.',
@@ -1385,6 +1464,9 @@ const HUB_COPY = {
     appleCatchTitle: 'Catch Apples, Dodge Veggies',
     appleCatchDesc:
       'Catch the target number of falling apples while dodging veggies across 20 locked stages.',
+    brickBreakerTitle: 'Neon Brick Breaker',
+    brickBreakerDesc:
+      'Shatter neon, armored steel, and chain-exploding bomb bricks with ×3 Multi-Ball & Fireball across 15 stages.',
     comingSoonTitle: 'More Games Soon',
     comingSoonDesc: 'Space ready for adding new mini-games anytime.',
   },
@@ -1393,12 +1475,16 @@ const HUB_COPY = {
 interface ArrowEscapeGameProps {
   lang: 'ar' | 'en';
   sfxEnabled: boolean;
+  musicEnabled: boolean;
+  onToggleMusic: () => void;
   onExitToHub: () => void;
 }
 
 const ArrowEscapeGame: React.FC<ArrowEscapeGameProps> = ({
   lang,
   sfxEnabled,
+  musicEnabled,
+  onToggleMusic,
   onExitToHub,
 }) => {
   const t = PUZZLE_COPY[lang];
@@ -1449,6 +1535,8 @@ const ArrowEscapeGame: React.FC<ArrowEscapeGameProps> = ({
   const streakRef = useRef<number>(0);
   const bumpTimerRef = useRef<number | null>(null);
   const loseTimerRef = useRef<number | null>(null);
+
+  useGameMusic('arrow-escape', musicEnabled && !lost);
 
   useEffect(() => {
     audioRef.current.enabled = sfxEnabled;
@@ -1642,24 +1730,25 @@ const ArrowEscapeGame: React.FC<ArrowEscapeGameProps> = ({
   );
 
   const handleUndo = useCallback(() => {
-    if (history.length === 0 || won || lost) return;
+    if (history.length === 0 || won || lost || hearts <= 0) return;
     const prevPieces = history[history.length - 1];
     setHistory((h) => h.slice(0, -1));
     setPieces(prevPieces);
+    setSlithers([]);
     setMoves((m) => Math.max(0, m - 1));
     setHintId(null);
     setBlockedImpact(null);
     setStatusMessage('');
-  }, [history, lost, won]);
+  }, [hearts, history, lost, won]);
 
   const handleHint = useCallback(() => {
-    if (won || lost) return;
+    if (won || lost || hearts <= 0) return;
     const bestId = findOptimalHintPieceId(pieces, spec.gridSize);
     if (bestId !== null) {
       setHintId(bestId);
       audioRef.current.playHint();
     }
-  }, [lost, pieces, spec.gridSize, won]);
+  }, [hearts, lost, pieces, spec.gridSize, won]);
 
   const orderedPieces = useMemo(() => {
     return [...pieces].sort((a, b) => Number(a.isGold) - Number(b.isGold));
@@ -1751,6 +1840,11 @@ const ArrowEscapeGame: React.FC<ArrowEscapeGameProps> = ({
                 {completedLevels.length}/{TOTAL_LEVELS}
               </span>
             </div>
+            <MusicToggleButton
+              enabled={musicEnabled}
+              onToggle={onToggleMusic}
+              lang={lang}
+            />
           </div>
         </div>
       </header>
@@ -1874,8 +1968,8 @@ const ArrowEscapeGame: React.FC<ArrowEscapeGameProps> = ({
                 0,
                 Math.min(1, (animNow - anim.startedAt) / anim.duration)
               );
-              // Smooth accelerate-out easing so the arrow rockets cleanly out of the maze
-              const eased = rawT * rawT * (2 - rawT * 0.65);
+              // Smooth accelerate-out easing clamped cleanly to [0, 1] so arrows never pop/shrink early
+              const eased = Math.min(1, rawT * rawT * (1.85 - 0.85 * rawT));
               const maxTravel = Math.max(1, anim.totalLen - anim.bodyLen);
               const offset = eased * maxTravel;
               const livePts = extractSubPolyline(
@@ -2018,10 +2112,10 @@ const ArrowEscapeGame: React.FC<ArrowEscapeGameProps> = ({
         <div className="w-full max-w-[540px] grid grid-cols-4 gap-2 shrink-0">
           <button
             type="button"
-            disabled={history.length === 0 || won || lost}
+            disabled={history.length === 0 || won || lost || hearts <= 0}
             onClick={handleUndo}
             className={`h-11 px-2 rounded-lg border text-xs sm:text-sm font-bold inline-flex items-center justify-center gap-1.5 transition-colors whitespace-nowrap ${
-              history.length === 0 || won || lost
+              history.length === 0 || won || lost || hearts <= 0
                 ? 'border-white/5 bg-slate-900/50 text-slate-500 cursor-not-allowed'
                 : 'border-white/12 bg-slate-900/90 hover:bg-slate-800 text-slate-100 cursor-pointer'
             }`}
@@ -2044,10 +2138,10 @@ const ArrowEscapeGame: React.FC<ArrowEscapeGameProps> = ({
 
           <button
             type="button"
-            disabled={won || lost}
+            disabled={won || lost || hearts <= 0}
             onClick={handleHint}
             className={`h-11 px-2 rounded-lg border text-xs sm:text-sm font-bold inline-flex items-center justify-center gap-1.5 transition-colors whitespace-nowrap ${
-              won || lost
+              won || lost || hearts <= 0
                 ? 'border-white/5 bg-slate-900/50 text-slate-500 cursor-not-allowed'
                 : 'border-emerald-400/35 bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-200 cursor-pointer'
             }`}
@@ -2116,8 +2210,14 @@ const ArrowEscapeGame: React.FC<ArrowEscapeGameProps> = ({
 
         {/* Level Picker Overlay Inside the Puzzle Game */}
         {levelsPickerOpen && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#050b16]/86 backdrop-blur-[4px]">
-            <div className="w-full max-w-md rounded-xl border border-white/14 bg-[#0f1a2e]/98 p-5 shadow-2xl">
+          <div
+            onClick={() => setLevelsPickerOpen(false)}
+            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#050b16]/86 backdrop-blur-[4px]"
+          >
+            <div
+              onClick={(e) => e.stopPropagation()}
+              className="w-full max-w-md rounded-xl border border-white/14 bg-[#0f1a2e]/98 p-5 shadow-2xl"
+            >
               <div className="flex items-start justify-between gap-3 mb-4">
                 <div>
                   <h2 className="text-base sm:text-lg font-bold text-white">
@@ -2151,7 +2251,14 @@ const ArrowEscapeGame: React.FC<ArrowEscapeGameProps> = ({
 
               <div className="space-y-3 max-h-[65vh] overflow-y-auto pe-1">
                 {(
-                  ['intro', 'curved', 'woven', 'hard', 'master'] as const
+                  [
+                    'intro',
+                    'curved',
+                    'woven',
+                    'hard',
+                    'master',
+                    'legend',
+                  ] as const
                 ).map((tierKey) => {
                   const tierLevels = LEVEL_SPECS.filter(
                     (s) => s.tierKey === tierKey
@@ -2161,7 +2268,13 @@ const ArrowEscapeGame: React.FC<ArrowEscapeGameProps> = ({
                       <div className="text-xs font-semibold text-slate-400 mb-1.5">
                         {t.tiers[tierKey]}
                       </div>
-                      <div className="grid grid-cols-4 gap-2">
+                      <div
+                        className={`grid gap-2 ${
+                          tierLevels.length === 5
+                            ? 'grid-cols-5'
+                            : 'grid-cols-4'
+                        }`}
+                      >
                         {tierLevels.map((lvlSpec) => {
                           const isLocked = lvlSpec.level > maxUnlockedLevel;
                           const isDone =
@@ -2366,6 +2479,8 @@ function ArrowEscapePreviewArt() {
 export const GamesModal: React.FC<GamesModalProps> = ({
   lang,
   sfxEnabled,
+  musicEnabled,
+  onToggleMusic,
   onClose,
 }) => {
   const [activeGame, setActiveGame] = useState<MiniGameId | null>(null);
@@ -2381,12 +2496,41 @@ export const GamesModal: React.FC<GamesModalProps> = ({
   const [appleCatchCleared, setAppleCatchCleared] = useState<number>(() =>
     readAppleCatchClearedCount()
   );
+  const [mosaicCleared, setMosaicCleared] = useState<number>(() =>
+    readArrowMosaicClearedCount()
+  );
+  const [fruitMergeStats, setFruitMergeStats] = useState<FruitMergeStats>(() =>
+    readFruitMergeStats()
+  );
+  const [brickBreakerStats, setBrickBreakerStats] = useState<BrickBreakerStats>(
+    () => readBrickBreakerStats()
+  );
+
+  // Play soft arcade lounge music while browsing the Games Hub
+  useGameMusic('hub', musicEnabled && activeGame === null);
+
+  // Allow Escape key to exit Games Hub cleanly back to the main game
+  useEffect(() => {
+    if (activeGame !== null) return;
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        e.stopPropagation();
+        onClose();
+      }
+    };
+    window.addEventListener('keydown', onKeyDown, true);
+    return () => window.removeEventListener('keydown', onKeyDown, true);
+  }, [activeGame, onClose]);
 
   const handleExitGameToHub = useCallback(() => {
     setArrowSolvedCount(readCompletedLevels().length);
     setStats2048(read2048Stats());
     setSnakeStats(readSnakeStats());
     setAppleCatchCleared(readAppleCatchClearedCount());
+    setMosaicCleared(readArrowMosaicClearedCount());
+    setFruitMergeStats(readFruitMergeStats());
+    setBrickBreakerStats(readBrickBreakerStats());
     setActiveGame(null);
   }, []);
 
@@ -2395,6 +2539,32 @@ export const GamesModal: React.FC<GamesModalProps> = ({
       <ArrowEscapeGame
         lang={lang}
         sfxEnabled={sfxEnabled}
+        musicEnabled={musicEnabled}
+        onToggleMusic={onToggleMusic}
+        onExitToHub={handleExitGameToHub}
+      />
+    );
+  }
+
+  if (activeGame === 'arrow-mosaic') {
+    return (
+      <ArrowMosaicGame
+        lang={lang}
+        sfxEnabled={sfxEnabled}
+        musicEnabled={musicEnabled}
+        onToggleMusic={onToggleMusic}
+        onExitToHub={handleExitGameToHub}
+      />
+    );
+  }
+
+  if (activeGame === 'fruit-merge') {
+    return (
+      <FruitMergeGame
+        lang={lang}
+        sfxEnabled={sfxEnabled}
+        musicEnabled={musicEnabled}
+        onToggleMusic={onToggleMusic}
         onExitToHub={handleExitGameToHub}
       />
     );
@@ -2405,6 +2575,8 @@ export const GamesModal: React.FC<GamesModalProps> = ({
       <Neon2048Game
         lang={lang}
         sfxEnabled={sfxEnabled}
+        musicEnabled={musicEnabled}
+        onToggleMusic={onToggleMusic}
         onExitToHub={handleExitGameToHub}
       />
     );
@@ -2415,6 +2587,8 @@ export const GamesModal: React.FC<GamesModalProps> = ({
       <NeonSnakeGame
         lang={lang}
         sfxEnabled={sfxEnabled}
+        musicEnabled={musicEnabled}
+        onToggleMusic={onToggleMusic}
         onExitToHub={handleExitGameToHub}
       />
     );
@@ -2425,12 +2599,27 @@ export const GamesModal: React.FC<GamesModalProps> = ({
       <AppleCatchGame
         lang={lang}
         sfxEnabled={sfxEnabled}
+        musicEnabled={musicEnabled}
+        onToggleMusic={onToggleMusic}
+        onExitToHub={handleExitGameToHub}
+      />
+    );
+  }
+
+  if (activeGame === 'brick-breaker') {
+    return (
+      <BrickBreakerGame
+        lang={lang}
+        sfxEnabled={sfxEnabled}
+        musicEnabled={musicEnabled}
+        onToggleMusic={onToggleMusic}
         onExitToHub={handleExitGameToHub}
       />
     );
   }
 
   const ht = HUB_COPY[lang];
+  const bestFruitTier = FRUIT_TIERS[Math.min(fruitMergeStats.maxTier, FRUIT_TIERS.length - 1)];
 
   return (
     <div
@@ -2470,9 +2659,16 @@ export const GamesModal: React.FC<GamesModalProps> = ({
             </h1>
           </div>
 
-          {/* Available Games Count */}
-          <div className="text-xs sm:text-sm font-semibold text-sky-300 whitespace-nowrap shrink-0">
-            {ht.gamesCount(4)}
+          {/* Available Games Count + Music Toggle */}
+          <div className="flex items-center gap-2.5 shrink-0">
+            <div className="text-xs sm:text-sm font-semibold text-sky-300 whitespace-nowrap">
+              {ht.gamesCount(7)}
+            </div>
+            <MusicToggleButton
+              enabled={musicEnabled}
+              onToggle={onToggleMusic}
+              lang={lang}
+            />
           </div>
         </div>
       </header>
@@ -2628,6 +2824,123 @@ export const GamesModal: React.FC<GamesModalProps> = ({
                   type="button"
                   onClick={() => setActiveGame('apple-catch')}
                   className="w-full h-11 rounded-lg bg-rose-500 hover:bg-rose-400 active:scale-[0.99] text-white font-bold text-sm sm:text-base transition-all cursor-pointer"
+                >
+                  {ht.playBtn}
+                </button>
+              </div>
+            </div>
+
+            {/* Game Card 5: Arrow Mosaic (فسيفساء الأسهم) */}
+            <div className="group rounded-2xl border border-indigo-400/40 bg-[#0d182d] hover:border-indigo-300/75 transition-colors overflow-hidden shadow-xl flex flex-col">
+              <div className="aspect-[2/1] w-full border-b border-white/10 overflow-hidden bg-[#1e0a6e]">
+                <ArrowMosaicPreviewArt />
+              </div>
+
+              <div className="p-4 flex-1 flex flex-col">
+                <div className="flex items-center justify-between gap-2 mb-1.5">
+                  <h2 className="text-base sm:text-lg font-bold text-white">
+                    {ht.arrowMosaicTitle}
+                  </h2>
+                  <span className="font-num text-xs font-semibold text-indigo-300 whitespace-nowrap">
+                    {ht.arrowMosaicTag}
+                  </span>
+                </div>
+
+                <p className="text-xs sm:text-sm text-slate-300 leading-relaxed mb-4 flex-1">
+                  {ht.arrowMosaicDesc}
+                </p>
+
+                <div className="flex items-center justify-between text-xs text-slate-400 mb-3 pt-2.5 border-t border-white/8">
+                  <span>{ht.progressLabel}</span>
+                  <span className="font-num font-bold text-indigo-300">
+                    {mosaicCleared}/{ARROW_MOSAIC_TOTAL_LEVELS}
+                  </span>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => setActiveGame('arrow-mosaic')}
+                  className="w-full h-11 rounded-lg bg-indigo-500 hover:bg-indigo-400 active:scale-[0.99] text-white font-bold text-sm sm:text-base transition-all cursor-pointer"
+                >
+                  {ht.playBtn}
+                </button>
+              </div>
+            </div>
+
+            {/* Game Card 6: Fruit Merge (دمج الفواكه) */}
+            <div className="group rounded-2xl border border-orange-400/35 bg-[#0d182d] hover:border-orange-300/70 transition-colors overflow-hidden shadow-xl flex flex-col">
+              <div className="aspect-[2/1] w-full border-b border-white/10 overflow-hidden bg-[#21130d]">
+                <FruitMergePreviewArt />
+              </div>
+
+              <div className="p-4 flex-1 flex flex-col">
+                <div className="flex items-center justify-between gap-2 mb-1.5">
+                  <h2 className="text-base sm:text-lg font-bold text-white">
+                    {ht.fruitMergeTitle}
+                  </h2>
+                  <span className="font-num text-xs font-semibold text-orange-300 whitespace-nowrap">
+                    {ht.fruitMergeTag}
+                  </span>
+                </div>
+
+                <p className="text-xs sm:text-sm text-slate-300 leading-relaxed mb-4 flex-1">
+                  {ht.fruitMergeDesc}
+                </p>
+
+                <div className="flex items-center justify-between text-xs text-slate-400 mb-3 pt-2.5 border-t border-white/8">
+                  <span>{ht.bestScoreLabel}</span>
+                  <span className="font-num font-bold text-orange-300">
+                    {fruitMergeStats.bestScore}
+                    {fruitMergeStats.bestScore > 0 && bestFruitTier
+                      ? ` · ${lang === 'ar' ? bestFruitTier.nameAr : bestFruitTier.nameEn}`
+                      : ''}
+                  </span>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => setActiveGame('fruit-merge')}
+                  className="w-full h-11 rounded-lg bg-orange-400 hover:bg-orange-300 active:scale-[0.99] text-slate-950 font-bold text-sm sm:text-base transition-all cursor-pointer"
+                >
+                  {ht.playBtn}
+                </button>
+              </div>
+            </div>
+
+            {/* Game Card 7: Neon Brick Breaker (تكسير النيون) */}
+            <div className="group rounded-2xl border border-sky-400/35 bg-[#0d182d] hover:border-sky-300/70 transition-colors overflow-hidden shadow-xl flex flex-col">
+              <div className="aspect-[2/1] w-full border-b border-white/10 overflow-hidden bg-[#060e1f]">
+                <BrickBreakerPreviewArt />
+              </div>
+
+              <div className="p-4 flex-1 flex flex-col">
+                <div className="flex items-center justify-between gap-2 mb-1.5">
+                  <h2 className="text-base sm:text-lg font-bold text-white">
+                    {ht.brickBreakerTitle}
+                  </h2>
+                  <span className="font-num text-xs font-semibold text-rose-300 whitespace-nowrap">
+                    {ht.brickBreakerTag}
+                  </span>
+                </div>
+
+                <p className="text-xs sm:text-sm text-slate-300 leading-relaxed mb-4 flex-1">
+                  {ht.brickBreakerDesc}
+                </p>
+
+                <div className="flex items-center justify-between text-xs text-slate-400 mb-3 pt-2.5 border-t border-white/8">
+                  <span>{ht.progressLabel}</span>
+                  <span className="font-num font-bold text-sky-300">
+                    {brickBreakerStats.clearedStages.length}/{BRICK_BREAKER_TOTAL_LEVELS}
+                    {brickBreakerStats.bestScore > 0
+                      ? ` · ${brickBreakerStats.bestScore}`
+                      : ''}
+                  </span>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => setActiveGame('brick-breaker')}
+                  className="w-full h-11 rounded-lg bg-sky-400 hover:bg-sky-300 active:scale-[0.99] text-slate-950 font-bold text-sm sm:text-base transition-all cursor-pointer"
                 >
                   {ht.playBtn}
                 </button>

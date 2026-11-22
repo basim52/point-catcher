@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { MusicToggleButton, useGameMusic } from './gameMusic';
 
 type SnakeDir = 'UP' | 'DOWN' | 'LEFT' | 'RIGHT';
 type WallMode = 'walls' | 'wrap';
@@ -430,6 +431,8 @@ export interface NeonSnakeStats {
 export interface NeonSnakeGameProps {
   lang: 'ar' | 'en';
   sfxEnabled: boolean;
+  musicEnabled: boolean;
+  onToggleMusic: () => void;
   onExitToHub: () => void;
 }
 
@@ -785,6 +788,8 @@ interface EngineState {
 export const NeonSnakeGame: React.FC<NeonSnakeGameProps> = ({
   lang,
   sfxEnabled,
+  musicEnabled,
+  onToggleMusic,
   onExitToHub,
 }) => {
   const t = COPY_SNAKE[lang];
@@ -798,6 +803,11 @@ export const NeonSnakeGame: React.FC<NeonSnakeGameProps> = ({
   const [length, setLength] = useState<number>(4);
   const [boostSeconds, setBoostSeconds] = useState<number>(0);
   const [stats, setStats] = useState<NeonSnakeStats>(() => readSnakeStats());
+
+  useGameMusic(
+    'neon-snake',
+    musicEnabled && phase !== 'PAUSED' && phase !== 'GAME_OVER'
+  );
 
   const phaseRef = useRef<GamePhase>(phase);
   const wallModeRef = useRef<WallMode>(wallMode);
@@ -1429,6 +1439,11 @@ export const NeonSnakeGame: React.FC<NeonSnakeGameProps> = ({
                 {length}
               </span>
             </div>
+            <MusicToggleButton
+              enabled={musicEnabled}
+              onToggle={onToggleMusic}
+              lang={lang}
+            />
           </div>
         </div>
       </header>

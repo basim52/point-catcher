@@ -18,7 +18,7 @@ export type SupplyId =
   | 'one_heart'
   | 'one_corn'
   | 'one_diamond';
-export type ShopTab = 'skins' | 'points' | 'supplies';
+export type ShopTab = 'skins' | 'points' | 'supplies' | 'upgrades';
 export type PointsSubTab = 'plus' | 'minus';
 
 export interface ShopState {
@@ -29,6 +29,7 @@ export interface ShopState {
   ownedMinusSkins: MinusPointSkinId[];
   equippedMinusSkin: MinusPointSkinId;
   shields: number;
+  maxHeartsUpgrade: number;
 }
 
 export interface SkinDefinition {
@@ -62,6 +63,9 @@ export interface SupplyDefinition {
 export const SHOP_STORAGE_KEY = 'point_catcher_shop_v1';
 export const MAX_SHIELDS = 5;
 export const SHIELD_DURATION = 2;
+export const MAX_HEARTS_UPGRADE_LEVELS = 5;
+// Expensive progressive Pink Coin costs for +1 Max Heart per level (10 -> 11 -> 12 -> 13 -> 14 -> 15)
+export const MAX_HEARTS_UPGRADE_COSTS: readonly number[] = [180, 300, 450, 675, 975];
 
 export const SKIN_CATALOG: SkinDefinition[] = [
   {
@@ -266,6 +270,7 @@ export function getDefaultShopState(): ShopState {
     ownedMinusSkins: ['classic'],
     equippedMinusSkin: 'classic',
     shields: 0,
+    maxHeartsUpgrade: 0,
   };
 }
 
@@ -327,6 +332,11 @@ export function readStoredShopState(): ShopState {
         : 'classic';
 
     const shields = clampInt(parsed.shields, 0, MAX_SHIELDS);
+    const maxHeartsUpgrade = clampInt(
+      parsed.maxHeartsUpgrade,
+      0,
+      MAX_HEARTS_UPGRADE_LEVELS
+    );
 
     return {
       ownedSkins,
@@ -336,6 +346,7 @@ export function readStoredShopState(): ShopState {
       ownedMinusSkins,
       equippedMinusSkin,
       shields,
+      maxHeartsUpgrade,
     };
   } catch {
     return fallback;
@@ -650,11 +661,14 @@ export function drawCustomPlusPoint(
   const isBlue = item.kind === 'blue_triangle';
   const isPurple = item.kind === 'purple_diamond';
   const isGold = item.kind === 'gold_star';
-  const label = isGold
+  const isRoyalNova = item.kind === 'royal_nova';
+  const label = isRoyalNova
+    ? '+10'
+    : isGold
     ? '+7'
-    : isPurple
+    : isPurple || item.kind === 'amber_crescent'
     ? '+5'
-    : isBlue
+    : isBlue || item.kind === 'coral_pentagon' || item.kind === 'indigo_octagon'
     ? '+4'
     : isGreen
     ? '+2'
@@ -662,7 +676,9 @@ export function drawCustomPlusPoint(
   const r = item.radius;
   const pulse = 1 + Math.sin(item.pulsePhase) * 0.06;
 
-  const light = isGold
+  const light = isRoyalNova
+    ? '#fdf4ff'
+    : isGold
     ? '#fef9c3'
     : isPurple
     ? '#f3e8ff'
@@ -671,7 +687,9 @@ export function drawCustomPlusPoint(
     : isGreen
     ? '#d1fae5'
     : '#fce7f3';
-  const mid = isGold
+  const mid = isRoyalNova
+    ? '#e879f9'
+    : isGold
     ? '#fbbf24'
     : isPurple
     ? '#c084fc'
@@ -680,7 +698,9 @@ export function drawCustomPlusPoint(
     : isGreen
     ? '#10b981'
     : '#f472b6';
-  const deep = isGold
+  const deep = isRoyalNova
+    ? '#86198f'
+    : isGold
     ? '#b45309'
     : isPurple
     ? '#6b21a8'
@@ -689,7 +709,9 @@ export function drawCustomPlusPoint(
     : isGreen
     ? '#047857'
     : '#be185d';
-  const glow = isGold
+  const glow = isRoyalNova
+    ? 'rgba(232, 121, 249, 0.66)'
+    : isGold
     ? 'rgba(251, 191, 36, 0.58)'
     : isPurple
     ? 'rgba(192, 132, 252, 0.54)'
@@ -834,6 +856,7 @@ export function drawCustomMinusPoint(
   item: PointCanvasRenderItem,
   skin: MinusPointSkinId
 ): void {
+  const isGiantBlack = item.kind === 'hazard_black_square';
   const isHeavy = item.kind === 'hazard_square';
   const isFreeze = item.kind === 'hazard_star';
   const isAmberArrow = item.kind === 'hazard_arrow_amber';
@@ -843,7 +866,9 @@ export function drawCustomMinusPoint(
   const r = item.radius;
   const pulse = 1 + Math.sin(item.pulsePhase * 1.2) * 0.05;
 
-  const rimColor = isFreeze
+  const rimColor = isGiantBlack
+    ? '#f87171'
+    : isFreeze
     ? '#7dd3fc'
     : isAmberArrow
     ? '#fde68a'
@@ -852,7 +877,9 @@ export function drawCustomMinusPoint(
     : isHeavy
     ? '#fca5a5'
     : '#fecaca';
-  const glowColor = isFreeze
+  const glowColor = isGiantBlack
+    ? 'rgba(239, 68, 68, 0.52)'
+    : isFreeze
     ? 'rgba(56, 189, 248, 0.45)'
     : isAmberArrow
     ? 'rgba(245, 158, 11, 0.52)'
@@ -1047,8 +1074,16 @@ export function drawCustomMinusPoint(
     ctx.restore();
   }
 
-  // Distinct crisp indicator badge for -2 Heavy Square or Freeze Star
-  if (isHeavy) {
+  // Distinct crisp indicator badge for -3 Giant Black Square, -2 Heavy Square, or Freeze Star
+  if (isGiantBlack) {
+    ctx.fillStyle = '#ffffff';
+    ctx.font = `900 ${Math.max(12, Math.round(r * 0.58))}px "Segoe UI", system-ui, sans-serif`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.shadowColor = 'rgba(220, 38, 38, 0.95)';
+    ctx.shadowBlur = 5;
+    ctx.fillText('-3', 0, 1);
+  } else if (isHeavy) {
     ctx.fillStyle = '#ffffff';
     ctx.font = `900 ${Math.max(10, Math.round(r * 0.62))}px "Segoe UI", system-ui, sans-serif`;
     ctx.textAlign = 'center';
@@ -1080,6 +1115,26 @@ export function drawCustomMinusPoint(
     ctx.shadowColor = 'rgba(88, 28, 135, 0.9)';
     ctx.shadowBlur = 4;
     ctx.fillText('▼', 0, 1);
+  } else if (
+    item.kind === 'minus_crimson_hex' ||
+    item.kind === 'minus_rust_diamond' ||
+    item.kind === 'minus_slate_cross' ||
+    item.kind === 'minus_teal_bolt' ||
+    item.kind === 'minus_plum_ring'
+  ) {
+    const minusText =
+      item.kind === 'minus_plum_ring'
+        ? '-5'
+        : item.kind === 'minus_rust_diamond' || item.kind === 'minus_teal_bolt'
+        ? '-4'
+        : '-3';
+    ctx.fillStyle = '#ffffff';
+    ctx.font = `900 ${Math.max(9.5, Math.round(r * 0.58))}px "Segoe UI", system-ui, sans-serif`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.shadowColor = 'rgba(15, 23, 42, 0.9)';
+    ctx.shadowBlur = 4;
+    ctx.fillText(minusText, 0, 1);
   } else if (skin === 'bombs') {
     ctx.fillStyle = '#fecaca';
     ctx.font = `900 ${Math.max(10, Math.round(r * 0.56))}px "Segoe UI", system-ui, sans-serif`;
@@ -1334,6 +1389,7 @@ interface ShopModalProps {
   onSelectOrBuyPlusSkin: (id: PlusPointSkinId) => void;
   onSelectOrBuyMinusSkin: (id: MinusPointSkinId) => void;
   onBuySupply: (id: SupplyId) => void;
+  onBuyMaxHeartsUpgrade: () => void;
 }
 
 export function ShopModal({
@@ -1356,6 +1412,7 @@ export function ShopModal({
   onSelectOrBuyPlusSkin,
   onSelectOrBuyMinusSkin,
   onBuySupply,
+  onBuyMaxHeartsUpgrade,
 }: ShopModalProps) {
   const isAr = lang === 'ar';
 
@@ -1409,13 +1466,14 @@ export function ShopModal({
           <div
             role="tablist"
             aria-label={isAr ? 'أقسام المتجر' : 'Shop categories'}
-            className="grid grid-cols-3 gap-1.5 p-1 rounded-lg bg-slate-950/75 border border-white/10 mb-4"
+            className="grid grid-cols-4 gap-1 p-1 rounded-lg bg-slate-950/75 border border-white/10 mb-4"
           >
             {(
               [
-                ['skins', isAr ? 'أشكال الملتقط' : 'Catcher'],
-                ['points', isAr ? 'أشكال النقاط' : 'Point Shapes'],
+                ['skins', isAr ? 'الملتقط' : 'Catcher'],
+                ['points', isAr ? 'النقاط' : 'Points'],
                 ['supplies', isAr ? 'الإمدادات' : 'Supplies'],
+                ['upgrades', isAr ? 'التطويرات' : 'Upgrades'],
               ] as [ShopTab, string][]
             ).map(([tabKey, label]) => (
               <button
@@ -1424,9 +1482,11 @@ export function ShopModal({
                 role="tab"
                 aria-selected={activeTab === tabKey}
                 onClick={() => onChangeTab(tabKey)}
-                className={`h-9 px-2 rounded-md text-xs sm:text-sm font-bold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400 whitespace-nowrap cursor-pointer ${
+                className={`h-9 px-1.5 rounded-md text-[11px] sm:text-xs font-bold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400 whitespace-nowrap cursor-pointer ${
                   activeTab === tabKey
-                    ? 'bg-amber-400 text-slate-950'
+                    ? tabKey === 'upgrades'
+                      ? 'bg-pink-400 text-slate-950'
+                      : 'bg-amber-400 text-slate-950'
                     : 'text-slate-300 hover:text-white hover:bg-slate-800/70'
                 }`}
               >
@@ -1746,14 +1806,26 @@ export function ShopModal({
                     <div className="min-w-0 flex-1">
                       <div className="flex items-baseline justify-between gap-2">
                         <span className="text-sm sm:text-base font-bold text-white truncate">
-                          {isAr ? sup.nameAr : sup.nameEn}
+                          {sup.id === 'full_hearts'
+                            ? isAr
+                              ? `تعبئة القلوب (${maxLives}/${maxLives})`
+                              : `Full Hearts Refill (${maxLives}/${maxLives})`
+                            : isAr
+                            ? sup.nameAr
+                            : sup.nameEn}
                         </span>
                         <span className="font-num text-xs font-semibold text-slate-400 whitespace-nowrap shrink-0">
                           {stockText}
                         </span>
                       </div>
                       <p className="text-xs text-slate-300 mt-0.5 leading-relaxed">
-                        {isAr ? sup.descAr : sup.descEn}
+                        {sup.id === 'full_hearts'
+                          ? isAr
+                            ? `يعبّئ رصيد القلوب بالكامل إلى ${maxLives}/${maxLives} دفعة واحدة.`
+                            : `Refills your entire Normal Stages heart pool back to ${maxLives}/${maxLives}.`
+                          : isAr
+                          ? sup.descAr
+                          : sup.descEn}
                       </p>
                     </div>
                     <button
@@ -1784,6 +1856,146 @@ export function ShopModal({
               })}
             </div>
           )}
+
+          {/* Upgrades Tab (Single permanent upgrade: Max Hearts 10 -> 15 in 5 expensive Pink Coin tiers) */}
+          {activeTab === 'upgrades' && (() => {
+            const level = shop.maxHeartsUpgrade;
+            const isMaxed = level >= MAX_HEARTS_UPGRADE_LEVELS;
+            const nextCost = isMaxed ? 0 : MAX_HEARTS_UPGRADE_COSTS[level];
+            const canAfford = !isMaxed && pinkCoins >= nextCost;
+            const baseMax = maxLives - level;
+            const maxPossible = baseMax + MAX_HEARTS_UPGRADE_LEVELS;
+
+            return (
+              <div className="space-y-3.5" role="tabpanel">
+                <div className="flex items-start gap-2.5 p-3 rounded-lg border border-pink-400/30 bg-pink-950/30">
+                  <PinkCoinIcon className="w-5 h-5 shrink-0 mt-0.5" />
+                  <p className="text-xs text-pink-100 leading-relaxed">
+                    <strong className="text-pink-300">
+                      {isAr ? 'التطويرات الدائمة:' : 'Permanent Upgrades:'}
+                    </strong>{' '}
+                    {isAr
+                      ? 'تُشترى التطويرات بالعملة الوردية وتبقى مفعّلة معك بشكل دائم.'
+                      : 'Permanent upgrades are purchased with Pink Coins and stay active forever.'}
+                  </p>
+                </div>
+
+                <div className="p-4 rounded-xl border border-pink-400/35 bg-gradient-to-b from-pink-950/35 to-slate-900/90 space-y-4">
+                  <div className="flex items-start gap-3.5">
+                    <div
+                      className="w-13 h-13 rounded-xl border border-rose-400/35 bg-[#1b0b18] flex items-center justify-center shrink-0 relative"
+                      aria-hidden="true"
+                    >
+                      <svg
+                        viewBox="0 0 24 24"
+                        className="w-7 h-7 text-rose-500"
+                        fill="currentColor"
+                      >
+                        <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z" />
+                      </svg>
+                      <span className="font-num absolute -bottom-1 -right-1 text-[10px] font-black bg-pink-400 text-slate-950 rounded px-1 leading-tight shadow">
+                        +1
+                      </span>
+                    </div>
+
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-baseline justify-between gap-2">
+                        <h3 className="text-sm sm:text-base font-bold text-white">
+                          {isAr ? 'زيادة عدد القلوب' : 'Max Hearts Capacity'}
+                        </h3>
+                        <span className="font-num text-xs font-bold text-pink-300 whitespace-nowrap shrink-0">
+                          {isAr
+                            ? `التطويرة ${level}/${MAX_HEARTS_UPGRADE_LEVELS}`
+                            : `Tier ${level}/${MAX_HEARTS_UPGRADE_LEVELS}`}
+                        </span>
+                      </div>
+                      <p className="text-xs text-slate-300 mt-1 leading-relaxed">
+                        {isAr
+                          ? `ترفع الحد الأقصى لقلوبك من ${baseMax} حتى ${maxPossible} قلباً (5 تطويرات — كل تطويرة تزيد +1 قلب دائماً وتعطيك قلباً فورياً).`
+                          : `Raises your maximum hearts from ${baseMax} up to ${maxPossible} (5 upgrades — each tier adds +1 permanent max heart and grants +1 heart immediately).`}
+                      </p>
+                      <div className="font-num text-xs font-bold text-rose-300 mt-2">
+                        {isAr
+                          ? `الحد الأقصى الحالي: ${maxLives} / ${maxPossible} قلب`
+                          : `Current Max: ${maxLives} / ${maxPossible} Hearts`}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* 5 Upgrade Tier Steps */}
+                  <div className="grid grid-cols-5 gap-1.5">
+                    {MAX_HEARTS_UPGRADE_COSTS.map((tierCost, idx) => {
+                      const tierNum = idx + 1;
+                      const targetHearts = baseMax + tierNum;
+                      const completed = level >= tierNum;
+                      const isNext = level === idx;
+                      return (
+                        <div
+                          key={tierNum}
+                          className={`rounded-lg border px-1.5 py-2 text-center transition-colors ${
+                            completed
+                              ? 'border-emerald-400/45 bg-emerald-500/15 text-emerald-200'
+                              : isNext
+                              ? 'border-pink-400/60 bg-pink-500/15 text-white'
+                              : 'border-white/10 bg-slate-950/60 text-slate-500'
+                          }`}
+                        >
+                          <div className="font-num text-xs font-black">
+                            {targetHearts} ❤
+                          </div>
+                          <div className="font-num text-[10px] font-semibold mt-0.5 flex items-center justify-center gap-0.5">
+                            {completed ? (
+                              <span>{isAr ? 'تم' : 'Done'}</span>
+                            ) : (
+                              <>
+                                <span>{tierCost}</span>
+                                <PinkCoinIcon className="w-2.5 h-2.5 shrink-0" />
+                              </>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  {/* Purchase Action */}
+                  <div className="flex items-center justify-between gap-3 pt-1">
+                    <div className="text-xs text-slate-300 font-num">
+                      {isMaxed
+                        ? isAr
+                          ? 'وصلت للحد الأقصى (15 قلباً)!'
+                          : 'Maximum capacity reached (15 Hearts)!'
+                        : isAr
+                        ? `التطويرة القادمة: ${maxLives} ← ${maxLives + 1} قلب`
+                        : `Next Upgrade: ${maxLives} → ${maxLives + 1} Hearts`}
+                    </div>
+                    <button
+                      type="button"
+                      disabled={isMaxed || !canAfford}
+                      onClick={onBuyMaxHeartsUpgrade}
+                      className={`h-9 px-4 rounded-lg inline-flex items-center justify-center gap-1.5 text-xs sm:text-sm font-bold transition-colors whitespace-nowrap shrink-0 ${
+                        isMaxed
+                          ? 'bg-emerald-500/15 text-emerald-300 border border-emerald-400/30 cursor-default'
+                          : canAfford
+                          ? 'bg-pink-400 hover:bg-pink-300 active:scale-95 text-slate-950 cursor-pointer'
+                          : 'bg-slate-800 text-slate-500 border border-white/10 cursor-not-allowed'
+                      }`}
+                    >
+                      {isMaxed ? (
+                        <span>{isAr ? 'مكتمل (15/15)' : 'Maxed (15/15)'}</span>
+                      ) : (
+                        <>
+                          <span>{isAr ? 'تطوير' : 'Upgrade'}</span>
+                          <span className="font-num">{nextCost}</span>
+                          <PinkCoinIcon className="w-4 h-4 shrink-0" />
+                        </>
+                      )}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            );
+          })()}
         </div>
       </div>
     </div>
