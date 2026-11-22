@@ -38,6 +38,12 @@ import {
   type BrickBreakerStats,
 } from './gameBrickBreaker';
 import { MusicToggleButton, useGameMusic } from './gameMusic';
+import { DateCatcherGame, DateCatcherPreviewArt } from './dateCatcher/DateCatcherGame';
+import { readDateCatcherBestScore } from './dateCatcher/types';
+import { DesertRallyGame, DesertRallyPreviewArt } from './desertRally/DesertRallyGame';
+import { readDesertRallyStats, type RallyStats } from './desertRally/types';
+import { ShawarmaGame, ShawarmaPreviewArt } from './shawarmaShop/ShawarmaGame';
+import { readShawarmaStats, type ShawarmaStats } from './shawarmaShop/types';
 
 type Dir = 'UP' | 'DOWN' | 'LEFT' | 'RIGHT';
 type TierKey = 'intro' | 'curved' | 'woven' | 'hard' | 'master' | 'legend';
@@ -95,6 +101,7 @@ export interface GamesModalProps {
   lang: 'ar' | 'en';
   sfxEnabled: boolean;
   musicEnabled: boolean;
+  initialGame?: MiniGameId | null;
   onToggleMusic: () => void;
   onClose: () => void;
 }
@@ -784,36 +791,6 @@ function generatePuzzleLevel(spec: LevelSpec): ArrowPiece[] {
   }));
 }
 
-function findOptimalHintPieceId(
-  pieces: ArrowPiece[],
-  gridSize: number
-): number | null {
-  const gold = pieces.find((p) => p.isGold);
-  if (!gold) return null;
-
-  const visited = new Set<number>([gold.id]);
-  const queue: ArrowPiece[] = [gold];
-
-  while (queue.length > 0) {
-    const curr = queue.shift()!;
-    const blockers = getAllBlockers(curr, pieces, gridSize);
-    if (blockers.length === 0) {
-      return curr.id;
-    }
-    for (const b of blockers) {
-      if (!visited.has(b.id)) {
-        visited.add(b.id);
-        queue.push(b);
-      }
-    }
-  }
-
-  for (const p of pieces) {
-    if (getAllBlockers(p, pieces, gridSize).length === 0) return p.id;
-  }
-  return null;
-}
-
 /**
  * Polyline arc-length helpers for silky 60fps curved slither-out animations (⤵️⤴️)
  */
@@ -1017,23 +994,6 @@ class PuzzleAudio {
       osc.stop(t + 0.26);
     });
   }
-
-  public playHint(): void {
-    const ctx = this.ensure();
-    if (!ctx) return;
-    const now = ctx.currentTime;
-    const osc = ctx.createOscillator();
-    const gain = ctx.createGain();
-    osc.type = 'sine';
-    osc.frequency.setValueAtTime(660, now);
-    osc.frequency.exponentialRampToValueAtTime(880, now + 0.12);
-    gain.gain.setValueAtTime(0.08, now);
-    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.14);
-    osc.connect(gain);
-    gain.connect(ctx.destination);
-    osc.start(now);
-    osc.stop(now + 0.15);
-  }
 }
 
 const PUZZLE_COPY = {
@@ -1056,7 +1016,6 @@ const PUZZLE_COPY = {
     },
     heartsAria: (n: number) => `القلوب المتبقية: ${n} من ${MAX_HEARTS}`,
     undoBtn: 'تراجع',
-    hintBtn: 'تلميح',
     restartBtn: 'إعادة',
     levelsBtn: 'المراحل',
     winTitle: (lvl: number) => `عبقري! حرّرت السهم الذهبي في المرحلة ${lvl}`,
@@ -1099,7 +1058,6 @@ const PUZZLE_COPY = {
     },
     heartsAria: (n: number) => `Hearts remaining: ${n} of ${MAX_HEARTS}`,
     undoBtn: 'Undo',
-    hintBtn: 'Hint',
     restartBtn: 'Restart',
     levelsBtn: 'Levels',
     winTitle: (lvl: number) => `Brilliant! Golden Arrow Freed (Level ${lvl})`,
@@ -1135,7 +1093,6 @@ function CurvedArrowGraphic({
   isGold,
   colorIdx,
   isBlockerFlash,
-  isHint,
   isHovered,
   isGoldFree,
   interactive,
@@ -1145,7 +1102,6 @@ function CurvedArrowGraphic({
   isGold: boolean;
   colorIdx: number;
   isBlockerFlash: boolean;
-  isHint: boolean;
   isHovered: boolean;
   isGoldFree: boolean;
   interactive: boolean;
@@ -1215,8 +1171,8 @@ function CurvedArrowGraphic({
         />
       )}
 
-      {/* Status glow halo (Blocker flash / Hint / Hover / Golden aura) */}
-      {(isBlockerFlash || isHint || isHovered || isGold) && (
+      {/* Status glow halo (Blocker flash / Hover / Golden aura) */}
+      {(isBlockerFlash || isHovered || isGold) && (
         <g pointerEvents="none">
           <path
             d={shaftPath}
@@ -1224,23 +1180,19 @@ function CurvedArrowGraphic({
             stroke={
               isBlockerFlash
                 ? '#fb7185'
-                : isHint
-                ? '#34d399'
                 : isGold
                 ? '#fde047'
                 : pal.light
             }
             strokeWidth={
               casingWidth +
-              (isBlockerFlash || isHint || isGoldFree ? 8 : isHovered ? 5 : 4.5)
+              (isBlockerFlash || isGoldFree ? 8 : isHovered ? 5 : 4.5)
             }
             strokeLinecap="round"
             strokeLinejoin="round"
             opacity={
               isBlockerFlash
                 ? 0.72
-                : isHint
-                ? 0.78
                 : isGoldFree
                 ? 0.56
                 : isGold
@@ -1257,19 +1209,15 @@ function CurvedArrowGraphic({
             stroke={
               isBlockerFlash
                 ? '#fb7185'
-                : isHint
-                ? '#34d399'
                 : isGold
                 ? '#fde047'
                 : pal.light
             }
-            strokeWidth={isBlockerFlash || isHint || isGoldFree ? 7 : 4}
+            strokeWidth={isBlockerFlash || isGoldFree ? 7 : 4}
             strokeLinejoin="round"
             opacity={
               isBlockerFlash
                 ? 0.72
-                : isHint
-                ? 0.78
                 : isGoldFree
                 ? 0.56
                 : isGold
@@ -1382,7 +1330,10 @@ function HeartIcon({ filled, pulse }: { filled: boolean; pulse: boolean }) {
   );
 }
 
-type MiniGameId =
+export type MiniGameId =
+  | 'shawarma-shop'
+  | 'desert-rally'
+  | 'date-catcher'
   | 'arrow-escape'
   | 'arrow-mosaic'
   | 'fruit-merge'
@@ -1407,6 +1358,18 @@ const HUB_COPY = {
     snakeTag: 'نيون كلاسيك',
     appleCatchTag: '20 مرحلة',
     brickBreakerTag: '3 قلوب · 15 مرحلة',
+    dateCatcherTag: 'ثلاثية الأبعاد · 3 قلوب',
+    dateCatcherTitle: 'صيد التمر 3D',
+    dateCatcherDesc:
+      'التقط التمر والرطب الذهبي المتساقط من النخلة بسلة الخوص في مزرعة غروب ثلاثية الأبعاد، وتجنّب الحصى والدبابير!',
+    desertRallyTag: 'سباق 3D · نيترو وقفز',
+    desertRallyTitle: 'سباق الصحراء 3D',
+    desertRallyDesc:
+      'انطلق بسيارة الرالي ثلاثية الأبعاد عبر طريق الوادي السريع، اقفز فوق الحواجز والصخور، اجمع العملات، وفعّل تيربو النيترو!',
+    shawarmaTag: 'مطعم 3D · شاورما',
+    shawarmaTitle: 'ملك الشاورما 3D',
+    shawarmaDesc:
+      'قصّ الشاورما من السيخ الدوّار وأضف الثومية والمخلل والبطاطس والشطة حسب طلبات الزبائن واجمع الريالات لتطوير محلك!',
     arrowGameTitle: 'لغز الأسهم',
     arrowGameDesc:
       'حرّر السهم الذهبي من متاهة الأسهم المنحنية والمتشابكة عبر 25 مرحلة مقفلة بالتسلسل.',
@@ -1446,6 +1409,18 @@ const HUB_COPY = {
     snakeTag: 'Neon Arcade',
     appleCatchTag: '20 Stages',
     brickBreakerTag: '3 Hearts · 15 Stages',
+    dateCatcherTag: '3D · 3 Hearts',
+    dateCatcherTitle: 'Date Catcher 3D',
+    dateCatcherDesc:
+      'Catch falling dates & golden rutab in a woven palm basket across a warm 3D sunset oasis while dodging stones and wasps!',
+    desertRallyTag: '3D Racer · Nitro & Jumps',
+    desertRallyTitle: 'Desert Rally 3D',
+    desertRallyDesc:
+      'Race your 3D rally buggy down the canyon highway, leap over barriers & boulders, collect gold coins, and ignite Turbo Nitro!',
+    shawarmaTag: '3D Shop · Cooking',
+    shawarmaTitle: 'Shawarma King 3D',
+    shawarmaDesc:
+      'Slice roasting meat off the spinning 3D spit, add garlic, pickles, fries & chili to order, earn SAR, and upgrade your shop!',
     arrowGameTitle: 'Arrow Escape',
     arrowGameDesc:
       'Free the Golden Arrow from interlocked curved arrows across 25 locked levels.',
@@ -1527,7 +1502,6 @@ const ArrowEscapeGame: React.FC<ArrowEscapeGameProps> = ({
   const [slithers, setSlithers] = useState<SlitherAnim[]>([]);
   const [animNow, setAnimNow] = useState<number>(() => performance.now());
   const [blockedImpact, setBlockedImpact] = useState<BlockedImpact | null>(null);
-  const [hintId, setHintId] = useState<number | null>(null);
   const [hoveredId, setHoveredId] = useState<number | null>(null);
   const [statusMessage, setStatusMessage] = useState<string>('');
   const [levelsPickerOpen, setLevelsPickerOpen] = useState<boolean>(false);
@@ -1600,7 +1574,6 @@ const ArrowEscapeGame: React.FC<ArrowEscapeGameProps> = ({
       setLost(false);
       setSlithers([]);
       setBlockedImpact(null);
-      setHintId(null);
       setHoveredId(null);
       setStatusMessage('');
       setLevelsPickerOpen(false);
@@ -1666,7 +1639,6 @@ const ArrowEscapeGame: React.FC<ArrowEscapeGameProps> = ({
       const remaining = pieces.filter((p) => p.id !== piece.id);
       setPieces(remaining);
       setMoves((m) => m + 1);
-      setHintId(null);
       setHoveredId(null);
       setBlockedImpact(null);
       setStatusMessage('');
@@ -1736,19 +1708,9 @@ const ArrowEscapeGame: React.FC<ArrowEscapeGameProps> = ({
     setPieces(prevPieces);
     setSlithers([]);
     setMoves((m) => Math.max(0, m - 1));
-    setHintId(null);
     setBlockedImpact(null);
     setStatusMessage('');
   }, [hearts, history, lost, won]);
-
-  const handleHint = useCallback(() => {
-    if (won || lost || hearts <= 0) return;
-    const bestId = findOptimalHintPieceId(pieces, spec.gridSize);
-    if (bestId !== null) {
-      setHintId(bestId);
-      audioRef.current.playHint();
-    }
-  }, [hearts, lost, pieces, spec.gridSize, won]);
 
   const orderedPieces = useMemo(() => {
     return [...pieces].sort((a, b) => Number(a.isGold) - Number(b.isGold));
@@ -1907,7 +1869,6 @@ const ArrowEscapeGame: React.FC<ArrowEscapeGameProps> = ({
             {orderedPieces.map((piece) => {
               const isBumped = blockedImpact?.pieceId === piece.id;
               const isBlockerFlash = blockedImpact?.blockerId === piece.id;
-              const isHint = hintId === piece.id;
               const isHovered = hoveredId === piece.id;
               const { dx, dy } = DIR_DELTA[piece.dir];
               const bumpPx = isBumped ? cellSize * 0.16 : 0;
@@ -1953,7 +1914,6 @@ const ArrowEscapeGame: React.FC<ArrowEscapeGameProps> = ({
                     isGold={piece.isGold}
                     colorIdx={piece.colorIdx}
                     isBlockerFlash={isBlockerFlash}
-                    isHint={isHint}
                     isHovered={isHovered}
                     isGoldFree={piece.isGold && isGoldCurrentlyFree}
                     interactive={true}
@@ -1991,7 +1951,6 @@ const ArrowEscapeGame: React.FC<ArrowEscapeGameProps> = ({
                     isGold={anim.piece.isGold}
                     colorIdx={anim.piece.colorIdx}
                     isBlockerFlash={false}
-                    isHint={false}
                     isHovered={false}
                     isGoldFree={anim.piece.isGold}
                     interactive={false}
@@ -2109,7 +2068,7 @@ const ArrowEscapeGame: React.FC<ArrowEscapeGameProps> = ({
         </div>
 
         {/* Clean Action Toolbar Below Arena */}
-        <div className="w-full max-w-[540px] grid grid-cols-4 gap-2 shrink-0">
+        <div className="w-full max-w-[540px] grid grid-cols-3 gap-2 shrink-0">
           <button
             type="button"
             disabled={history.length === 0 || won || lost || hearts <= 0}
@@ -2134,33 +2093,6 @@ const ArrowEscapeGame: React.FC<ArrowEscapeGameProps> = ({
               <path d="M21 17a9 9 0 0 0-9-9 9 9 0 0 0-6 2.3L3 13" />
             </svg>
             <span>{t.undoBtn}</span>
-          </button>
-
-          <button
-            type="button"
-            disabled={won || lost || hearts <= 0}
-            onClick={handleHint}
-            className={`h-11 px-2 rounded-lg border text-xs sm:text-sm font-bold inline-flex items-center justify-center gap-1.5 transition-colors whitespace-nowrap ${
-              won || lost || hearts <= 0
-                ? 'border-white/5 bg-slate-900/50 text-slate-500 cursor-not-allowed'
-                : 'border-emerald-400/35 bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-200 cursor-pointer'
-            }`}
-          >
-            <svg
-              viewBox="0 0 24 24"
-              className="w-4 h-4 shrink-0"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2.2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              aria-hidden="true"
-            >
-              <path d="M9 18h6" />
-              <path d="M10 22h4" />
-              <path d="M12 2a7 7 0 0 0-4 12.7V17h8v-2.3A7 7 0 0 0 12 2z" />
-            </svg>
-            <span>{t.hintBtn}</span>
           </button>
 
           <button
@@ -2480,10 +2412,11 @@ export const GamesModal: React.FC<GamesModalProps> = ({
   lang,
   sfxEnabled,
   musicEnabled,
+  initialGame = null,
   onToggleMusic,
   onClose,
 }) => {
-  const [activeGame, setActiveGame] = useState<MiniGameId | null>(null);
+  const [activeGame, setActiveGame] = useState<MiniGameId | null>(initialGame);
   const [arrowSolvedCount, setArrowSolvedCount] = useState<number>(
     () => readCompletedLevels().length
   );
@@ -2504,6 +2437,15 @@ export const GamesModal: React.FC<GamesModalProps> = ({
   );
   const [brickBreakerStats, setBrickBreakerStats] = useState<BrickBreakerStats>(
     () => readBrickBreakerStats()
+  );
+  const [dateCatcherBest, setDateCatcherBest] = useState<number>(() =>
+    readDateCatcherBestScore()
+  );
+  const [desertRallyStats, setDesertRallyStats] = useState<RallyStats>(() =>
+    readDesertRallyStats()
+  );
+  const [shawarmaStats, setShawarmaStats] = useState<ShawarmaStats>(() =>
+    readShawarmaStats()
   );
 
   // Play soft arcade lounge music while browsing the Games Hub
@@ -2531,8 +2473,23 @@ export const GamesModal: React.FC<GamesModalProps> = ({
     setMosaicCleared(readArrowMosaicClearedCount());
     setFruitMergeStats(readFruitMergeStats());
     setBrickBreakerStats(readBrickBreakerStats());
+    setDateCatcherBest(readDateCatcherBestScore());
+    setDesertRallyStats(readDesertRallyStats());
+    setShawarmaStats(readShawarmaStats());
     setActiveGame(null);
   }, []);
+
+  if (activeGame === 'shawarma-shop') {
+    return <ShawarmaGame lang={lang} onExit={handleExitGameToHub} />;
+  }
+
+  if (activeGame === 'desert-rally') {
+    return <DesertRallyGame lang={lang} onExit={handleExitGameToHub} />;
+  }
+
+  if (activeGame === 'date-catcher') {
+    return <DateCatcherGame onExit={handleExitGameToHub} />;
+  }
 
   if (activeGame === 'arrow-escape') {
     return (
@@ -2662,7 +2619,7 @@ export const GamesModal: React.FC<GamesModalProps> = ({
           {/* Available Games Count + Music Toggle */}
           <div className="flex items-center gap-2.5 shrink-0">
             <div className="text-xs sm:text-sm font-semibold text-sky-300 whitespace-nowrap">
-              {ht.gamesCount(7)}
+              {ht.gamesCount(10)}
             </div>
             <MusicToggleButton
               enabled={musicEnabled}
@@ -2941,6 +2898,122 @@ export const GamesModal: React.FC<GamesModalProps> = ({
                   type="button"
                   onClick={() => setActiveGame('brick-breaker')}
                   className="w-full h-9 sm:h-11 rounded-lg bg-sky-400 hover:bg-sky-300 active:scale-[0.99] text-slate-950 font-bold text-xs sm:text-base transition-all cursor-pointer"
+                >
+                  {ht.playBtn}
+                </button>
+              </div>
+            </div>
+
+            {/* Game Card 8: Date Catcher 3D (صيد التمر) */}
+            <div className="group rounded-xl sm:rounded-2xl border border-amber-400/50 bg-[#1a1314] hover:border-amber-300/80 transition-colors overflow-hidden shadow-xl flex flex-col">
+              <div className="aspect-[2/1] w-full border-b border-white/10 overflow-hidden bg-[#2b1718]">
+                <DateCatcherPreviewArt />
+              </div>
+
+              <div className="p-2.5 sm:p-4 flex-1 flex flex-col">
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-0.5 sm:gap-2 mb-1 sm:mb-1.5">
+                  <h2 className="text-xs sm:text-lg font-bold text-amber-100 leading-snug">
+                    {ht.dateCatcherTitle}
+                  </h2>
+                  <span className="font-num text-[10px] sm:text-xs font-semibold text-amber-300 whitespace-nowrap">
+                    {ht.dateCatcherTag}
+                  </span>
+                </div>
+
+                <p className="text-[11px] sm:text-sm text-amber-100/75 leading-snug sm:leading-relaxed mb-2.5 sm:mb-4 flex-1 line-clamp-2 sm:line-clamp-none">
+                  {ht.dateCatcherDesc}
+                </p>
+
+                <div className="flex items-center justify-between gap-1 text-[10.5px] sm:text-xs text-amber-200/75 mb-2 sm:mb-3 pt-2 sm:pt-2.5 border-t border-white/10">
+                  <span className="truncate">{ht.bestScoreLabel}</span>
+                  <span className="font-num font-bold text-amber-300 whitespace-nowrap">
+                    {dateCatcherBest}
+                  </span>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => setActiveGame('date-catcher')}
+                  className="w-full h-9 sm:h-11 rounded-lg bg-gradient-to-b from-amber-300 to-amber-500 hover:from-amber-200 hover:to-amber-400 active:scale-[0.99] text-[#2a1104] font-extrabold text-xs sm:text-base transition-all cursor-pointer"
+                >
+                  {ht.playBtn}
+                </button>
+              </div>
+            </div>
+
+            {/* Game Card 9: Desert Rally 3D (سباق الصحراء 3D) */}
+            <div className="group rounded-xl sm:rounded-2xl border border-orange-400/55 bg-[#1a131b] hover:border-orange-300/85 transition-colors overflow-hidden shadow-xl flex flex-col">
+              <div className="aspect-[2/1] w-full border-b border-white/10 overflow-hidden bg-[#1d2b53]">
+                <DesertRallyPreviewArt />
+              </div>
+
+              <div className="p-2.5 sm:p-4 flex-1 flex flex-col">
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-0.5 sm:gap-2 mb-1 sm:mb-1.5">
+                  <h2 className="text-xs sm:text-lg font-bold text-orange-100 leading-snug">
+                    {ht.desertRallyTitle}
+                  </h2>
+                  <span className="font-num text-[10px] sm:text-xs font-semibold text-orange-300 whitespace-nowrap">
+                    {ht.desertRallyTag}
+                  </span>
+                </div>
+
+                <p className="text-[11px] sm:text-sm text-orange-100/75 leading-snug sm:leading-relaxed mb-2.5 sm:mb-4 flex-1 line-clamp-2 sm:line-clamp-none">
+                  {ht.desertRallyDesc}
+                </p>
+
+                <div className="flex items-center justify-between gap-1 text-[10.5px] sm:text-xs text-orange-200/75 mb-2 sm:mb-3 pt-2 sm:pt-2.5 border-t border-white/10">
+                  <span className="truncate">{ht.bestScoreLabel}</span>
+                  <span className="font-num font-bold text-orange-300 whitespace-nowrap">
+                    {desertRallyStats.bestScore}
+                    {desertRallyStats.bestDistanceM > 0
+                      ? ` · ${desertRallyStats.bestDistanceM}m`
+                      : ''}
+                  </span>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => setActiveGame('desert-rally')}
+                  className="w-full h-9 sm:h-11 rounded-lg bg-gradient-to-b from-orange-400 to-amber-500 hover:from-orange-300 hover:to-amber-400 active:scale-[0.99] text-slate-950 font-extrabold text-xs sm:text-base transition-all cursor-pointer"
+                >
+                  {ht.playBtn}
+                </button>
+              </div>
+            </div>
+
+            {/* Game Card 10: Shawarma King 3D (ملك الشاورما 3D) */}
+            <div className="group rounded-xl sm:rounded-2xl border border-red-400/50 bg-[#1f1216] hover:border-amber-300/80 transition-colors overflow-hidden shadow-xl flex flex-col">
+              <div className="aspect-[2/1] w-full border-b border-white/10 overflow-hidden bg-[#3b1824]">
+                <ShawarmaPreviewArt />
+              </div>
+
+              <div className="p-2.5 sm:p-4 flex-1 flex flex-col">
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-0.5 sm:gap-2 mb-1 sm:mb-1.5">
+                  <h2 className="text-xs sm:text-lg font-bold text-amber-100 leading-snug">
+                    {ht.shawarmaTitle}
+                  </h2>
+                  <span className="font-num text-[10px] sm:text-xs font-semibold text-rose-300 whitespace-nowrap">
+                    {ht.shawarmaTag}
+                  </span>
+                </div>
+
+                <p className="text-[11px] sm:text-sm text-amber-100/75 leading-snug sm:leading-relaxed mb-2.5 sm:mb-4 flex-1 line-clamp-2 sm:line-clamp-none">
+                  {ht.shawarmaDesc}
+                </p>
+
+                <div className="flex items-center justify-between gap-1 text-[10.5px] sm:text-xs text-amber-200/75 mb-2 sm:mb-3 pt-2 sm:pt-2.5 border-t border-white/10">
+                  <span className="truncate">{ht.bestScoreLabel}</span>
+                  <span className="font-num font-bold text-amber-300 whitespace-nowrap">
+                    {shawarmaStats.bestCash > 0
+                      ? `${shawarmaStats.bestCash} · D${shawarmaStats.bestDay}`
+                      : '0'}
+                  </span>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => setActiveGame('shawarma-shop')}
+                  className="w-full h-9 sm:h-11 rounded-lg bg-gradient-to-b from-amber-300 to-orange-500 hover:from-amber-200 hover:to-orange-400 active:scale-[0.99] text-[#261105] font-extrabold text-xs sm:text-base transition-all cursor-pointer"
                 >
                   {ht.playBtn}
                 </button>

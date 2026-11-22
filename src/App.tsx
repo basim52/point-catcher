@@ -70,7 +70,9 @@ import {
   SUPPLY_CATALOG,
   SupplyId,
 } from './shop';
-import { GamesModal } from './miniGames';
+import { GamesModal, type MiniGameId } from './miniGames';
+import { LandingBoard } from './LandingBoard';
+import { IntroSplash } from './IntroSplash';
 
 type Lang = 'ar' | 'en';
 type GameStatus =
@@ -1836,6 +1838,9 @@ export default function App() {
   const [shop, setShop] = useState<ShopState>(initialShopState);
   const [settingsModalOpen, setSettingsModalOpen] = useState<boolean>(false);
   const [gamesModalOpen, setGamesModalOpen] = useState<boolean>(false);
+  const [showIntro, setShowIntro] = useState<boolean>(true);
+  const [showLanding, setShowLanding] = useState<boolean>(true);
+  const [initialMiniGame, setInitialMiniGame] = useState<MiniGameId | null>(null);
   const [musicEnabled, setMusicEnabled] = useState<boolean>(() =>
     readStoredBoolean(MUSIC_STORAGE_KEY, true)
   );
@@ -1859,6 +1864,8 @@ export default function App() {
   const bagRef = useRef<BagState>(bag);
   const settingsModalOpenRef = useRef<boolean>(false);
   const gamesModalOpenRef = useRef<boolean>(false);
+  const showIntroRef = useRef<boolean>(true);
+  const showLandingRef = useRef<boolean>(true);
   const shopRef = useRef<ShopState>(shop);
   const scoreRef = useRef<number>(0);
   const stagePointsRef = useRef<number>(0);
@@ -1924,6 +1931,14 @@ export default function App() {
       pointerId: null as number | null,
     },
   });
+
+  useEffect(() => {
+    showIntroRef.current = showIntro;
+  }, [showIntro]);
+
+  useEffect(() => {
+    showLandingRef.current = showLanding;
+  }, [showLanding]);
 
   const t = COPY[lang];
   const isFruitMode = gameMode === 'fruit';
@@ -3355,11 +3370,94 @@ export default function App() {
     if (!gamesModalOpenRef.current) return;
     gamesModalOpenRef.current = false;
     setGamesModalOpen(false);
+    setInitialMiniGame(null);
     if (statusBeforeModalRef.current === 'PLAYING') {
       statusRef.current = 'PLAYING';
       setStatus('PLAYING');
     }
   }, []);
+
+  const openLandingBoard = useCallback(() => {
+    if (statusRef.current === 'PLAYING') {
+      statusRef.current = 'PAUSED';
+      setStatus('PAUSED');
+    }
+    simRef.current.input.pointerActive = false;
+    simRef.current.input.leftBtn = false;
+    simRef.current.input.rightBtn = false;
+    setShowLanding(true);
+  }, []);
+
+  const handleLandingStartMain = useCallback(
+    (mode?: GameMode) => {
+      setShowLanding(false);
+      if (mode === 'fruit') {
+        if (fruitUnlockedRef.current && cornRef.current > 0) {
+          let highest = 1;
+          while (
+            highest < TOTAL_FRUIT_STAGES &&
+            completedFruitStagesRef.current.includes(highest)
+          ) {
+            highest++;
+          }
+          startAtStage(highest, 'fruit');
+        } else {
+          setStagesModalTab('fruit');
+          openStagesModal();
+        }
+        return;
+      }
+      if (mode === 'gold') {
+        if (goldUnlockedRef.current && diamondsRef.current > 0) {
+          let highest = 1;
+          while (
+            highest < TOTAL_GOLD_STAGES &&
+            completedGoldStagesRef.current.includes(highest)
+          ) {
+            highest++;
+          }
+          startAtStage(highest, 'gold');
+        } else {
+          setStagesModalTab('gold');
+          openStagesModal();
+        }
+        return;
+      }
+      if (mode === 'normal') {
+        gameModeRef.current = 'normal';
+        setGameMode('normal');
+      }
+    },
+    [openStagesModal, startAtStage]
+  );
+
+  const handleLandingOpenGamesHub = useCallback(() => {
+    setInitialMiniGame(null);
+    if (!gamesModalOpenRef.current) {
+      openGamesModal();
+    }
+  }, [openGamesModal]);
+
+  const handleLandingOpenDateCatcher = useCallback(() => {
+    setInitialMiniGame('date-catcher');
+    if (!gamesModalOpenRef.current) {
+      openGamesModal();
+    }
+  }, [openGamesModal]);
+
+  const handleLandingOpenDesertRally = useCallback(() => {
+    setInitialMiniGame('desert-rally');
+    if (!gamesModalOpenRef.current) {
+      openGamesModal();
+    }
+  }, [openGamesModal]);
+
+  const handleLandingOpenShawarma = useCallback(() => {
+    setInitialMiniGame('shawarma-shop');
+    if (!gamesModalOpenRef.current) {
+      openGamesModal();
+    }
+  }, [openGamesModal]);
 
   const togglePause = useCallback(() => {
     if (
@@ -3447,6 +3545,10 @@ export default function App() {
           e.preventDefault();
           closeGamesModal();
         }
+        return;
+      }
+
+      if (showIntroRef.current || showLandingRef.current) {
         return;
       }
 
@@ -7708,10 +7810,15 @@ export default function App() {
         <div className="mx-auto max-w-[1040px] px-2 sm:px-6 flex flex-col lg:flex-row lg:items-center lg:justify-between lg:h-16 lg:gap-4">
           {/* Row 1 on <lg (Title + Controls); splits cleanly on lg+ via display:contents */}
           <div className="h-10 lg:h-auto flex items-center justify-between gap-1 sm:gap-2 min-w-0 lg:contents">
-            {/* Title Wordmark */}
-            <div className="text-[11px] min-[390px]:text-xs sm:text-base lg:text-lg font-bold tracking-tight text-white whitespace-nowrap shrink-0 lg:order-1">
+            {/* Title Wordmark — click to return to Landing Board (لوحة الهبوط) */}
+            <button
+              type="button"
+              onClick={openLandingBoard}
+              title={lang === 'ar' ? 'العودة إلى لوحة الهبوط' : 'Back to Landing Screen'}
+              className="text-[11px] min-[390px]:text-xs sm:text-base lg:text-lg font-bold tracking-tight text-white hover:text-sky-300 transition-colors whitespace-nowrap shrink-0 lg:order-1 cursor-pointer"
+            >
               {t.title}
-            </div>
+            </button>
 
             {/* Utility Controls — compact on mobile so Stages, Games, Shop, Bag, Index & Settings all fit cleanly */}
             <div className="flex items-center justify-end gap-1 sm:gap-2 min-w-0 lg:order-3">
@@ -10673,12 +10780,60 @@ export default function App() {
         </div>
       </main>
 
+      {/* Landing Board ("لوحة الهبوط") */}
+      {showLanding && (
+        <LandingBoard
+          lang={lang}
+          bestScore={bestScore}
+          coins={coins}
+          pinkCoins={pinkCoins}
+          lives={lives}
+          maxLives={effectiveMaxLives}
+          completedNormalCount={completedStages.length}
+          totalNormalStages={TOTAL_STAGES}
+          completedFruitCount={completedFruitStages.length}
+          totalFruitStages={TOTAL_FRUIT_STAGES}
+          completedGoldCount={completedGoldStages.length}
+          totalGoldStages={TOTAL_GOLD_STAGES}
+          totalBagCount={totalBagCount}
+          onStartMainGame={handleLandingStartMain}
+          onOpenGamesHub={handleLandingOpenGamesHub}
+          onOpenDateCatcher={handleLandingOpenDateCatcher}
+          onOpenDesertRally={handleLandingOpenDesertRally}
+          onOpenShawarma={handleLandingOpenShawarma}
+          onOpenShop={() => {
+            setShowLanding(false);
+            openShopModal();
+          }}
+          onOpenIndex={() => {
+            setShowLanding(false);
+            openIndexModal();
+          }}
+          onOpenBag={() => {
+            setShowLanding(false);
+            openBagModal();
+          }}
+          onReplayIntro={() => setShowIntro(true)}
+          onToggleLang={() => setLang((prev) => (prev === 'ar' ? 'en' : 'ar'))}
+        />
+      )}
+
+      {/* Opening Logo Splash Screen with Signature / Custom Music */}
+      {showIntro && (
+        <IntroSplash
+          lang={lang}
+          musicEnabled={musicEnabled}
+          onComplete={() => setShowIntro(false)}
+        />
+      )}
+
       {/* Full-Screen Mini-Games Hub ("صالة اللعاب") */}
       {gamesModalOpen && (
         <GamesModal
           lang={lang}
           sfxEnabled={sfxEnabled}
           musicEnabled={musicEnabled}
+          initialGame={initialMiniGame}
           onToggleMusic={() => setMusicEnabled((prev) => !prev)}
           onClose={closeGamesModal}
         />
