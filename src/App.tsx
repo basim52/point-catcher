@@ -7703,24 +7703,24 @@ export default function App() {
       dir={lang === 'ar' ? 'rtl' : 'ltr'}
       className="h-[100dvh] w-full bg-[#070e1a] text-slate-100 flex flex-col overflow-hidden"
     >
-      {/* Top HUD Bar — 2 compact rows on mobile & tablet (zero overlap), single spacious row on lg+ */}
+      {/* Top HUD Bar — 2 compact rows on mobile & tablet (zero overlap/clipping), single spacious row on lg+ */}
       <header className="relative z-30 w-full border-b border-white/10 bg-[#0b1424]/95 shrink-0">
-        <div className="mx-auto max-w-[1040px] px-3 sm:px-6 flex flex-col lg:flex-row lg:items-center lg:justify-between lg:h-16 lg:gap-4">
+        <div className="mx-auto max-w-[1040px] px-2 sm:px-6 flex flex-col lg:flex-row lg:items-center lg:justify-between lg:h-16 lg:gap-4">
           {/* Row 1 on <lg (Title + Controls); splits cleanly on lg+ via display:contents */}
-          <div className="h-10 lg:h-auto flex items-center justify-between gap-1.5 lg:contents">
+          <div className="h-10 lg:h-auto flex items-center justify-between gap-1 sm:gap-2 min-w-0 lg:contents">
             {/* Title Wordmark */}
-            <div className="text-xs sm:text-base lg:text-lg font-bold tracking-tight text-white whitespace-nowrap shrink-0 lg:order-1">
+            <div className="text-[11px] min-[390px]:text-xs sm:text-base lg:text-lg font-bold tracking-tight text-white whitespace-nowrap shrink-0 lg:order-1">
               {t.title}
             </div>
 
-            {/* Utility Controls */}
-            <div className="flex items-center gap-1 sm:gap-2 shrink-0 lg:order-3">
+            {/* Utility Controls — compact on mobile so Stages, Games, Shop, Bag, Index & Settings all fit cleanly */}
+            <div className="flex items-center justify-end gap-1 sm:gap-2 min-w-0 lg:order-3">
               {/* Compact Stages Navigation Button ("المراحل") */}
               <button
                 type="button"
                 onClick={openStagesModal}
                 aria-expanded={stagesModalOpen}
-                className={`h-7 lg:h-8 px-1.5 sm:px-2.5 inline-flex items-center justify-center gap-1 rounded-md border text-[11px] sm:text-xs font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400 whitespace-nowrap shrink-0 cursor-pointer ${
+                className={`h-7 lg:h-8 px-1.5 sm:px-2.5 inline-flex items-center justify-center gap-1 rounded-md border text-[10.5px] min-[390px]:text-[11px] sm:text-xs font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400 whitespace-nowrap shrink-0 cursor-pointer ${
                   stagesModalOpen
                     ? 'border-sky-400/60 bg-sky-500/20 text-sky-200'
                     : 'border-white/12 bg-slate-900/80 text-slate-100 hover:bg-slate-800 hover:text-white'
@@ -7728,7 +7728,7 @@ export default function App() {
               >
                 <svg
                   viewBox="0 0 24 24"
-                  className="w-3 h-3 sm:w-3.5 sm:h-3.5 shrink-0"
+                  className="hidden sm:block w-3.5 h-3.5 shrink-0"
                   fill="none"
                   stroke="currentColor"
                   strokeWidth="2"
@@ -7749,7 +7749,7 @@ export default function App() {
                 type="button"
                 onClick={openGamesModal}
                 aria-expanded={gamesModalOpen}
-                className={`h-7 lg:h-8 px-1.5 sm:px-2.5 inline-flex items-center justify-center gap-1 rounded-md border text-[11px] sm:text-xs font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400 whitespace-nowrap shrink-0 cursor-pointer ${
+                className={`h-7 lg:h-8 px-1.5 sm:px-2.5 inline-flex items-center justify-center gap-1 rounded-md border text-[10.5px] min-[390px]:text-[11px] sm:text-xs font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400 whitespace-nowrap shrink-0 cursor-pointer ${
                   gamesModalOpen
                     ? 'border-emerald-400/60 bg-emerald-500/20 text-emerald-200'
                     : 'border-emerald-400/35 bg-emerald-500/10 text-emerald-200 hover:bg-emerald-500/20 hover:text-emerald-100'
@@ -7757,7 +7757,7 @@ export default function App() {
               >
                 <svg
                   viewBox="0 0 24 24"
-                  className="w-3 h-3 sm:w-3.5 sm:h-3.5 shrink-0"
+                  className="hidden sm:block w-3.5 h-3.5 shrink-0"
                   fill="none"
                   stroke="currentColor"
                   strokeWidth="2"
@@ -7779,7 +7779,7 @@ export default function App() {
                 type="button"
                 onClick={openShopModal}
                 aria-expanded={shopModalOpen}
-                className={`h-7 lg:h-8 px-1.5 sm:px-2.5 inline-flex items-center justify-center gap-1 rounded-md border text-[11px] sm:text-xs font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400 whitespace-nowrap shrink-0 cursor-pointer ${
+                className={`h-7 lg:h-8 px-1.5 sm:px-2.5 inline-flex items-center justify-center gap-1 rounded-md border text-[10.5px] min-[390px]:text-[11px] sm:text-xs font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400 whitespace-nowrap shrink-0 cursor-pointer ${
                   shopModalOpen
                     ? 'border-amber-400/60 bg-amber-500/20 text-amber-200'
                     : 'border-amber-400/30 bg-amber-500/10 text-amber-200 hover:bg-amber-500/20 hover:text-amber-100'
@@ -7787,7 +7787,7 @@ export default function App() {
               >
                 <svg
                   viewBox="0 0 24 24"
-                  className="w-3 h-3 sm:w-3.5 sm:h-3.5 shrink-0"
+                  className="hidden sm:block w-3.5 h-3.5 shrink-0"
                   fill="none"
                   stroke="currentColor"
                   strokeWidth="2"
@@ -7802,12 +7802,14 @@ export default function App() {
                 <span>{t.shopBtn}</span>
               </button>
 
-              {/* Bag Button ("الحقيبة") */}
+              {/* Compact Bag Button ("الحقيبة") — icon + count on mobile, full label on sm+ */}
               <button
                 type="button"
                 onClick={openBagModal}
                 aria-expanded={bagModalOpen}
-                className={`h-7 lg:h-8 px-1.5 sm:px-2.5 inline-flex items-center justify-center gap-1 rounded-md border text-[11px] sm:text-xs font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-400 whitespace-nowrap shrink-0 cursor-pointer ${
+                aria-label={`${t.bagBtn}${totalBagCount > 0 ? ` (${totalBagCount})` : ''}`}
+                title={`${t.bagBtn}${totalBagCount > 0 ? ` (${totalBagCount})` : ''}`}
+                className={`h-7 lg:h-8 px-1.5 sm:px-2.5 inline-flex items-center justify-center gap-1 rounded-md border text-[10.5px] sm:text-xs font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-400 whitespace-nowrap shrink-0 cursor-pointer ${
                   bagModalOpen
                     ? 'border-rose-400/60 bg-rose-500/20 text-rose-200'
                     : 'border-rose-400/30 bg-rose-500/10 text-rose-200 hover:bg-rose-500/20 hover:text-rose-100'
@@ -7815,7 +7817,7 @@ export default function App() {
               >
                 <svg
                   viewBox="0 0 24 24"
-                  className="w-3 h-3 sm:w-3.5 sm:h-3.5 shrink-0"
+                  className="w-3.5 h-3.5 shrink-0"
                   fill="none"
                   stroke="currentColor"
                   strokeWidth="2"
@@ -7827,10 +7829,11 @@ export default function App() {
                   <path d="M9 6V5a3 3 0 0 1 6 0v1" />
                   <path d="M9 13h6" />
                 </svg>
-                <span>{t.bagBtn}</span>
+                <span className="hidden sm:inline">{t.bagBtn}</span>
                 {totalBagCount > 0 && (
                   <span className="font-num text-[10px] font-bold text-white">
-                    ({totalBagCount})
+                    <span className="sm:hidden">{totalBagCount}</span>
+                    <span className="hidden sm:inline">({totalBagCount})</span>
                   </span>
                 )}
               </button>
@@ -7840,7 +7843,7 @@ export default function App() {
                 type="button"
                 onClick={openIndexModal}
                 aria-expanded={indexModalOpen}
-                className={`h-7 lg:h-8 px-1.5 sm:px-2.5 inline-flex items-center justify-center gap-1 rounded-md border text-[11px] sm:text-xs font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400 whitespace-nowrap shrink-0 cursor-pointer ${
+                className={`h-7 lg:h-8 px-1.5 sm:px-2.5 inline-flex items-center justify-center gap-1 rounded-md border text-[10.5px] min-[390px]:text-[11px] sm:text-xs font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400 whitespace-nowrap shrink-0 cursor-pointer ${
                   indexModalOpen
                     ? 'border-sky-400/60 bg-sky-500/20 text-sky-200'
                     : 'border-white/12 bg-slate-900/80 text-slate-100 hover:bg-slate-800 hover:text-white'
@@ -7848,7 +7851,7 @@ export default function App() {
               >
                 <svg
                   viewBox="0 0 24 24"
-                  className="w-3 h-3 sm:w-3.5 sm:h-3.5 shrink-0"
+                  className="hidden sm:block w-3.5 h-3.5 shrink-0"
                   fill="none"
                   stroke="currentColor"
                   strokeWidth="2"
@@ -7898,7 +7901,8 @@ export default function App() {
                 onClick={openSettingsModal}
                 aria-expanded={settingsModalOpen}
                 aria-label={t.settingsBtn}
-                className={`h-7 lg:h-8 px-1.5 sm:px-2.5 inline-flex items-center justify-center gap-1 rounded-md border text-[11px] sm:text-xs font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400 whitespace-nowrap shrink-0 cursor-pointer ${
+                title={t.settingsBtn}
+                className={`h-7 w-7 sm:w-auto lg:h-8 sm:px-2.5 inline-flex items-center justify-center gap-1 rounded-md border text-[11px] sm:text-xs font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400 whitespace-nowrap shrink-0 cursor-pointer ${
                   settingsModalOpen
                     ? 'border-sky-400/60 bg-sky-500/20 text-sky-200'
                     : 'border-white/12 bg-slate-900/80 text-slate-100 hover:bg-slate-800 hover:text-white'
@@ -7933,16 +7937,16 @@ export default function App() {
 
           {/* Row 2 on <lg (Dedicated Metrics Bar); middle section on lg+ */}
           <div
-            className="h-9 lg:h-auto border-t border-white/5 lg:border-t-0 flex items-center justify-between lg:justify-center gap-2 sm:gap-3 lg:gap-4 min-w-0 lg:order-2"
+            className="h-9 lg:h-auto border-t border-white/5 lg:border-t-0 flex items-center justify-between lg:justify-center gap-1 sm:gap-3 lg:gap-4 min-w-0 lg:order-2"
             aria-live="polite"
           >
             {/* Stage Indicator */}
-            <div className="flex items-baseline gap-1 whitespace-nowrap">
-              <span className="text-[11px] sm:text-xs text-slate-400">
+            <div className="flex items-baseline gap-0.5 sm:gap-1 whitespace-nowrap">
+              <span className="text-[10px] sm:text-xs text-slate-400">
                 {t.stage}
               </span>
               <span
-                className={`font-num text-xs sm:text-sm lg:text-base font-bold ${
+                className={`font-num text-[11px] sm:text-sm lg:text-base font-bold ${
                   isGoldMode
                     ? 'text-yellow-300'
                     : isFruitMode
@@ -7954,26 +7958,26 @@ export default function App() {
               </span>
             </div>
 
-            <div className="h-3.5 sm:h-4 w-px bg-white/10 shrink-0" aria-hidden="true" />
+            <div className="hidden sm:block h-4 w-px bg-white/10 shrink-0" aria-hidden="true" />
 
             {/* Stage Progress & Score */}
-            <div className="flex items-baseline gap-1 whitespace-nowrap">
-              <span className="text-[11px] sm:text-xs lg:text-sm text-slate-400">
+            <div className="flex items-baseline gap-0.5 sm:gap-1 whitespace-nowrap">
+              <span className="text-[10px] sm:text-xs lg:text-sm text-slate-400">
                 {t.score}
               </span>
-              <span className="font-num text-xs sm:text-sm lg:text-base font-bold text-white">
+              <span className="font-num text-[11px] sm:text-sm lg:text-base font-bold text-white">
                 {stagePoints}
               </span>
-              <span className="font-num text-[11px] sm:text-xs text-slate-400">
+              <span className="font-num text-[10px] sm:text-xs text-slate-400">
                 /{currentStageConfig.pointsNeeded}
               </span>
             </div>
 
-            <div className="h-3.5 sm:h-4 w-px bg-white/10 shrink-0" aria-hidden="true" />
+            <div className="hidden sm:block h-4 w-px bg-white/10 shrink-0" aria-hidden="true" />
 
             {/* Coins (الفلوس) */}
             <div
-              className="flex items-center gap-1 whitespace-nowrap"
+              className="flex items-center gap-0.5 sm:gap-1 whitespace-nowrap"
               aria-label={`${t.coins}: ${coins}`}
             >
               <svg
@@ -7998,12 +8002,12 @@ export default function App() {
                   strokeWidth="1.4"
                 />
               </svg>
-              <span className="font-num text-xs sm:text-sm lg:text-base font-bold text-amber-300">
+              <span className="font-num text-[11px] sm:text-sm lg:text-base font-bold text-amber-300">
                 {coins}
               </span>
             </div>
 
-            <div className="h-3.5 sm:h-4 w-px bg-white/10 shrink-0" aria-hidden="true" />
+            <div className="hidden sm:block h-4 w-px bg-white/10 shrink-0" aria-hidden="true" />
 
             {/* Pink Coins (العملات الوردية) + Benefit Info */}
             <div className="relative flex items-center whitespace-nowrap">
@@ -8013,14 +8017,14 @@ export default function App() {
                 aria-expanded={pinkCoinInfoOpen}
                 aria-label={`${t.pinkCoins}: ${pinkCoins} — ${t.pinkCoinBenefitDesc}`}
                 title={`${t.pinkCoinBenefitTitle}: ${t.pinkCoinBenefitDesc}`}
-                className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md border transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-pink-400 ${
+                className={`inline-flex items-center gap-0.5 sm:gap-1 px-1 sm:px-1.5 py-0.5 rounded-md border transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-pink-400 ${
                   pinkCoinInfoOpen
                     ? 'border-pink-400/70 bg-pink-500/20'
                     : 'border-pink-400/30 bg-pink-500/10 hover:bg-pink-500/20'
                 }`}
               >
                 <PinkCoinIcon className="w-3.5 h-3.5 sm:w-4 sm:h-4 lg:w-4.5 lg:h-4.5 shrink-0" />
-                <span className="font-num text-xs sm:text-sm lg:text-base font-bold text-pink-300">
+                <span className="font-num text-[11px] sm:text-sm lg:text-base font-bold text-pink-300">
                   {pinkCoins}
                 </span>
                 <span className="hidden md:inline text-[10px] font-semibold text-pink-200/90 border-s border-pink-400/30 ps-1">
@@ -8028,7 +8032,7 @@ export default function App() {
                 </span>
                 <span
                   aria-hidden="true"
-                  className="inline-flex items-center justify-center w-3.5 h-3.5 rounded-full bg-pink-400/25 text-[9px] font-bold text-pink-100"
+                  className="hidden sm:inline-flex items-center justify-center w-3.5 h-3.5 rounded-full bg-pink-400/25 text-[9px] font-bold text-pink-100"
                 >
                   ؟
                 </span>
@@ -8038,7 +8042,7 @@ export default function App() {
                 <div
                   role="dialog"
                   aria-label={t.pinkCoinBenefitTitle}
-                  className="absolute top-full mt-2 left-1/2 -translate-x-1/2 z-40 w-64 sm:w-72 p-3 rounded-xl border border-pink-400/45 bg-[#120d1f]/98 shadow-2xl whitespace-normal text-start"
+                  className="fixed top-20 inset-x-3 mx-auto sm:absolute sm:top-full sm:inset-x-auto sm:left-1/2 sm:-translate-x-1/2 sm:mt-2 z-40 w-auto max-w-[300px] sm:w-72 p-3 rounded-xl border border-pink-400/45 bg-[#120d1f]/98 shadow-2xl whitespace-normal text-start"
                 >
                   <div className="flex items-center justify-between gap-2 mb-1.5">
                     <div className="flex items-center gap-1.5">
@@ -8073,31 +8077,31 @@ export default function App() {
               </span>
             </div>
 
-            <div className="h-3.5 sm:h-4 w-px bg-white/10 shrink-0" aria-hidden="true" />
+            <div className="hidden sm:block h-4 w-px bg-white/10 shrink-0" aria-hidden="true" />
 
             {/* Lives (Hearts in Normal, Corn in Fruit, Diamonds in Gold) + live 5-min regen + buy button */}
             <div
-              className="flex items-center gap-1 sm:gap-1.5 whitespace-nowrap"
+              className="flex items-center gap-0.5 sm:gap-1.5 whitespace-nowrap"
               aria-label={`${
                 isGoldMode ? t.diamondsLabel : isFruitMode ? t.cornLabel : t.lives
               }: ${activeLives}/${activeMaxLives}`}
             >
               {isGoldMode ? (
                 <DiamondIcon
-                  className={`w-4 h-4 sm:w-5 sm:h-5 shrink-0 ${
+                  className={`w-3.5 h-3.5 sm:w-5 sm:h-5 shrink-0 ${
                     activeLives > 0 ? '' : 'opacity-40 grayscale'
                   }`}
                 />
               ) : isFruitMode ? (
                 <CornIcon
-                  className={`w-4 h-4 sm:w-5 sm:h-5 shrink-0 ${
+                  className={`w-3.5 h-3.5 sm:w-5 sm:h-5 shrink-0 ${
                     activeLives > 0 ? '' : 'opacity-40 grayscale'
                   }`}
                 />
               ) : (
                 <svg
                   viewBox="0 0 24 24"
-                  className={`w-4 h-4 sm:w-4.5 sm:h-4.5 shrink-0 ${
+                  className={`w-3.5 h-3.5 sm:w-4.5 sm:h-4.5 shrink-0 ${
                     activeLives > 0 ? 'text-rose-500' : 'text-slate-600'
                   }`}
                   fill="currentColor"
@@ -8107,7 +8111,7 @@ export default function App() {
                 </svg>
               )}
               <span
-                className={`font-num text-xs sm:text-sm lg:text-base font-bold ${
+                className={`font-num text-[11px] sm:text-sm lg:text-base font-bold ${
                   activeLives > 0
                     ? isGoldMode
                       ? 'text-sky-300'
@@ -8120,7 +8124,7 @@ export default function App() {
                 {activeLives}/{activeMaxLives}
               </span>
               {activeLives < activeMaxLives && (
-                <span className="font-num text-[10px] sm:text-xs font-semibold text-sky-300 bg-sky-500/15 border border-sky-400/25 rounded px-1 py-0.5">
+                <span className="font-num text-[9.5px] sm:text-xs font-semibold text-sky-300 bg-sky-500/15 border border-sky-400/25 rounded px-1 py-0.5">
                   {formatCountdown(activeNextRegenMs)}
                 </span>
               )}
@@ -8159,7 +8163,7 @@ export default function App() {
                     ? t.buyCornAria
                     : t.buyHeartAria
                 }
-                className={`h-6 px-1.5 inline-flex items-center justify-center gap-0.5 rounded border text-[10px] sm:text-[11px] font-bold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400 shrink-0 ${
+                className={`h-6 px-1 sm:px-1.5 inline-flex items-center justify-center gap-0.5 rounded border text-[10px] sm:text-[11px] font-bold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400 shrink-0 ${
                   activeLives < activeMaxLives &&
                   activeLifeCurrencyBalance >= activeLifeBuyCost
                     ? isGoldMode
