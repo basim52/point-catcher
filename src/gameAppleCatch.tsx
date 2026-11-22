@@ -2275,8 +2275,8 @@ export const AppleCatchGame: React.FC<AppleCatchGameProps> = ({
                               <IndexItemIcon kind={item.kind} />
                             </div>
                             <div className="min-w-0 flex-1">
-                              <div className="flex items-center justify-between gap-2 mb-0.5">
-                                <span className="text-sm font-bold text-white truncate">
+                              <div className="flex flex-wrap items-center justify-between gap-x-2 gap-y-1 mb-0.5">
+                                <span className="text-sm font-bold text-white leading-snug break-words">
                                   {item.name}
                                 </span>
                                 <span
@@ -2315,8 +2315,8 @@ export const AppleCatchGame: React.FC<AppleCatchGameProps> = ({
                             <IndexItemIcon kind={item.kind} />
                           </div>
                           <div className="min-w-0 flex-1">
-                            <div className="flex items-center justify-between gap-2 mb-0.5">
-                              <span className="text-sm font-bold text-white truncate">
+                            <div className="flex flex-wrap items-center justify-between gap-x-2 gap-y-1 mb-0.5">
+                              <span className="text-sm font-bold text-white leading-snug break-words">
                                 {item.name}
                               </span>
                               <span className="font-num text-[11px] font-extrabold px-2 py-0.5 rounded-md border border-rose-400/40 bg-rose-500/20 text-rose-200 whitespace-nowrap shrink-0">

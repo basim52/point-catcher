@@ -9299,11 +9299,17 @@ export default function App() {
 
           {/* Index Overlay ("الاندكس") — Normal + Fruit + Gold Indexes with catch-based discovery lock */}
           {indexModalOpen && (
-            <div className="absolute inset-0 z-20 flex items-center justify-center p-3 sm:p-5 bg-[#060c17]/82 backdrop-blur-[4px]">
-              <div className="w-full max-w-md max-h-full flex flex-col rounded-xl border border-white/14 bg-[#0f1a2e]/98 shadow-2xl overflow-hidden">
-                <div className="flex items-center justify-between gap-3 px-5 py-4 border-b border-white/10 shrink-0">
-                  <div className="flex items-center gap-2.5 min-w-0">
-                    <h2 className="text-lg sm:text-xl font-bold text-white whitespace-nowrap">
+            <div
+              className="fixed inset-0 z-40 flex items-center justify-center p-2.5 sm:p-5 bg-[#060c17]/84 backdrop-blur-[4px]"
+              onClick={closeIndexModal}
+            >
+              <div
+                onClick={(e) => e.stopPropagation()}
+                className="w-full max-w-md max-h-[88dvh] flex flex-col rounded-xl border border-white/14 bg-[#0f1a2e]/98 shadow-2xl overflow-hidden"
+              >
+                <div className="flex items-center justify-between gap-2.5 px-3.5 sm:px-5 py-3 sm:py-4 border-b border-white/10 shrink-0">
+                  <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5 min-w-0">
+                    <h2 className="text-base sm:text-xl font-bold text-white leading-tight">
                       {indexModalWorld === 'gold'
                         ? t.goldIndexWorldBtn
                         : indexModalWorld === 'fruit'
@@ -9358,7 +9364,7 @@ export default function App() {
                   </button>
                 </div>
 
-                <div className="px-5 pt-3.5 pb-5 overflow-y-auto">
+                <div className="px-3.5 sm:px-5 pt-3 pb-4 sm:pb-5 overflow-y-auto overflow-x-hidden">
                   {/* World Switcher: Normal vs Fruit vs Gold Index */}
                   <div
                     role="tablist"
@@ -9370,15 +9376,15 @@ export default function App() {
                       role="tab"
                       aria-selected={indexModalWorld === 'normal'}
                       onClick={() => setIndexModalWorld('normal')}
-                      className={`h-9 px-1.5 rounded-md inline-flex items-center justify-center gap-1 text-[11px] sm:text-xs font-bold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400 whitespace-nowrap cursor-pointer ${
+                      className={`min-w-0 min-h-[44px] sm:h-9 px-1.5 py-1.5 sm:py-0 rounded-md flex flex-col sm:flex-row items-center justify-center gap-0.5 sm:gap-1 text-[11px] sm:text-xs font-bold leading-tight text-center transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400 cursor-pointer ${
                         indexModalWorld === 'normal'
                           ? 'bg-sky-500 text-slate-950'
                           : 'text-slate-300 hover:text-white hover:bg-slate-800/70'
                       }`}
                     >
-                      <span>{t.normalIndexWorldBtn}</span>
+                      <span className="max-w-full truncate">{t.normalIndexWorldBtn}</span>
                       <span
-                        className={`font-num text-[10px] ${
+                        className={`font-num text-[10px] shrink-0 ${
                           indexModalWorld === 'normal'
                             ? 'text-slate-900'
                             : 'text-slate-400'
@@ -9393,15 +9399,15 @@ export default function App() {
                       role="tab"
                       aria-selected={indexModalWorld === 'fruit'}
                       onClick={() => setIndexModalWorld('fruit')}
-                      className={`h-9 px-1.5 rounded-md inline-flex items-center justify-center gap-1 text-[11px] sm:text-xs font-bold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400 whitespace-nowrap cursor-pointer ${
+                      className={`min-w-0 min-h-[44px] sm:h-9 px-1.5 py-1.5 sm:py-0 rounded-md flex flex-col sm:flex-row items-center justify-center gap-0.5 sm:gap-1 text-[11px] sm:text-xs font-bold leading-tight text-center transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400 cursor-pointer ${
                         indexModalWorld === 'fruit'
                           ? 'bg-amber-400 text-slate-950'
                           : 'text-amber-200 hover:text-white hover:bg-amber-500/15'
                       }`}
                     >
-                      <span>{t.fruitIndexWorldBtn}</span>
+                      <span className="max-w-full truncate">{t.fruitIndexWorldBtn}</span>
                       <span
-                        className={`font-num text-[10px] ${
+                        className={`font-num text-[10px] shrink-0 ${
                           indexModalWorld === 'fruit'
                             ? 'text-slate-900'
                             : 'text-amber-300/80'
@@ -9416,15 +9422,15 @@ export default function App() {
                       role="tab"
                       aria-selected={indexModalWorld === 'gold'}
                       onClick={() => setIndexModalWorld('gold')}
-                      className={`h-9 px-1.5 rounded-md inline-flex items-center justify-center gap-1 text-[11px] sm:text-xs font-bold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-yellow-300 whitespace-nowrap cursor-pointer ${
+                      className={`min-w-0 min-h-[44px] sm:h-9 px-1.5 py-1.5 sm:py-0 rounded-md flex flex-col sm:flex-row items-center justify-center gap-0.5 sm:gap-1 text-[11px] sm:text-xs font-bold leading-tight text-center transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-yellow-300 cursor-pointer ${
                         indexModalWorld === 'gold'
                           ? 'bg-gradient-to-r from-yellow-400 via-amber-400 to-sky-400 text-slate-950'
                           : 'text-yellow-200 hover:text-white hover:bg-yellow-500/15'
                       }`}
                     >
-                      <span>{t.goldIndexWorldBtn}</span>
+                      <span className="max-w-full truncate">{t.goldIndexWorldBtn}</span>
                       <span
-                        className={`font-num text-[10px] ${
+                        className={`font-num text-[10px] shrink-0 ${
                           indexModalWorld === 'gold'
                             ? 'text-slate-950/85'
                             : 'text-sky-300/90'
@@ -9435,7 +9441,7 @@ export default function App() {
                     </button>
                   </div>
 
-                  <p className="text-xs sm:text-sm text-slate-300 mb-3.5 leading-relaxed">
+                  <p className="text-xs sm:text-sm text-slate-300 mb-3 leading-relaxed">
                     {indexModalWorld === 'gold'
                       ? t.goldIndexModalHint
                       : indexModalWorld === 'fruit'
@@ -9447,14 +9453,14 @@ export default function App() {
                   <div
                     role="tablist"
                     aria-label={t.indexModalTitle}
-                    className="grid grid-cols-2 gap-2 p-1 rounded-lg bg-slate-950/70 border border-white/10 mb-4"
+                    className="grid grid-cols-2 gap-1.5 sm:gap-2 p-1 rounded-lg bg-slate-950/70 border border-white/10 mb-3.5"
                   >
                     <button
                       type="button"
                       role="tab"
                       aria-selected={indexTab === 'positive'}
                       onClick={() => setIndexTab('positive')}
-                      className={`h-10 px-3 rounded-md inline-flex items-center justify-center gap-2 text-xs sm:text-sm font-bold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400 whitespace-nowrap cursor-pointer ${
+                      className={`min-w-0 h-10 px-2 sm:px-3 rounded-md inline-flex items-center justify-center gap-1.5 sm:gap-2 text-xs sm:text-sm font-bold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400 cursor-pointer ${
                         indexTab === 'positive'
                           ? indexModalWorld === 'gold'
                             ? 'bg-gradient-to-r from-yellow-400 to-sky-400 text-slate-950'
@@ -9464,7 +9470,7 @@ export default function App() {
                           : 'text-slate-300 hover:text-white hover:bg-slate-800/70'
                       }`}
                     >
-                      <span>
+                      <span className="truncate">
                         {indexModalWorld === 'gold'
                           ? t.goldIndexPlusTab
                           : indexModalWorld === 'fruit'
@@ -9472,7 +9478,7 @@ export default function App() {
                           : t.indexPlusTab}
                       </span>
                       <span
-                        className={`font-num text-[11px] ${
+                        className={`font-num text-[11px] shrink-0 ${
                           indexTab === 'positive' ? 'text-slate-900' : 'text-slate-400'
                         }`}
                       >
@@ -9489,13 +9495,13 @@ export default function App() {
                       role="tab"
                       aria-selected={indexTab === 'negative'}
                       onClick={() => setIndexTab('negative')}
-                      className={`h-10 px-3 rounded-md inline-flex items-center justify-center gap-2 text-xs sm:text-sm font-bold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-400 whitespace-nowrap cursor-pointer ${
+                      className={`min-w-0 h-10 px-2 sm:px-3 rounded-md inline-flex items-center justify-center gap-1.5 sm:gap-2 text-xs sm:text-sm font-bold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-400 cursor-pointer ${
                         indexTab === 'negative'
                           ? 'bg-rose-500 text-white'
                           : 'text-slate-300 hover:text-white hover:bg-slate-800/70'
                       }`}
                     >
-                      <span>
+                      <span className="truncate">
                         {indexModalWorld === 'gold'
                           ? t.goldIndexMinusTab
                           : indexModalWorld === 'fruit'
@@ -9503,7 +9509,7 @@ export default function App() {
                           : t.indexMinusTab}
                       </span>
                       <span
-                        className={`font-num text-[11px] ${
+                        className={`font-num text-[11px] shrink-0 ${
                           indexTab === 'negative' ? 'text-rose-100' : 'text-slate-400'
                         }`}
                       >
@@ -9525,7 +9531,7 @@ export default function App() {
                           return (
                             <div
                               key={entry.kind}
-                              className={`flex items-center gap-3.5 p-3.5 rounded-lg border transition-colors ${
+                              className={`flex items-start gap-3 p-3 sm:p-3.5 rounded-lg border transition-colors ${
                                 discovered
                                   ? isPositive
                                     ? 'border-yellow-400/30 bg-gradient-to-r from-[#221908]/85 to-[#101c2d]/85'
@@ -9534,7 +9540,7 @@ export default function App() {
                               }`}
                             >
                               <div
-                                className={`w-12 h-12 rounded-lg border flex items-center justify-center shrink-0 ${
+                                className={`w-11 h-11 sm:w-12 sm:h-12 rounded-lg border flex items-center justify-center shrink-0 mt-0.5 ${
                                   discovered
                                     ? 'border-yellow-400/25 bg-[#161108]'
                                     : 'border-yellow-400/18 bg-[#120e07]'
@@ -9547,12 +9553,12 @@ export default function App() {
                               <div className="min-w-0 flex-1">
                                 {discovered ? (
                                   <>
-                                    <div className="flex items-baseline justify-between gap-2">
-                                      <span className="text-sm sm:text-base font-bold text-white truncate">
+                                    <div className="flex flex-wrap items-baseline justify-between gap-x-2 gap-y-0.5">
+                                      <span className="text-sm sm:text-base font-bold text-white leading-snug break-words">
                                         {lang === 'ar' ? entry.nameAr : entry.nameEn}
                                       </span>
                                       <span
-                                        className={`font-num text-xs sm:text-sm font-bold whitespace-nowrap shrink-0 ${
+                                        className={`font-num text-xs sm:text-sm font-bold leading-snug break-words ${
                                           entry.kind === 'blue_diamond'
                                             ? 'text-sky-300'
                                             : isPositive
@@ -9563,12 +9569,12 @@ export default function App() {
                                         {lang === 'ar' ? entry.valueAr : entry.valueEn}
                                       </span>
                                     </div>
-                                    <div className="font-num text-[11px] font-semibold text-amber-300/90 mt-0.5">
+                                    <div className="font-num text-[11px] font-semibold text-amber-300/90 mt-1">
                                       {lang === 'ar'
                                         ? `تظهر من المرحلة ${entry.minStage}`
                                         : `Appears from Stage ${entry.minStage}`}
                                     </div>
-                                    <p className="text-xs text-slate-300 mt-1 leading-relaxed">
+                                    <p className="text-xs text-slate-300 mt-1 leading-relaxed break-words">
                                       {lang === 'ar'
                                         ? entry.benefitAr
                                         : entry.benefitEn}
@@ -9576,20 +9582,20 @@ export default function App() {
                                   </>
                                 ) : (
                                   <>
-                                    <div className="flex items-baseline justify-between gap-2">
-                                      <span className="text-sm sm:text-base font-bold text-slate-100 truncate">
+                                    <div className="flex flex-wrap items-baseline justify-between gap-x-2 gap-y-0.5">
+                                      <span className="text-sm sm:text-base font-bold text-slate-100 leading-snug break-words">
                                         {lang === 'ar' ? entry.nameAr : entry.nameEn}
                                       </span>
-                                      <span className="text-[11px] font-semibold text-slate-400 whitespace-nowrap shrink-0">
+                                      <span className="text-[11px] font-semibold text-slate-400 whitespace-nowrap">
                                         {lang === 'ar' ? 'فائدته مقفلة' : 'Effect Locked'}
                                       </span>
                                     </div>
-                                    <div className="font-num text-[11px] font-semibold text-amber-300/85 mt-0.5">
+                                    <div className="font-num text-[11px] font-semibold text-amber-300/85 mt-1">
                                       {lang === 'ar'
                                         ? `تظهر من المرحلة ${entry.minStage}`
                                         : `Appears from Stage ${entry.minStage}`}
                                     </div>
-                                    <p className="text-xs text-slate-400 mt-1 leading-relaxed">
+                                    <p className="text-xs text-slate-400 mt-1 leading-relaxed break-words">
                                       {lang === 'ar'
                                         ? 'الفائدة مخفية — التقطه أو المسه أثناء اللعب لفتح فائدته.'
                                         : 'Benefit hidden — catch or touch it during play to unlock its effect.'}
@@ -9607,7 +9613,7 @@ export default function App() {
                           return (
                             <div
                               key={entry.kind}
-                              className={`flex items-center gap-3.5 p-3.5 rounded-lg border transition-colors ${
+                              className={`flex items-start gap-3 p-3 sm:p-3.5 rounded-lg border transition-colors ${
                                 discovered
                                   ? isPositive
                                     ? 'border-emerald-400/25 bg-emerald-950/45'
@@ -9616,7 +9622,7 @@ export default function App() {
                               }`}
                             >
                               <div
-                                className={`w-12 h-12 rounded-lg border flex items-center justify-center shrink-0 ${
+                                className={`w-11 h-11 sm:w-12 sm:h-12 rounded-lg border flex items-center justify-center shrink-0 mt-0.5 ${
                                   discovered
                                     ? 'border-white/12 bg-[#0a1a12]'
                                     : 'border-emerald-400/15 bg-[#09150f]'
@@ -9629,12 +9635,12 @@ export default function App() {
                               <div className="min-w-0 flex-1">
                                 {discovered ? (
                                   <>
-                                    <div className="flex items-baseline justify-between gap-2">
-                                      <span className="text-sm sm:text-base font-bold text-white truncate">
+                                    <div className="flex flex-wrap items-baseline justify-between gap-x-2 gap-y-0.5">
+                                      <span className="text-sm sm:text-base font-bold text-white leading-snug break-words">
                                         {lang === 'ar' ? entry.nameAr : entry.nameEn}
                                       </span>
                                       <span
-                                        className={`font-num text-xs sm:text-sm font-bold whitespace-nowrap shrink-0 ${
+                                        className={`font-num text-xs sm:text-sm font-bold leading-snug break-words ${
                                           isPositive
                                             ? 'text-lime-300'
                                             : 'text-rose-400'
@@ -9643,12 +9649,12 @@ export default function App() {
                                         {lang === 'ar' ? entry.valueAr : entry.valueEn}
                                       </span>
                                     </div>
-                                    <div className="font-num text-[11px] font-semibold text-emerald-300/90 mt-0.5">
+                                    <div className="font-num text-[11px] font-semibold text-emerald-300/90 mt-1">
                                       {lang === 'ar'
                                         ? `تظهر من المرحلة ${entry.minStage}`
                                         : `Appears from Stage ${entry.minStage}`}
                                     </div>
-                                    <p className="text-xs text-slate-300 mt-1 leading-relaxed">
+                                    <p className="text-xs text-slate-300 mt-1 leading-relaxed break-words">
                                       {lang === 'ar'
                                         ? entry.benefitAr
                                         : entry.benefitEn}
@@ -9656,20 +9662,20 @@ export default function App() {
                                   </>
                                 ) : (
                                   <>
-                                    <div className="flex items-baseline justify-between gap-2">
-                                      <span className="text-sm sm:text-base font-bold text-slate-100 truncate">
+                                    <div className="flex flex-wrap items-baseline justify-between gap-x-2 gap-y-0.5">
+                                      <span className="text-sm sm:text-base font-bold text-slate-100 leading-snug break-words">
                                         {lang === 'ar' ? entry.nameAr : entry.nameEn}
                                       </span>
-                                      <span className="text-[11px] font-semibold text-slate-400 whitespace-nowrap shrink-0">
+                                      <span className="text-[11px] font-semibold text-slate-400 whitespace-nowrap">
                                         {lang === 'ar' ? 'فائدته مقفلة' : 'Effect Locked'}
                                       </span>
                                     </div>
-                                    <div className="font-num text-[11px] font-semibold text-emerald-300/85 mt-0.5">
+                                    <div className="font-num text-[11px] font-semibold text-emerald-300/85 mt-1">
                                       {lang === 'ar'
                                         ? `تظهر من المرحلة ${entry.minStage}`
                                         : `Appears from Stage ${entry.minStage}`}
                                     </div>
-                                    <p className="text-xs text-slate-400 mt-1 leading-relaxed">
+                                    <p className="text-xs text-slate-400 mt-1 leading-relaxed break-words">
                                       {lang === 'ar'
                                         ? 'الفائدة مخفية — التقطه أو المسه أثناء اللعب لفتح فائدته.'
                                         : 'Benefit hidden — catch or touch it during play to unlock its effect.'}
@@ -9686,7 +9692,7 @@ export default function App() {
                           return (
                             <div
                               key={entry.kind}
-                              className={`flex items-center gap-3.5 p-3.5 rounded-lg border transition-colors ${
+                              className={`flex items-start gap-3 p-3 sm:p-3.5 rounded-lg border transition-colors ${
                                 discovered
                                   ? isPositive
                                     ? 'border-sky-400/25 bg-slate-900/85'
@@ -9696,7 +9702,7 @@ export default function App() {
                             >
                               {/* Item Artwork (always visible; value digits appear once discovered) */}
                               <div
-                                className={`w-12 h-12 rounded-lg border flex items-center justify-center shrink-0 ${
+                                className={`w-11 h-11 sm:w-12 sm:h-12 rounded-lg border flex items-center justify-center shrink-0 mt-0.5 ${
                                   discovered
                                     ? 'border-white/12 bg-[#0a1324]'
                                     : 'border-white/10 bg-[#0b1426]'
@@ -10164,12 +10170,12 @@ export default function App() {
                               <div className="min-w-0 flex-1">
                                 {discovered ? (
                                   <>
-                                    <div className="flex items-baseline justify-between gap-2">
-                                      <span className="text-sm sm:text-base font-bold text-white truncate">
+                                    <div className="flex flex-wrap items-baseline justify-between gap-x-2 gap-y-0.5">
+                                      <span className="text-sm sm:text-base font-bold text-white leading-snug break-words">
                                         {lang === 'ar' ? entry.nameAr : entry.nameEn}
                                       </span>
                                       <span
-                                        className={`font-num text-xs sm:text-sm font-bold whitespace-nowrap shrink-0 ${
+                                        className={`font-num text-xs sm:text-sm font-bold leading-snug break-words ${
                                           entry.kind === 'pink_circle'
                                             ? 'text-pink-300'
                                             : entry.kind === 'blue_triangle'
@@ -10204,12 +10210,12 @@ export default function App() {
                                         {lang === 'ar' ? entry.valueAr : entry.valueEn}
                                       </span>
                                     </div>
-                                    <div className="font-num text-[11px] font-semibold text-sky-300/90 mt-0.5">
+                                    <div className="font-num text-[11px] font-semibold text-sky-300/90 mt-1">
                                       {lang === 'ar'
                                         ? `تظهر من المرحلة ${entry.minStage}`
                                         : `Appears from Stage ${entry.minStage}`}
                                     </div>
-                                    <p className="text-xs text-slate-300 mt-1 leading-relaxed">
+                                    <p className="text-xs text-slate-300 mt-1 leading-relaxed break-words">
                                       {lang === 'ar'
                                         ? entry.benefitAr
                                         : entry.benefitEn}
@@ -10217,20 +10223,20 @@ export default function App() {
                                   </>
                                 ) : (
                                   <>
-                                    <div className="flex items-baseline justify-between gap-2">
-                                      <span className="text-sm sm:text-base font-bold text-slate-100 truncate">
+                                    <div className="flex flex-wrap items-baseline justify-between gap-x-2 gap-y-0.5">
+                                      <span className="text-sm sm:text-base font-bold text-slate-100 leading-snug break-words">
                                         {lang === 'ar' ? entry.nameAr : entry.nameEn}
                                       </span>
-                                      <span className="text-[11px] font-semibold text-slate-400 whitespace-nowrap shrink-0">
+                                      <span className="text-[11px] font-semibold text-slate-400 whitespace-nowrap">
                                         {lang === 'ar' ? 'فائدته مقفلة' : 'Effect Locked'}
                                       </span>
                                     </div>
-                                    <div className="font-num text-[11px] font-semibold text-sky-300/85 mt-0.5">
+                                    <div className="font-num text-[11px] font-semibold text-sky-300/85 mt-1">
                                       {lang === 'ar'
                                         ? `تظهر من المرحلة ${entry.minStage}`
                                         : `Appears from Stage ${entry.minStage}`}
                                     </div>
-                                    <p className="text-xs text-slate-400 mt-1 leading-relaxed">
+                                    <p className="text-xs text-slate-400 mt-1 leading-relaxed break-words">
                                       {lang === 'ar'
                                         ? 'الفائدة مخفية — التقطه أو المسه أثناء اللعب لفتح فائدته.'
                                         : 'Benefit hidden — catch or touch it during play to unlock its effect.'}
