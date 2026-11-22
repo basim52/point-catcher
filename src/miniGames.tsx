@@ -2674,36 +2674,36 @@ export const GamesModal: React.FC<GamesModalProps> = ({
       </header>
 
       {/* Games Selection Lobby */}
-      <main className="flex-1 min-h-0 overflow-y-auto px-4 sm:px-6 py-6 sm:py-8">
+      <main className="flex-1 min-h-0 overflow-y-auto px-2.5 sm:px-6 py-4 sm:py-8">
         <div className="mx-auto max-w-[920px]">
-          <p className="text-xs sm:text-sm text-slate-300 mb-5">
+          <p className="text-xs sm:text-sm text-slate-300 mb-3.5 sm:mb-5">
             {ht.hubSubtitle}
           </p>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          <div className="grid grid-cols-2 lg:grid-cols-3 gap-2.5 sm:gap-4">
             {/* Game Card 1: Arrow Escape */}
-            <div className="group rounded-2xl border border-amber-400/30 bg-[#0d182d] hover:border-amber-300/60 transition-colors overflow-hidden shadow-xl flex flex-col">
+            <div className="group rounded-xl sm:rounded-2xl border border-amber-400/30 bg-[#0d182d] hover:border-amber-300/60 transition-colors overflow-hidden shadow-xl flex flex-col">
               <div className="aspect-[2/1] w-full border-b border-white/10 overflow-hidden bg-[#071123]">
                 <ArrowEscapePreviewArt />
               </div>
 
-              <div className="p-4 flex-1 flex flex-col">
-                <div className="flex items-center justify-between gap-2 mb-1.5">
-                  <h2 className="text-base sm:text-lg font-bold text-white">
+              <div className="p-2.5 sm:p-4 flex-1 flex flex-col">
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-0.5 sm:gap-2 mb-1 sm:mb-1.5">
+                  <h2 className="text-xs sm:text-lg font-bold text-white leading-snug">
                     {ht.arrowGameTitle}
                   </h2>
-                  <span className="font-num text-xs font-semibold text-rose-300 whitespace-nowrap">
+                  <span className="font-num text-[10px] sm:text-xs font-semibold text-rose-300 whitespace-nowrap">
                     {ht.heartsTag}
                   </span>
                 </div>
 
-                <p className="text-xs sm:text-sm text-slate-300 leading-relaxed mb-4 flex-1">
+                <p className="text-[11px] sm:text-sm text-slate-300 leading-snug sm:leading-relaxed mb-2.5 sm:mb-4 flex-1 line-clamp-2 sm:line-clamp-none">
                   {ht.arrowGameDesc}
                 </p>
 
-                <div className="flex items-center justify-between text-xs text-slate-400 mb-3 pt-2.5 border-t border-white/8">
-                  <span>{ht.progressLabel}</span>
-                  <span className="font-num font-bold text-amber-300">
+                <div className="flex items-center justify-between gap-1 text-[10.5px] sm:text-xs text-slate-400 mb-2 sm:mb-3 pt-2 sm:pt-2.5 border-t border-white/8">
+                  <span className="truncate">{ht.progressLabel}</span>
+                  <span className="font-num font-bold text-amber-300 whitespace-nowrap">
                     {arrowSolvedCount}/{TOTAL_LEVELS}
                   </span>
                 </div>
@@ -2711,7 +2711,7 @@ export const GamesModal: React.FC<GamesModalProps> = ({
                 <button
                   type="button"
                   onClick={() => setActiveGame('arrow-escape')}
-                  className="w-full h-11 rounded-lg bg-amber-400 hover:bg-amber-300 active:scale-[0.99] text-slate-950 font-bold text-sm sm:text-base transition-all cursor-pointer"
+                  className="w-full h-9 sm:h-11 rounded-lg bg-amber-400 hover:bg-amber-300 active:scale-[0.99] text-slate-950 font-bold text-xs sm:text-base transition-all cursor-pointer"
                 >
                   {ht.playBtn}
                 </button>
@@ -2719,28 +2719,28 @@ export const GamesModal: React.FC<GamesModalProps> = ({
             </div>
 
             {/* Game Card 2: Neon 2048 */}
-            <div className="group rounded-2xl border border-cyan-400/30 bg-[#0d182d] hover:border-cyan-300/60 transition-colors overflow-hidden shadow-xl flex flex-col">
+            <div className="group rounded-xl sm:rounded-2xl border border-cyan-400/30 bg-[#0d182d] hover:border-cyan-300/60 transition-colors overflow-hidden shadow-xl flex flex-col">
               <div className="aspect-[2/1] w-full border-b border-white/10 overflow-hidden bg-[#071123]">
                 <Neon2048PreviewArt />
               </div>
 
-              <div className="p-4 flex-1 flex flex-col">
-                <div className="flex items-center justify-between gap-2 mb-1.5">
-                  <h2 className="text-base sm:text-lg font-bold text-white">
+              <div className="p-2.5 sm:p-4 flex-1 flex flex-col">
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-0.5 sm:gap-2 mb-1 sm:mb-1.5">
+                  <h2 className="text-xs sm:text-lg font-bold text-white leading-snug">
                     {ht.neon2048Title}
                   </h2>
-                  <span className="font-num text-xs font-semibold text-cyan-300 whitespace-nowrap">
+                  <span className="font-num text-[10px] sm:text-xs font-semibold text-cyan-300 whitespace-nowrap">
                     {ht.neonTag}
                   </span>
                 </div>
 
-                <p className="text-xs sm:text-sm text-slate-300 leading-relaxed mb-4 flex-1">
+                <p className="text-[11px] sm:text-sm text-slate-300 leading-snug sm:leading-relaxed mb-2.5 sm:mb-4 flex-1 line-clamp-2 sm:line-clamp-none">
                   {ht.neon2048Desc}
                 </p>
 
-                <div className="flex items-center justify-between text-xs text-slate-400 mb-3 pt-2.5 border-t border-white/8">
-                  <span>{ht.bestScoreLabel}</span>
-                  <span className="font-num font-bold text-cyan-300">
+                <div className="flex items-center justify-between gap-1 text-[10.5px] sm:text-xs text-slate-400 mb-2 sm:mb-3 pt-2 sm:pt-2.5 border-t border-white/8">
+                  <span className="truncate">{ht.bestScoreLabel}</span>
+                  <span className="font-num font-bold text-cyan-300 truncate">
                     {stats2048.bestScore}
                     {stats2048.bestTile > 0 ? ` · ${stats2048.bestTile}` : ''}
                   </span>
@@ -2749,7 +2749,7 @@ export const GamesModal: React.FC<GamesModalProps> = ({
                 <button
                   type="button"
                   onClick={() => setActiveGame('neon-2048')}
-                  className="w-full h-11 rounded-lg bg-cyan-400 hover:bg-cyan-300 active:scale-[0.99] text-slate-950 font-bold text-sm sm:text-base transition-all cursor-pointer"
+                  className="w-full h-9 sm:h-11 rounded-lg bg-cyan-400 hover:bg-cyan-300 active:scale-[0.99] text-slate-950 font-bold text-xs sm:text-base transition-all cursor-pointer"
                 >
                   {ht.playBtn}
                 </button>
@@ -2757,28 +2757,28 @@ export const GamesModal: React.FC<GamesModalProps> = ({
             </div>
 
             {/* Game Card 3: Neon Snake */}
-            <div className="group rounded-2xl border border-emerald-400/30 bg-[#0d182d] hover:border-emerald-300/60 transition-colors overflow-hidden shadow-xl flex flex-col">
+            <div className="group rounded-xl sm:rounded-2xl border border-emerald-400/30 bg-[#0d182d] hover:border-emerald-300/60 transition-colors overflow-hidden shadow-xl flex flex-col">
               <div className="aspect-[2/1] w-full border-b border-white/10 overflow-hidden bg-[#071123]">
                 <NeonSnakePreviewArt />
               </div>
 
-              <div className="p-4 flex-1 flex flex-col">
-                <div className="flex items-center justify-between gap-2 mb-1.5">
-                  <h2 className="text-base sm:text-lg font-bold text-white">
+              <div className="p-2.5 sm:p-4 flex-1 flex flex-col">
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-0.5 sm:gap-2 mb-1 sm:mb-1.5">
+                  <h2 className="text-xs sm:text-lg font-bold text-white leading-snug">
                     {ht.neonSnakeTitle}
                   </h2>
-                  <span className="font-num text-xs font-semibold text-emerald-300 whitespace-nowrap">
+                  <span className="font-num text-[10px] sm:text-xs font-semibold text-emerald-300 whitespace-nowrap">
                     {ht.snakeTag}
                   </span>
                 </div>
 
-                <p className="text-xs sm:text-sm text-slate-300 leading-relaxed mb-4 flex-1">
+                <p className="text-[11px] sm:text-sm text-slate-300 leading-snug sm:leading-relaxed mb-2.5 sm:mb-4 flex-1 line-clamp-2 sm:line-clamp-none">
                   {ht.neonSnakeDesc}
                 </p>
 
-                <div className="flex items-center justify-between text-xs text-slate-400 mb-3 pt-2.5 border-t border-white/8">
-                  <span>{ht.bestScoreLabel}</span>
-                  <span className="font-num font-bold text-emerald-300">
+                <div className="flex items-center justify-between gap-1 text-[10.5px] sm:text-xs text-slate-400 mb-2 sm:mb-3 pt-2 sm:pt-2.5 border-t border-white/8">
+                  <span className="truncate">{ht.bestScoreLabel}</span>
+                  <span className="font-num font-bold text-emerald-300 whitespace-nowrap">
                     {snakeStats.bestScore}
                   </span>
                 </div>
@@ -2786,7 +2786,7 @@ export const GamesModal: React.FC<GamesModalProps> = ({
                 <button
                   type="button"
                   onClick={() => setActiveGame('neon-snake')}
-                  className="w-full h-11 rounded-lg bg-emerald-400 hover:bg-emerald-300 active:scale-[0.99] text-slate-950 font-bold text-sm sm:text-base transition-all cursor-pointer"
+                  className="w-full h-9 sm:h-11 rounded-lg bg-emerald-400 hover:bg-emerald-300 active:scale-[0.99] text-slate-950 font-bold text-xs sm:text-base transition-all cursor-pointer"
                 >
                   {ht.playBtn}
                 </button>
@@ -2794,28 +2794,28 @@ export const GamesModal: React.FC<GamesModalProps> = ({
             </div>
 
             {/* Game Card 4: Catch Apples, Dodge Veggies */}
-            <div className="group rounded-2xl border border-rose-400/30 bg-[#0d182d] hover:border-rose-300/60 transition-colors overflow-hidden shadow-xl flex flex-col">
+            <div className="group rounded-xl sm:rounded-2xl border border-rose-400/30 bg-[#0d182d] hover:border-rose-300/60 transition-colors overflow-hidden shadow-xl flex flex-col">
               <div className="aspect-[2/1] w-full border-b border-white/10 overflow-hidden bg-[#071123]">
                 <AppleCatchPreviewArt />
               </div>
 
-              <div className="p-4 flex-1 flex flex-col">
-                <div className="flex items-center justify-between gap-2 mb-1.5">
-                  <h2 className="text-base sm:text-lg font-bold text-white">
+              <div className="p-2.5 sm:p-4 flex-1 flex flex-col">
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-0.5 sm:gap-2 mb-1 sm:mb-1.5">
+                  <h2 className="text-xs sm:text-lg font-bold text-white leading-snug">
                     {ht.appleCatchTitle}
                   </h2>
-                  <span className="font-num text-xs font-semibold text-rose-300 whitespace-nowrap">
+                  <span className="font-num text-[10px] sm:text-xs font-semibold text-rose-300 whitespace-nowrap">
                     {ht.appleCatchTag}
                   </span>
                 </div>
 
-                <p className="text-xs sm:text-sm text-slate-300 leading-relaxed mb-4 flex-1">
+                <p className="text-[11px] sm:text-sm text-slate-300 leading-snug sm:leading-relaxed mb-2.5 sm:mb-4 flex-1 line-clamp-2 sm:line-clamp-none">
                   {ht.appleCatchDesc}
                 </p>
 
-                <div className="flex items-center justify-between text-xs text-slate-400 mb-3 pt-2.5 border-t border-white/8">
-                  <span>{ht.progressLabel}</span>
-                  <span className="font-num font-bold text-rose-300">
+                <div className="flex items-center justify-between gap-1 text-[10.5px] sm:text-xs text-slate-400 mb-2 sm:mb-3 pt-2 sm:pt-2.5 border-t border-white/8">
+                  <span className="truncate">{ht.progressLabel}</span>
+                  <span className="font-num font-bold text-rose-300 whitespace-nowrap">
                     {appleCatchCleared}/{APPLE_CATCH_TOTAL_LEVELS}
                   </span>
                 </div>
@@ -2823,7 +2823,7 @@ export const GamesModal: React.FC<GamesModalProps> = ({
                 <button
                   type="button"
                   onClick={() => setActiveGame('apple-catch')}
-                  className="w-full h-11 rounded-lg bg-rose-500 hover:bg-rose-400 active:scale-[0.99] text-white font-bold text-sm sm:text-base transition-all cursor-pointer"
+                  className="w-full h-9 sm:h-11 rounded-lg bg-rose-500 hover:bg-rose-400 active:scale-[0.99] text-white font-bold text-xs sm:text-base transition-all cursor-pointer"
                 >
                   {ht.playBtn}
                 </button>
@@ -2831,28 +2831,28 @@ export const GamesModal: React.FC<GamesModalProps> = ({
             </div>
 
             {/* Game Card 5: Arrow Mosaic (فسيفساء الأسهم) */}
-            <div className="group rounded-2xl border border-indigo-400/40 bg-[#0d182d] hover:border-indigo-300/75 transition-colors overflow-hidden shadow-xl flex flex-col">
+            <div className="group rounded-xl sm:rounded-2xl border border-indigo-400/40 bg-[#0d182d] hover:border-indigo-300/75 transition-colors overflow-hidden shadow-xl flex flex-col">
               <div className="aspect-[2/1] w-full border-b border-white/10 overflow-hidden bg-[#1e0a6e]">
                 <ArrowMosaicPreviewArt />
               </div>
 
-              <div className="p-4 flex-1 flex flex-col">
-                <div className="flex items-center justify-between gap-2 mb-1.5">
-                  <h2 className="text-base sm:text-lg font-bold text-white">
+              <div className="p-2.5 sm:p-4 flex-1 flex flex-col">
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-0.5 sm:gap-2 mb-1 sm:mb-1.5">
+                  <h2 className="text-xs sm:text-lg font-bold text-white leading-snug">
                     {ht.arrowMosaicTitle}
                   </h2>
-                  <span className="font-num text-xs font-semibold text-indigo-300 whitespace-nowrap">
+                  <span className="font-num text-[10px] sm:text-xs font-semibold text-indigo-300 whitespace-nowrap">
                     {ht.arrowMosaicTag}
                   </span>
                 </div>
 
-                <p className="text-xs sm:text-sm text-slate-300 leading-relaxed mb-4 flex-1">
+                <p className="text-[11px] sm:text-sm text-slate-300 leading-snug sm:leading-relaxed mb-2.5 sm:mb-4 flex-1 line-clamp-2 sm:line-clamp-none">
                   {ht.arrowMosaicDesc}
                 </p>
 
-                <div className="flex items-center justify-between text-xs text-slate-400 mb-3 pt-2.5 border-t border-white/8">
-                  <span>{ht.progressLabel}</span>
-                  <span className="font-num font-bold text-indigo-300">
+                <div className="flex items-center justify-between gap-1 text-[10.5px] sm:text-xs text-slate-400 mb-2 sm:mb-3 pt-2 sm:pt-2.5 border-t border-white/8">
+                  <span className="truncate">{ht.progressLabel}</span>
+                  <span className="font-num font-bold text-indigo-300 whitespace-nowrap">
                     {mosaicCleared}/{ARROW_MOSAIC_TOTAL_LEVELS}
                   </span>
                 </div>
@@ -2860,7 +2860,7 @@ export const GamesModal: React.FC<GamesModalProps> = ({
                 <button
                   type="button"
                   onClick={() => setActiveGame('arrow-mosaic')}
-                  className="w-full h-11 rounded-lg bg-indigo-500 hover:bg-indigo-400 active:scale-[0.99] text-white font-bold text-sm sm:text-base transition-all cursor-pointer"
+                  className="w-full h-9 sm:h-11 rounded-lg bg-indigo-500 hover:bg-indigo-400 active:scale-[0.99] text-white font-bold text-xs sm:text-base transition-all cursor-pointer"
                 >
                   {ht.playBtn}
                 </button>
@@ -2868,28 +2868,28 @@ export const GamesModal: React.FC<GamesModalProps> = ({
             </div>
 
             {/* Game Card 6: Fruit Merge (دمج الفواكه) */}
-            <div className="group rounded-2xl border border-orange-400/35 bg-[#0d182d] hover:border-orange-300/70 transition-colors overflow-hidden shadow-xl flex flex-col">
+            <div className="group rounded-xl sm:rounded-2xl border border-orange-400/35 bg-[#0d182d] hover:border-orange-300/70 transition-colors overflow-hidden shadow-xl flex flex-col">
               <div className="aspect-[2/1] w-full border-b border-white/10 overflow-hidden bg-[#21130d]">
                 <FruitMergePreviewArt />
               </div>
 
-              <div className="p-4 flex-1 flex flex-col">
-                <div className="flex items-center justify-between gap-2 mb-1.5">
-                  <h2 className="text-base sm:text-lg font-bold text-white">
+              <div className="p-2.5 sm:p-4 flex-1 flex flex-col">
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-0.5 sm:gap-2 mb-1 sm:mb-1.5">
+                  <h2 className="text-xs sm:text-lg font-bold text-white leading-snug">
                     {ht.fruitMergeTitle}
                   </h2>
-                  <span className="font-num text-xs font-semibold text-orange-300 whitespace-nowrap">
+                  <span className="font-num text-[10px] sm:text-xs font-semibold text-orange-300 whitespace-nowrap">
                     {ht.fruitMergeTag}
                   </span>
                 </div>
 
-                <p className="text-xs sm:text-sm text-slate-300 leading-relaxed mb-4 flex-1">
+                <p className="text-[11px] sm:text-sm text-slate-300 leading-snug sm:leading-relaxed mb-2.5 sm:mb-4 flex-1 line-clamp-2 sm:line-clamp-none">
                   {ht.fruitMergeDesc}
                 </p>
 
-                <div className="flex items-center justify-between text-xs text-slate-400 mb-3 pt-2.5 border-t border-white/8">
-                  <span>{ht.bestScoreLabel}</span>
-                  <span className="font-num font-bold text-orange-300">
+                <div className="flex items-center justify-between gap-1 text-[10.5px] sm:text-xs text-slate-400 mb-2 sm:mb-3 pt-2 sm:pt-2.5 border-t border-white/8">
+                  <span className="truncate">{ht.bestScoreLabel}</span>
+                  <span className="font-num font-bold text-orange-300 truncate">
                     {fruitMergeStats.bestScore}
                     {fruitMergeStats.bestScore > 0 && bestFruitTier
                       ? ` · ${lang === 'ar' ? bestFruitTier.nameAr : bestFruitTier.nameEn}`
@@ -2900,7 +2900,7 @@ export const GamesModal: React.FC<GamesModalProps> = ({
                 <button
                   type="button"
                   onClick={() => setActiveGame('fruit-merge')}
-                  className="w-full h-11 rounded-lg bg-orange-400 hover:bg-orange-300 active:scale-[0.99] text-slate-950 font-bold text-sm sm:text-base transition-all cursor-pointer"
+                  className="w-full h-9 sm:h-11 rounded-lg bg-orange-400 hover:bg-orange-300 active:scale-[0.99] text-slate-950 font-bold text-xs sm:text-base transition-all cursor-pointer"
                 >
                   {ht.playBtn}
                 </button>
@@ -2908,28 +2908,28 @@ export const GamesModal: React.FC<GamesModalProps> = ({
             </div>
 
             {/* Game Card 7: Neon Brick Breaker (تكسير النيون) */}
-            <div className="group rounded-2xl border border-sky-400/35 bg-[#0d182d] hover:border-sky-300/70 transition-colors overflow-hidden shadow-xl flex flex-col">
+            <div className="group rounded-xl sm:rounded-2xl border border-sky-400/35 bg-[#0d182d] hover:border-sky-300/70 transition-colors overflow-hidden shadow-xl flex flex-col">
               <div className="aspect-[2/1] w-full border-b border-white/10 overflow-hidden bg-[#060e1f]">
                 <BrickBreakerPreviewArt />
               </div>
 
-              <div className="p-4 flex-1 flex flex-col">
-                <div className="flex items-center justify-between gap-2 mb-1.5">
-                  <h2 className="text-base sm:text-lg font-bold text-white">
+              <div className="p-2.5 sm:p-4 flex-1 flex flex-col">
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-0.5 sm:gap-2 mb-1 sm:mb-1.5">
+                  <h2 className="text-xs sm:text-lg font-bold text-white leading-snug">
                     {ht.brickBreakerTitle}
                   </h2>
-                  <span className="font-num text-xs font-semibold text-rose-300 whitespace-nowrap">
+                  <span className="font-num text-[10px] sm:text-xs font-semibold text-rose-300 whitespace-nowrap">
                     {ht.brickBreakerTag}
                   </span>
                 </div>
 
-                <p className="text-xs sm:text-sm text-slate-300 leading-relaxed mb-4 flex-1">
+                <p className="text-[11px] sm:text-sm text-slate-300 leading-snug sm:leading-relaxed mb-2.5 sm:mb-4 flex-1 line-clamp-2 sm:line-clamp-none">
                   {ht.brickBreakerDesc}
                 </p>
 
-                <div className="flex items-center justify-between text-xs text-slate-400 mb-3 pt-2.5 border-t border-white/8">
-                  <span>{ht.progressLabel}</span>
-                  <span className="font-num font-bold text-sky-300">
+                <div className="flex items-center justify-between gap-1 text-[10.5px] sm:text-xs text-slate-400 mb-2 sm:mb-3 pt-2 sm:pt-2.5 border-t border-white/8">
+                  <span className="truncate">{ht.progressLabel}</span>
+                  <span className="font-num font-bold text-sky-300 truncate">
                     {brickBreakerStats.clearedStages.length}/{BRICK_BREAKER_TOTAL_LEVELS}
                     {brickBreakerStats.bestScore > 0
                       ? ` · ${brickBreakerStats.bestScore}`
@@ -2940,7 +2940,7 @@ export const GamesModal: React.FC<GamesModalProps> = ({
                 <button
                   type="button"
                   onClick={() => setActiveGame('brick-breaker')}
-                  className="w-full h-11 rounded-lg bg-sky-400 hover:bg-sky-300 active:scale-[0.99] text-slate-950 font-bold text-sm sm:text-base transition-all cursor-pointer"
+                  className="w-full h-9 sm:h-11 rounded-lg bg-sky-400 hover:bg-sky-300 active:scale-[0.99] text-slate-950 font-bold text-xs sm:text-base transition-all cursor-pointer"
                 >
                   {ht.playBtn}
                 </button>
@@ -2948,11 +2948,11 @@ export const GamesModal: React.FC<GamesModalProps> = ({
             </div>
 
             {/* Extensible Placeholder Slot for Future Games */}
-            <div className="rounded-2xl border border-dashed border-white/14 bg-[#0a1324]/60 p-6 flex flex-col items-center justify-center text-center min-h-[260px]">
-              <div className="w-12 h-12 rounded-xl border border-white/12 bg-slate-900/80 flex items-center justify-center text-slate-400 mb-3">
+            <div className="rounded-xl sm:rounded-2xl border border-dashed border-white/14 bg-[#0a1324]/60 p-3 sm:p-6 flex flex-col items-center justify-center text-center min-h-[190px] sm:min-h-[260px]">
+              <div className="w-9 h-9 sm:w-12 sm:h-12 rounded-xl border border-white/12 bg-slate-900/80 flex items-center justify-center text-slate-400 mb-2 sm:mb-3">
                 <svg
                   viewBox="0 0 24 24"
-                  className="w-6 h-6"
+                  className="w-5 h-5 sm:w-6 sm:h-6"
                   fill="none"
                   stroke="currentColor"
                   strokeWidth="2"
@@ -2964,10 +2964,10 @@ export const GamesModal: React.FC<GamesModalProps> = ({
                   <line x1="5" y1="12" x2="19" y2="12" />
                 </svg>
               </div>
-              <h2 className="text-sm sm:text-base font-bold text-slate-300 mb-1">
+              <h2 className="text-xs sm:text-base font-bold text-slate-300 mb-1">
                 {ht.comingSoonTitle}
               </h2>
-              <p className="text-xs text-slate-500 max-w-[220px] leading-relaxed">
+              <p className="text-[11px] sm:text-xs text-slate-500 max-w-[220px] leading-snug sm:leading-relaxed">
                 {ht.comingSoonDesc}
               </p>
             </div>
