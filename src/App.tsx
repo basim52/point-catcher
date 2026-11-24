@@ -10651,255 +10651,255 @@ export default function App() {
       dir={lang === 'ar' ? 'rtl' : 'ltr'}
       className="h-[100dvh] w-full bg-[#070e1a] text-slate-100 flex flex-col overflow-hidden"
     >
-      {/* Top HUD Bar — 2 compact rows on mobile & tablet (zero overlap/clipping), single spacious row on lg+ */}
+      {/* Top HUD Bar — 2 clean dedicated rows (Brand + Nav on Row 1, Metrics + Currencies + Lives on Row 2) to guarantee zero overlap at every viewport width */}
       <header className="relative z-30 w-full border-b border-white/10 bg-[#0b1424]/95 shrink-0">
-        <div className="mx-auto max-w-[1040px] px-2 sm:px-6 flex flex-col lg:flex-row lg:items-center lg:justify-between lg:h-16 lg:gap-4">
-          {/* Row 1 on <lg (Title + Controls); splits cleanly on lg+ via display:contents */}
-          <div className="h-10 lg:h-auto flex items-center justify-between gap-1 sm:gap-2 min-w-0 lg:contents">
-            {/* Title Wordmark — click to return to Landing Board (لوحة الهبوط) */}
+        {/* Row 1: Brand Wordmark + Navigation Controls */}
+        <div className="mx-auto max-w-[1280px] w-full px-2.5 sm:px-5 py-1.5 min-h-[42px] sm:min-h-[46px] flex items-center justify-between gap-2 flex-wrap">
+          {/* Title Wordmark — click to return to Landing Board (لوحة الهبوط) */}
+          <button
+            type="button"
+            onClick={openLandingBoard}
+            title={lang === 'ar' ? 'العودة إلى لوحة الهبوط' : 'Back to Landing Screen'}
+            className="text-xs min-[390px]:text-sm sm:text-base lg:text-lg font-bold tracking-tight text-white hover:text-sky-300 transition-colors whitespace-nowrap shrink-0 cursor-pointer"
+          >
+            {t.title}
+          </button>
+
+          {/* Utility Controls — Stages, Games, Shop, Bag, Index, Pause, Settings, Lang */}
+          <div className="flex items-center justify-end gap-1 sm:gap-1.5 md:gap-2 flex-wrap">
+            {/* Compact Stages Navigation Button ("المراحل") */}
             <button
               type="button"
-              onClick={openLandingBoard}
-              title={lang === 'ar' ? 'العودة إلى لوحة الهبوط' : 'Back to Landing Screen'}
-              className="text-[11px] min-[390px]:text-xs sm:text-base lg:text-lg font-bold tracking-tight text-white hover:text-sky-300 transition-colors whitespace-nowrap shrink-0 lg:order-1 cursor-pointer"
+              onClick={openStagesModal}
+              aria-expanded={stagesModalOpen}
+              className={`h-7 sm:h-8 px-1.5 sm:px-2.5 inline-flex items-center justify-center gap-1 rounded-md border text-[10.5px] min-[390px]:text-[11px] sm:text-xs font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400 whitespace-nowrap shrink-0 cursor-pointer ${
+                stagesModalOpen
+                  ? 'border-sky-400/60 bg-sky-500/20 text-sky-200'
+                  : 'border-white/12 bg-slate-900/80 text-slate-100 hover:bg-slate-800 hover:text-white'
+              }`}
             >
-              {t.title}
+              <svg
+                viewBox="0 0 24 24"
+                className="hidden sm:block w-3.5 h-3.5 shrink-0"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                aria-hidden="true"
+              >
+                <rect x="3" y="3" width="7" height="7" rx="1" />
+                <rect x="14" y="3" width="7" height="7" rx="1" />
+                <rect x="3" y="14" width="7" height="7" rx="1" />
+                <rect x="14" y="14" width="7" height="7" rx="1" />
+              </svg>
+              <span>{t.stagesBtn}</span>
             </button>
 
-            {/* Utility Controls — compact on mobile so Stages, Games, Shop, Bag, Index & Settings all fit cleanly */}
-            <div className="flex items-center justify-end gap-1 sm:gap-2 min-w-0 lg:order-3">
-              {/* Compact Stages Navigation Button ("المراحل") */}
-              <button
-                type="button"
-                onClick={openStagesModal}
-                aria-expanded={stagesModalOpen}
-                className={`h-7 lg:h-8 px-1.5 sm:px-2.5 inline-flex items-center justify-center gap-1 rounded-md border text-[10.5px] min-[390px]:text-[11px] sm:text-xs font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400 whitespace-nowrap shrink-0 cursor-pointer ${
-                  stagesModalOpen
-                    ? 'border-sky-400/60 bg-sky-500/20 text-sky-200'
-                    : 'border-white/12 bg-slate-900/80 text-slate-100 hover:bg-slate-800 hover:text-white'
-                }`}
+            {/* Games Button ("اللعاب") right next to Stages */}
+            <button
+              type="button"
+              onClick={openGamesModal}
+              aria-expanded={gamesModalOpen}
+              className={`h-7 sm:h-8 px-1.5 sm:px-2.5 inline-flex items-center justify-center gap-1 rounded-md border text-[10.5px] min-[390px]:text-[11px] sm:text-xs font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400 whitespace-nowrap shrink-0 cursor-pointer ${
+                gamesModalOpen
+                  ? 'border-emerald-400/60 bg-emerald-500/20 text-emerald-200'
+                  : 'border-emerald-400/35 bg-emerald-500/10 text-emerald-200 hover:bg-emerald-500/20 hover:text-emerald-100'
+              }`}
+            >
+              <svg
+                viewBox="0 0 24 24"
+                className="hidden sm:block w-3.5 h-3.5 shrink-0"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                aria-hidden="true"
               >
-                <svg
-                  viewBox="0 0 24 24"
-                  className="hidden sm:block w-3.5 h-3.5 shrink-0"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  aria-hidden="true"
-                >
-                  <rect x="3" y="3" width="7" height="7" rx="1" />
-                  <rect x="14" y="3" width="7" height="7" rx="1" />
-                  <rect x="3" y="14" width="7" height="7" rx="1" />
-                  <rect x="14" y="14" width="7" height="7" rx="1" />
-                </svg>
-                <span>{t.stagesBtn}</span>
-              </button>
+                <rect x="2" y="6" width="20" height="12" rx="4" />
+                <line x1="6" y1="12" x2="10" y2="12" />
+                <line x1="8" y1="10" x2="8" y2="14" />
+                <circle cx="15.5" cy="11" r="1" fill="currentColor" stroke="none" />
+                <circle cx="18" cy="13" r="1" fill="currentColor" stroke="none" />
+              </svg>
+              <span>{t.gamesBtn}</span>
+            </button>
 
-              {/* Games Button ("اللعاب") right next to Stages */}
-              <button
-                type="button"
-                onClick={openGamesModal}
-                aria-expanded={gamesModalOpen}
-                className={`h-7 lg:h-8 px-1.5 sm:px-2.5 inline-flex items-center justify-center gap-1 rounded-md border text-[10.5px] min-[390px]:text-[11px] sm:text-xs font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400 whitespace-nowrap shrink-0 cursor-pointer ${
-                  gamesModalOpen
-                    ? 'border-emerald-400/60 bg-emerald-500/20 text-emerald-200'
-                    : 'border-emerald-400/35 bg-emerald-500/10 text-emerald-200 hover:bg-emerald-500/20 hover:text-emerald-100'
-                }`}
+            {/* Shop Button ("المتجر") */}
+            <button
+              type="button"
+              onClick={openShopModal}
+              aria-expanded={shopModalOpen}
+              className={`h-7 sm:h-8 px-1.5 sm:px-2.5 inline-flex items-center justify-center gap-1 rounded-md border text-[10.5px] min-[390px]:text-[11px] sm:text-xs font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400 whitespace-nowrap shrink-0 cursor-pointer ${
+                shopModalOpen
+                  ? 'border-amber-400/60 bg-amber-500/20 text-amber-200'
+                  : 'border-amber-400/30 bg-amber-500/10 text-amber-200 hover:bg-amber-500/20 hover:text-amber-100'
+              }`}
+            >
+              <svg
+                viewBox="0 0 24 24"
+                className="hidden sm:block w-3.5 h-3.5 shrink-0"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                aria-hidden="true"
               >
-                <svg
-                  viewBox="0 0 24 24"
-                  className="hidden sm:block w-3.5 h-3.5 shrink-0"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  aria-hidden="true"
-                >
-                  <rect x="2" y="6" width="20" height="12" rx="4" />
-                  <line x1="6" y1="12" x2="10" y2="12" />
-                  <line x1="8" y1="10" x2="8" y2="14" />
-                  <circle cx="15.5" cy="11" r="1" fill="currentColor" stroke="none" />
-                  <circle cx="18" cy="13" r="1" fill="currentColor" stroke="none" />
-                </svg>
-                <span>{t.gamesBtn}</span>
-              </button>
+                <path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z" />
+                <line x1="3" y1="6" x2="21" y2="6" />
+                <path d="M16 10a4 4 0 0 1-8 0" />
+              </svg>
+              <span>{t.shopBtn}</span>
+            </button>
 
-              {/* Shop Button ("المتجر") */}
-              <button
-                type="button"
-                onClick={openShopModal}
-                aria-expanded={shopModalOpen}
-                className={`h-7 lg:h-8 px-1.5 sm:px-2.5 inline-flex items-center justify-center gap-1 rounded-md border text-[10.5px] min-[390px]:text-[11px] sm:text-xs font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400 whitespace-nowrap shrink-0 cursor-pointer ${
-                  shopModalOpen
-                    ? 'border-amber-400/60 bg-amber-500/20 text-amber-200'
-                    : 'border-amber-400/30 bg-amber-500/10 text-amber-200 hover:bg-amber-500/20 hover:text-amber-100'
-                }`}
+            {/* Compact Bag Button ("الحقيبة") — icon + count on mobile, full label on sm+ */}
+            <button
+              type="button"
+              onClick={openBagModal}
+              aria-expanded={bagModalOpen}
+              aria-label={`${t.bagBtn}${totalBagCount > 0 ? ` (${totalBagCount})` : ''}`}
+              title={`${t.bagBtn}${totalBagCount > 0 ? ` (${totalBagCount})` : ''}`}
+              className={`h-7 sm:h-8 px-1.5 sm:px-2.5 inline-flex items-center justify-center gap-1 rounded-md border text-[10.5px] sm:text-xs font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-400 whitespace-nowrap shrink-0 cursor-pointer ${
+                bagModalOpen
+                  ? 'border-rose-400/60 bg-rose-500/20 text-rose-200'
+                  : 'border-rose-400/30 bg-rose-500/10 text-rose-200 hover:bg-rose-500/20 hover:text-rose-100'
+              }`}
+            >
+              <svg
+                viewBox="0 0 24 24"
+                className="w-3.5 h-3.5 shrink-0"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                aria-hidden="true"
               >
-                <svg
-                  viewBox="0 0 24 24"
-                  className="hidden sm:block w-3.5 h-3.5 shrink-0"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  aria-hidden="true"
-                >
-                  <path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z" />
-                  <line x1="3" y1="6" x2="21" y2="6" />
-                  <path d="M16 10a4 4 0 0 1-8 0" />
-                </svg>
-                <span>{t.shopBtn}</span>
-              </button>
+                <path d="M5 10a4 4 0 0 1 4-4h6a4 4 0 0 1 4 4v9a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2v-9z" />
+                <path d="M9 6V5a3 3 0 0 1 6 0v1" />
+                <path d="M9 13h6" />
+              </svg>
+              <span className="hidden sm:inline">{t.bagBtn}</span>
+              {totalBagCount > 0 && (
+                <span className="font-num text-[10px] font-bold text-white">
+                  <span className="sm:hidden">{totalBagCount}</span>
+                  <span className="hidden sm:inline">({totalBagCount})</span>
+                </span>
+              )}
+            </button>
 
-              {/* Compact Bag Button ("الحقيبة") — icon + count on mobile, full label on sm+ */}
+            {/* Index Button ("الاندكس") */}
+            <button
+              type="button"
+              onClick={openIndexModal}
+              aria-expanded={indexModalOpen}
+              className={`h-7 sm:h-8 px-1.5 sm:px-2.5 inline-flex items-center justify-center gap-1 rounded-md border text-[10.5px] min-[390px]:text-[11px] sm:text-xs font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400 whitespace-nowrap shrink-0 cursor-pointer ${
+                indexModalOpen
+                  ? 'border-sky-400/60 bg-sky-500/20 text-sky-200'
+                  : 'border-white/12 bg-slate-900/80 text-slate-100 hover:bg-slate-800 hover:text-white'
+              }`}
+            >
+              <svg
+                viewBox="0 0 24 24"
+                className="hidden sm:block w-3.5 h-3.5 shrink-0"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                aria-hidden="true"
+              >
+                <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" />
+                <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" />
+              </svg>
+              <span>{t.indexBtn}</span>
+            </button>
+
+            {(status === 'PLAYING' || status === 'PAUSED') && !anyModalOpen && (
               <button
                 type="button"
-                onClick={openBagModal}
-                aria-expanded={bagModalOpen}
-                aria-label={`${t.bagBtn}${totalBagCount > 0 ? ` (${totalBagCount})` : ''}`}
-                title={`${t.bagBtn}${totalBagCount > 0 ? ` (${totalBagCount})` : ''}`}
-                className={`h-7 lg:h-8 px-1.5 sm:px-2.5 inline-flex items-center justify-center gap-1 rounded-md border text-[10.5px] sm:text-xs font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-400 whitespace-nowrap shrink-0 cursor-pointer ${
-                  bagModalOpen
-                    ? 'border-rose-400/60 bg-rose-500/20 text-rose-200'
-                    : 'border-rose-400/30 bg-rose-500/10 text-rose-200 hover:bg-rose-500/20 hover:text-rose-100'
-                }`}
+                onClick={togglePause}
+                aria-label={status === 'PAUSED' ? t.resume : t.pause}
+                title={status === 'PAUSED' ? t.resume : t.pause}
+                className="h-7 w-7 sm:h-8 sm:w-8 inline-flex items-center justify-center rounded-md border border-white/10 bg-slate-900/80 text-slate-200 hover:bg-slate-800 hover:text-white transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400 cursor-pointer shrink-0"
               >
-                <svg
-                  viewBox="0 0 24 24"
-                  className="w-3.5 h-3.5 shrink-0"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  aria-hidden="true"
-                >
-                  <path d="M5 10a4 4 0 0 1 4-4h6a4 4 0 0 1 4 4v9a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2v-9z" />
-                  <path d="M9 6V5a3 3 0 0 1 6 0v1" />
-                  <path d="M9 13h6" />
-                </svg>
-                <span className="hidden sm:inline">{t.bagBtn}</span>
-                {totalBagCount > 0 && (
-                  <span className="font-num text-[10px] font-bold text-white">
-                    <span className="sm:hidden">{totalBagCount}</span>
-                    <span className="hidden sm:inline">({totalBagCount})</span>
-                  </span>
+                {status === 'PAUSED' ? (
+                  <svg
+                    viewBox="0 0 24 24"
+                    className="w-3.5 h-3.5"
+                    fill="currentColor"
+                    aria-hidden="true"
+                  >
+                    <path d="M8 5v14l11-7z" />
+                  </svg>
+                ) : (
+                  <svg
+                    viewBox="0 0 24 24"
+                    className="w-3.5 h-3.5"
+                    fill="currentColor"
+                    aria-hidden="true"
+                  >
+                    <path d="M6 5h4v14H6zm8 0h4v14h-4z" />
+                  </svg>
                 )}
               </button>
+            )}
 
-              {/* Index Button ("الاندكس") */}
-              <button
-                type="button"
-                onClick={openIndexModal}
-                aria-expanded={indexModalOpen}
-                className={`h-7 lg:h-8 px-1.5 sm:px-2.5 inline-flex items-center justify-center gap-1 rounded-md border text-[10.5px] min-[390px]:text-[11px] sm:text-xs font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400 whitespace-nowrap shrink-0 cursor-pointer ${
-                  indexModalOpen
-                    ? 'border-sky-400/60 bg-sky-500/20 text-sky-200'
-                    : 'border-white/12 bg-slate-900/80 text-slate-100 hover:bg-slate-800 hover:text-white'
-                }`}
+            {/* Settings Button ("الإعدادات") */}
+            <button
+              type="button"
+              onClick={openSettingsModal}
+              aria-expanded={settingsModalOpen}
+              aria-label={t.settingsBtn}
+              title={t.settingsBtn}
+              className={`h-7 w-7 sm:w-auto sm:h-8 sm:px-2.5 inline-flex items-center justify-center gap-1 rounded-md border text-[11px] sm:text-xs font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400 whitespace-nowrap shrink-0 cursor-pointer ${
+                settingsModalOpen
+                  ? 'border-sky-400/60 bg-sky-500/20 text-sky-200'
+                  : 'border-white/12 bg-slate-900/80 text-slate-100 hover:bg-slate-800 hover:text-white'
+              }`}
+            >
+              <svg
+                viewBox="0 0 24 24"
+                className="w-3.5 h-3.5 shrink-0"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                aria-hidden="true"
               >
-                <svg
-                  viewBox="0 0 24 24"
-                  className="hidden sm:block w-3.5 h-3.5 shrink-0"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  aria-hidden="true"
-                >
-                  <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" />
-                  <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" />
-                </svg>
-                <span>{t.indexBtn}</span>
-              </button>
+                <circle cx="12" cy="12" r="3" />
+                <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
+              </svg>
+              <span className="hidden sm:inline">{t.settingsBtn}</span>
+            </button>
 
-              {(status === 'PLAYING' || status === 'PAUSED') && !anyModalOpen && (
-                <button
-                  type="button"
-                  onClick={togglePause}
-                  aria-label={status === 'PAUSED' ? t.resume : t.pause}
-                  title={status === 'PAUSED' ? t.resume : t.pause}
-                  className="h-7 w-7 lg:h-8 lg:w-8 inline-flex items-center justify-center rounded-md border border-white/10 bg-slate-900/80 text-slate-200 hover:bg-slate-800 hover:text-white transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400 cursor-pointer shrink-0"
-                >
-                  {status === 'PAUSED' ? (
-                    <svg
-                      viewBox="0 0 24 24"
-                      className="w-3.5 h-3.5"
-                      fill="currentColor"
-                      aria-hidden="true"
-                    >
-                      <path d="M8 5v14l11-7z" />
-                    </svg>
-                  ) : (
-                    <svg
-                      viewBox="0 0 24 24"
-                      className="w-3.5 h-3.5"
-                      fill="currentColor"
-                      aria-hidden="true"
-                    >
-                      <path d="M6 5h4v14H6zm8 0h4v14h-4z" />
-                    </svg>
-                  )}
-                </button>
-              )}
-
-              {/* Settings Button ("الإعدادات") */}
-              <button
-                type="button"
-                onClick={openSettingsModal}
-                aria-expanded={settingsModalOpen}
-                aria-label={t.settingsBtn}
-                title={t.settingsBtn}
-                className={`h-7 w-7 sm:w-auto lg:h-8 sm:px-2.5 inline-flex items-center justify-center gap-1 rounded-md border text-[11px] sm:text-xs font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400 whitespace-nowrap shrink-0 cursor-pointer ${
-                  settingsModalOpen
-                    ? 'border-sky-400/60 bg-sky-500/20 text-sky-200'
-                    : 'border-white/12 bg-slate-900/80 text-slate-100 hover:bg-slate-800 hover:text-white'
-                }`}
-              >
-                <svg
-                  viewBox="0 0 24 24"
-                  className="w-3.5 h-3.5 shrink-0"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  aria-hidden="true"
-                >
-                  <circle cx="12" cy="12" r="3" />
-                  <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
-                </svg>
-                <span className="hidden sm:inline">{t.settingsBtn}</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={toggleLang}
-                aria-label={t.langToggleAria}
-                className="hidden sm:inline-flex h-7 lg:h-8 px-2.5 items-center justify-center rounded-md border border-white/10 bg-slate-900/80 text-xs font-semibold text-slate-200 hover:bg-slate-800 hover:text-white transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400 whitespace-nowrap shrink-0 cursor-pointer"
-              >
-                {t.langToggle}
-              </button>
-            </div>
+            <button
+              type="button"
+              onClick={toggleLang}
+              aria-label={t.langToggleAria}
+              className="hidden sm:inline-flex h-7 sm:h-8 px-2.5 items-center justify-center rounded-md border border-white/10 bg-slate-900/80 text-xs font-semibold text-slate-200 hover:bg-slate-800 hover:text-white transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400 whitespace-nowrap shrink-0 cursor-pointer"
+            >
+              {t.langToggle}
+            </button>
           </div>
+        </div>
 
-          {/* Row 2 on <lg (Dedicated Metrics Bar); middle section on lg+ */}
+        {/* Row 2: Dedicated Live Metrics, Currencies & Lives Strip */}
+        <div className="w-full border-t border-white/8 bg-[#081020]/75">
           <div
-            className="h-9 lg:h-auto border-t border-white/5 lg:border-t-0 flex items-center justify-between lg:justify-center gap-1 sm:gap-3 lg:gap-4 min-w-0 lg:order-2"
+            className="mx-auto max-w-[1280px] w-full px-2.5 sm:px-5 py-1.5 min-h-[38px] flex items-center justify-between sm:justify-center flex-wrap gap-x-2 sm:gap-x-3.5 gap-y-1.5"
             aria-live="polite"
           >
             {/* Stage Indicator */}
-            <div className="flex items-baseline gap-0.5 sm:gap-1 whitespace-nowrap">
-              <span className="text-[10px] sm:text-xs text-slate-400">
+            <div className="flex items-baseline gap-1 whitespace-nowrap shrink-0">
+              <span className="text-[10.5px] sm:text-xs text-slate-400">
                 {t.stage}
               </span>
               <span
-                className={`font-num text-[11px] sm:text-sm lg:text-base font-bold ${
+                className={`font-num text-xs sm:text-sm font-bold ${
                   isMonsterMode
                     ? 'text-rose-300'
                     : isSpaceMode
@@ -10918,14 +10918,14 @@ export default function App() {
             <div className="hidden sm:block h-4 w-px bg-white/10 shrink-0" aria-hidden="true" />
 
             {/* Stage Progress & Score */}
-            <div className="flex items-baseline gap-0.5 sm:gap-1 whitespace-nowrap">
-              <span className="text-[10px] sm:text-xs lg:text-sm text-slate-400">
+            <div className="flex items-baseline gap-1 whitespace-nowrap shrink-0">
+              <span className="text-[10.5px] sm:text-xs text-slate-400">
                 {t.score}
               </span>
-              <span className="font-num text-[11px] sm:text-sm lg:text-base font-bold text-white">
+              <span className="font-num text-xs sm:text-sm font-bold text-white">
                 {stagePoints}
               </span>
-              <span className="font-num text-[10px] sm:text-xs text-slate-400">
+              <span className="font-num text-[10.5px] sm:text-xs text-slate-400">
                 /{currentStageConfig.pointsNeeded}
               </span>
             </div>
@@ -10934,12 +10934,12 @@ export default function App() {
 
             {/* Coins (الفلوس) */}
             <div
-              className="flex items-center gap-0.5 sm:gap-1 whitespace-nowrap"
+              className="flex items-center gap-1 whitespace-nowrap shrink-0"
               aria-label={`${t.coins}: ${coins}`}
             >
               <svg
                 viewBox="0 0 24 24"
-                className="w-3.5 h-3.5 sm:w-4 sm:h-4 lg:w-5 lg:h-5 text-amber-400 shrink-0"
+                className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-amber-400 shrink-0"
                 aria-hidden="true"
               >
                 <circle
@@ -10959,7 +10959,7 @@ export default function App() {
                   strokeWidth="1.4"
                 />
               </svg>
-              <span className="font-num text-[11px] sm:text-sm lg:text-base font-bold text-amber-300">
+              <span className="font-num text-xs sm:text-sm font-bold text-amber-300">
                 {coins}
               </span>
             </div>
@@ -10967,7 +10967,7 @@ export default function App() {
             <div className="hidden sm:block h-4 w-px bg-white/10 shrink-0" aria-hidden="true" />
 
             {/* Pink Coins (العملات الوردية) + Benefit Info */}
-            <div className="relative flex items-center whitespace-nowrap">
+            <div className="relative flex items-center whitespace-nowrap shrink-0">
               <button
                 type="button"
                 onClick={() => {
@@ -10977,17 +10977,17 @@ export default function App() {
                 aria-expanded={pinkCoinInfoOpen}
                 aria-label={`${t.pinkCoins}: ${pinkCoins} — ${t.pinkCoinBenefitDesc}`}
                 title={`${t.pinkCoinBenefitTitle}: ${t.pinkCoinBenefitDesc}`}
-                className={`inline-flex items-center gap-0.5 sm:gap-1 px-1 sm:px-1.5 py-0.5 rounded-md border transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-pink-400 ${
+                className={`inline-flex items-center gap-1 px-1.5 sm:px-2 py-0.5 rounded-md border transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-pink-400 ${
                   pinkCoinInfoOpen
                     ? 'border-pink-400/70 bg-pink-500/20'
                     : 'border-pink-400/30 bg-pink-500/10 hover:bg-pink-500/20'
                 }`}
               >
-                <PinkCoinIcon className="w-3.5 h-3.5 sm:w-4 sm:h-4 lg:w-4.5 lg:h-4.5 shrink-0" />
-                <span className="font-num text-[11px] sm:text-sm lg:text-base font-bold text-pink-300">
+                <PinkCoinIcon className="w-3.5 h-3.5 sm:w-4 sm:h-4 shrink-0" />
+                <span className="font-num text-xs sm:text-sm font-bold text-pink-300">
                   {pinkCoins}
                 </span>
-                <span className="hidden lg:inline text-[10px] font-semibold text-pink-200/90 border-s border-pink-400/30 ps-1">
+                <span className="hidden md:inline text-[11px] font-semibold text-pink-200/90 border-s border-pink-400/30 ps-1.5">
                   {t.pinkCoinShortBenefit}
                 </span>
                 <span
@@ -11002,7 +11002,7 @@ export default function App() {
                 <div
                   role="dialog"
                   aria-label={t.pinkCoinBenefitTitle}
-                  className="fixed top-20 inset-x-3 mx-auto sm:absolute sm:top-full sm:inset-x-auto sm:left-1/2 sm:-translate-x-1/2 sm:mt-2 z-40 w-auto max-w-[300px] sm:w-72 p-3 rounded-xl border border-pink-400/45 bg-[#120d1f]/98 shadow-2xl whitespace-normal text-start"
+                  className="fixed top-24 inset-x-3 mx-auto sm:absolute sm:top-full sm:inset-x-auto sm:left-1/2 sm:-translate-x-1/2 sm:mt-2 z-40 w-auto max-w-[300px] sm:w-72 p-3 rounded-xl border border-pink-400/45 bg-[#120d1f]/98 shadow-2xl whitespace-normal text-start"
                 >
                   <div className="flex items-center justify-between gap-2 mb-1.5">
                     <div className="flex items-center gap-1.5">
@@ -11028,7 +11028,7 @@ export default function App() {
             </div>
 
             {/* Space Coins (عملات الفضاء) + How to Earn Info */}
-            <div className="relative flex items-center whitespace-nowrap">
+            <div className="relative flex items-center whitespace-nowrap shrink-0">
               <button
                 type="button"
                 onClick={() => {
@@ -11038,17 +11038,17 @@ export default function App() {
                 aria-expanded={spaceCoinInfoOpen}
                 aria-label={`${t.spaceCoins}: ${spaceCoins} — ${t.spaceCoinBenefitDesc}`}
                 title={`${t.spaceCoinBenefitTitle}: ${t.spaceCoinBenefitDesc}`}
-                className={`inline-flex items-center gap-0.5 sm:gap-1 px-1 sm:px-1.5 py-0.5 rounded-md border transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-400 ${
+                className={`inline-flex items-center gap-1 px-1.5 sm:px-2 py-0.5 rounded-md border transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-400 ${
                   spaceCoinInfoOpen
                     ? 'border-cyan-400/75 bg-violet-500/25'
                     : 'border-violet-400/35 bg-violet-500/12 hover:bg-violet-500/22'
                 }`}
               >
-                <SpaceCoinIcon className="w-3.5 h-3.5 sm:w-4 sm:h-4 lg:w-4.5 lg:h-4.5 shrink-0" />
-                <span className="font-num text-[11px] sm:text-sm lg:text-base font-bold text-cyan-200">
+                <SpaceCoinIcon className="w-3.5 h-3.5 sm:w-4 sm:h-4 shrink-0" />
+                <span className="font-num text-xs sm:text-sm font-bold text-cyan-200">
                   {spaceCoins}
                 </span>
-                <span className="hidden lg:inline text-[10px] font-semibold text-violet-200/95 border-s border-violet-400/30 ps-1">
+                <span className="hidden md:inline text-[11px] font-semibold text-violet-200/95 border-s border-violet-400/30 ps-1.5">
                   {t.spaceCoinShortBenefit}
                 </span>
                 <span
@@ -11063,7 +11063,7 @@ export default function App() {
                 <div
                   role="dialog"
                   aria-label={t.spaceCoinBenefitTitle}
-                  className="fixed top-20 inset-x-3 mx-auto sm:absolute sm:top-full sm:inset-x-auto sm:left-1/2 sm:-translate-x-1/2 sm:mt-2 z-40 w-auto max-w-[320px] sm:w-80 p-3.5 rounded-xl border border-violet-400/50 bg-[#120b29]/98 shadow-2xl whitespace-normal text-start space-y-2.5"
+                  className="fixed top-24 inset-x-3 mx-auto sm:absolute sm:top-full sm:inset-x-auto sm:left-1/2 sm:-translate-x-1/2 sm:mt-2 z-40 w-auto max-w-[320px] sm:w-80 p-3.5 rounded-xl border border-violet-400/50 bg-[#120b29]/98 shadow-2xl whitespace-normal text-start space-y-2.5"
                 >
                   <div className="flex items-center justify-between gap-2">
                     <div className="flex items-center gap-1.5">
@@ -11095,12 +11095,12 @@ export default function App() {
               )}
             </div>
 
-            <div className="hidden xl:block h-4 w-px bg-white/10 shrink-0" aria-hidden="true" />
+            <div className="hidden lg:block h-4 w-px bg-white/10 shrink-0" aria-hidden="true" />
 
-            {/* Best Score (desktop HUD; also always shown in overlays) */}
-            <div className="hidden xl:flex items-baseline gap-1.5 whitespace-nowrap">
-              <span className="text-sm text-slate-400">{t.best}</span>
-              <span className="font-num text-base font-bold text-slate-200">
+            {/* Best Score (shown cleanly on lg+) */}
+            <div className="hidden lg:flex items-baseline gap-1 whitespace-nowrap shrink-0">
+              <span className="text-xs text-slate-400">{t.best}</span>
+              <span className="font-num text-sm font-bold text-slate-200">
                 {bestScore}
               </span>
             </div>
@@ -11109,7 +11109,7 @@ export default function App() {
 
             {/* Lives (Hearts in Normal, Corn in Fruit, Diamonds in Gold, Stars in Space) + live 5-min regen + buy button */}
             <div
-              className="flex items-center gap-0.5 sm:gap-1.5 whitespace-nowrap"
+              className="flex items-center gap-1 sm:gap-1.5 whitespace-nowrap shrink-0"
               aria-label={`${
                 isMonsterMode
                   ? t.monsterSkullsLabel
@@ -11125,23 +11125,23 @@ export default function App() {
               {isMonsterMode ? (
                 <MonsterSkullIcon
                   filled={activeLives > 0}
-                  className="w-3.5 h-3.5 sm:w-5 sm:h-5 shrink-0"
+                  className="w-3.5 h-3.5 sm:w-4.5 sm:h-4.5 shrink-0"
                 />
               ) : isSpaceMode ? (
                 <SpaceStarIcon
-                  className={`w-3.5 h-3.5 sm:w-5 sm:h-5 shrink-0 ${
+                  className={`w-3.5 h-3.5 sm:w-4.5 sm:h-4.5 shrink-0 ${
                     activeLives > 0 ? '' : 'opacity-40 grayscale'
                   }`}
                 />
               ) : isGoldMode ? (
                 <DiamondIcon
-                  className={`w-3.5 h-3.5 sm:w-5 sm:h-5 shrink-0 ${
+                  className={`w-3.5 h-3.5 sm:w-4.5 sm:h-4.5 shrink-0 ${
                     activeLives > 0 ? '' : 'opacity-40 grayscale'
                   }`}
                 />
               ) : isFruitMode ? (
                 <CornIcon
-                  className={`w-3.5 h-3.5 sm:w-5 sm:h-5 shrink-0 ${
+                  className={`w-3.5 h-3.5 sm:w-4.5 sm:h-4.5 shrink-0 ${
                     activeLives > 0 ? '' : 'opacity-40 grayscale'
                   }`}
                 />
@@ -11158,7 +11158,7 @@ export default function App() {
                 </svg>
               )}
               <span
-                className={`font-num text-[11px] sm:text-sm lg:text-base font-bold ${
+                className={`font-num text-xs sm:text-sm font-bold ${
                   activeLives > 0
                     ? isMonsterMode
                       ? 'text-rose-300'
@@ -11175,7 +11175,7 @@ export default function App() {
                 {activeLives}/{activeMaxLives}
               </span>
               {activeLives < activeMaxLives && (
-                <span className="font-num text-[9.5px] sm:text-xs font-semibold text-sky-300 bg-sky-500/15 border border-sky-400/25 rounded px-1 py-0.5">
+                <span className="font-num text-[10px] sm:text-xs font-semibold text-sky-300 bg-sky-500/15 border border-sky-400/25 rounded px-1.5 py-0.5">
                   {formatCountdown(activeNextRegenMs)}
                 </span>
               )}
@@ -11230,7 +11230,7 @@ export default function App() {
                     ? t.buyCornAria
                     : t.buyHeartAria
                 }
-                className={`h-6 px-1 sm:px-1.5 inline-flex items-center justify-center gap-0.5 rounded border text-[10px] sm:text-[11px] font-bold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400 shrink-0 ${
+                className={`h-6 px-1.5 inline-flex items-center justify-center gap-0.5 rounded border text-[10.5px] sm:text-[11px] font-bold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400 shrink-0 ${
                   activeLives < activeMaxLives &&
                   activeLifeCurrencyBalance >= activeLifeBuyCost
                     ? isGoldMode
