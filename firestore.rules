@@ -1,0 +1,52 @@
+rules_version = '2';
+
+// Point Catcher private analytics.
+// - Players (signed-in or not) may only CREATE anonymous session docs.
+// - Only the two admin Google accounts may READ them.
+// - Nobody may update or delete.
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isStatsAdmin() {
+      return request.auth != null
+        && request.auth.token.email_verified == true
+        && request.auth.token.email in [
+          'aboodalkhalil73@gmail.com',
+          'ab3256792@gmail.com'
+        ];
+    }
+
+    function isValidSession(d) {
+      return d.keys().hasOnly(['gameId', 'gameName', 'startedAt', 'endedAt', 'durationSeconds', 'visit'])
+        && d.keys().hasAll(['gameId', 'gameName', 'startedAt', 'endedAt', 'durationSeconds', 'visit'])
+        && d.gameId in [
+          'world-normal', 'world-fruit', 'world-gold', 'world-space', 'world-monster',
+          'mini-devil-trap', 'mini-monster-arena', 'mini-plant-merge', 'mini-shawarma-shop',
+          'mini-desert-rally', 'mini-date-catcher', 'mini-arrow-escape', 'mini-arrow-mosaic',
+          'mini-fruit-merge', 'mini-neon-2048', 'mini-neon-snake', 'mini-apple-catch',
+          'mini-brick-breaker'
+        ]
+        && d.gameName is string && d.gameName.size() > 0 && d.gameName.size() <= 60
+        && d.startedAt is timestamp
+        && d.endedAt is timestamp
+        && d.endedAt >= d.startedAt
+        && d.endedAt <= request.time + duration.value(10, 'm')
+        && d.endedAt >= request.time - duration.value(1, 'h')
+        && d.durationSeconds is int
+        && d.durationSeconds >= 0
+        && d.durationSeconds <= 21600
+        && d.durationSeconds * 1000 <= d.endedAt.toMillis() - d.startedAt.toMillis() + 5000
+        && d.visit is bool;
+    }
+
+    match /analytics_sessions/{sessionId} {
+      allow read: if isStatsAdmin();
+      allow create: if isValidSession(request.resource.data);
+      allow update, delete: if false;
+    }
+
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

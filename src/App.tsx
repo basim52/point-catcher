@@ -142,6 +142,8 @@ import {
 } from './shop';
 import { GamesModal, type MiniGameId } from './miniGames';
 import { LandingBoard } from './LandingBoard';
+import { useGamePlayTracking } from './analytics/tracker';
+import { worldGameId } from './analytics/games';
 import { IntroSplash } from './IntroSplash';
 import {
   PlayerStatsPanel,
@@ -2367,6 +2369,11 @@ export default function App() {
   const gameModeRef = useRef<GameMode>('normal');
   const statusRef = useRef<GameStatus>('START');
   const statusBeforeModalRef = useRef<GameStatus>('START');
+  // Private analytics: one visit per world entry, minutes only while PLAYING.
+  useGamePlayTracking(
+    status === 'START' ? null : worldGameId(gameMode),
+    status === 'PLAYING'
+  );
   const stagesModalOpenRef = useRef<boolean>(false);
   const indexModalOpenRef = useRef<boolean>(false);
   const shopModalOpenRef = useRef<boolean>(false);
