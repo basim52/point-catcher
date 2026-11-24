@@ -2,8 +2,8 @@ import React, { useEffect, useMemo, useState } from 'react';
 import type { User } from 'firebase/auth';
 import { isAnalyticsConfigured, STATS_ADMIN_EMAILS } from '../analytics/config';
 import { periodStart, summarize, type Period, type SessionRecord } from './aggregate';
-import { fetchSessions, signInWithGoogle, signOutUser, watchUser } from './firebaseClient';
-import { setStatsAdminFlag } from './adminAccess';
+import { completeRedirectSignIn, fetchSessions, signInWithGoogle, signOutUser, watchUser } from './firebaseClient';
+import { consumeStatsRedirectPending, setStatsAdminFlag } from './adminAccess';
 import { makeDemoSessions } from './demoData';
 
 type DemoMode = 'data' | 'denied' | 'signin' | null;
@@ -22,6 +22,13 @@ const PERIODS: { id: Period; label: string }[] = [
 
 const nf = new Intl.NumberFormat('ar-SA-u-nu-latn', { maximumFractionDigits: 1 });
 const fmt = (n: number) => nf.format(n);
+
+function signInErrorText(code: string): string {
+  if (code === 'auth/unauthorized-domain') return 'هذا النطاق غير مضاف في إعدادات Firebase Authentication.';
+  if (code === 'auth/popup-closed-by-user') return 'تم إغلاق نافذة Google قبل إكمال الدخول.';
+  if (code === 'auth/network-request-failed') return 'لا يوجد اتصال بالإنترنت. حاول مرة ثانية.';
+  return 'لم يكتمل تسجيل الدخول. حاول مرة ثانية.';
+}
 
 function isAdmin(user: User | null): boolean {
   if (!user || !user.emailVerified || !user.email) return false;
@@ -106,6 +113,14 @@ const StatsPage: React.FC<StatsPageProps> = ({ variant = 'page', onClose }) => {
 
   useEffect(() => {
     if (demoMode || !isAnalyticsConfigured) return;
+    consumeStatsRedirectPending();
+    void completeRedirectSignIn().then((code) => {
+      if (code) setError(signInErrorText(code));
+    });
+  }, []);
+
+  useEffect(() => {
+    if (demoMode || !isAnalyticsConfigured) return;
     return watchUser((u) => {
       setUser(u);
       setAuthReady(true);
@@ -169,11 +184,7 @@ const StatsPage: React.FC<StatsPageProps> = ({ variant = 'page', onClose }) => {
     } catch (e) {
       const code = (e as { code?: string }).code ?? 'unknown';
       console.warn('[stats] sign-in failed:', code);
-      setError(
-        code === 'auth/unauthorized-domain'
-          ? 'هذا النطاق غير مضاف في إعدادات Firebase Authentication.'
-          : 'لم يكتمل تسجيل الدخول. حاول مرة ثانية.'
-      );
+      setError(signInErrorText(code));
     } finally {
       setSigningIn(false);
     }

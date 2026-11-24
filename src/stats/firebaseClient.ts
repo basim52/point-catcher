@@ -1,6 +1,7 @@
 import { initializeApp, getApps, type FirebaseApp } from 'firebase/app';
 import {
   getAuth,
+  getRedirectResult,
   GoogleAuthProvider,
   onAuthStateChanged,
   signInWithPopup,
@@ -18,6 +19,7 @@ import {
   type QueryConstraint,
 } from 'firebase/firestore';
 import { firebaseWebConfig, SESSIONS_COLLECTION } from '../analytics/config';
+import { markStatsRedirectPending } from './adminAccess';
 import type { SessionRecord } from './aggregate';
 
 let app: FirebaseApp | null = null;
@@ -30,6 +32,14 @@ export function watchUser(cb: (u: User | null) => void): () => void {
   return onAuthStateChanged(getAuth(getApp()), cb);
 }
 
+// Popup works in normal mobile/desktop browsers; fall back to a full-page
+// redirect where popups are blocked or unsupported (in-app browsers, some PWAs).
+const REDIRECT_FALLBACK_CODES = new Set([
+  'auth/popup-blocked',
+  'auth/operation-not-supported-in-this-environment',
+  'auth/cancelled-popup-request',
+]);
+
 export async function signInWithGoogle(): Promise<void> {
   const auth = getAuth(getApp());
   const provider = new GoogleAuthProvider();
@@ -37,12 +47,23 @@ export async function signInWithGoogle(): Promise<void> {
   try {
     await signInWithPopup(auth, provider);
   } catch (e) {
-    const code = (e as { code?: string }).code;
-    if (code === 'auth/popup-blocked' || code === 'auth/operation-not-supported-in-this-environment') {
+    const code = (e as { code?: string }).code ?? '';
+    if (REDIRECT_FALLBACK_CODES.has(code)) {
+      markStatsRedirectPending();
       await signInWithRedirect(auth, provider);
       return;
     }
     throw e;
+  }
+}
+
+/** Finish a redirect sign-in (no-op if there was none). Returns an error code or null. */
+export async function completeRedirectSignIn(): Promise<string | null> {
+  try {
+    await getRedirectResult(getAuth(getApp()));
+    return null;
+  } catch (e) {
+    return (e as { code?: string }).code ?? 'unknown';
   }
 }
 
