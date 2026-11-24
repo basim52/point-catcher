@@ -1,5 +1,11 @@
 import React, { Component, lazy, Suspense, useCallback, useEffect, useState, type ReactNode } from 'react';
-import { openStatsOverlay, useLongPress, useStatsAdminFlag, useStatsOpenRequests } from './adminAccess';
+import {
+  consumeStatsRedirectPending,
+  openStatsOverlay,
+  useSecretEntry,
+  useStatsAdminFlag,
+  useStatsOpenRequests,
+} from './adminAccess';
 
 const StatsPage = lazy(() => import('./StatsPage'));
 
@@ -21,14 +27,26 @@ export const StatsAdminButton: React.FC<{ className?: string }> = ({ className =
   );
 };
 
-/** Wraps the game title: holding it ~2s opens the admin sign-in. */
+/** Wraps the game title: hold ~2s, or tap it 5 times quickly, to open the admin sign-in. */
 export const AdminLongPressTitle: React.FC<{ className?: string; children: ReactNode }> = ({
   className = '',
   children,
 }) => {
-  const { handlers } = useLongPress(openStatsOverlay, 2000);
+  const { holding, handlers } = useSecretEntry(openStatsOverlay, { holdMs: 2000, taps: 5 });
   return (
-    <span {...handlers} className={`select-none [-webkit-touch-callout:none] ${className}`}>
+    <span
+      {...handlers}
+      className={`inline-block cursor-default select-none transition-[transform,color] ${
+        holding ? 'scale-105 text-amber-200 duration-[2000ms]' : 'duration-150'
+      } ${className}`}
+      style={{
+        WebkitUserSelect: 'none',
+        userSelect: 'none',
+        WebkitTouchCallout: 'none',
+        WebkitTapHighlightColor: 'transparent',
+        touchAction: 'manipulation',
+      }}
+    >
       {children}
     </span>
   );
@@ -65,6 +83,10 @@ export const StatsOverlayHost: React.FC = () => {
   const onOpen = useCallback(() => setOpen(true), []);
   const onClose = useCallback(() => setOpen(false), []);
   useStatsOpenRequests(onOpen);
+  // Returning from a Google redirect sign-in: reopen the panel to finish it.
+  useEffect(() => {
+    if (consumeStatsRedirectPending()) setOpen(true);
+  }, []);
   useEffect(() => {
     if (!open) return;
     const onKey = (e: KeyboardEvent) => {
