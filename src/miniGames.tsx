@@ -1,4 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useGamePlayTracking } from './analytics/tracker';
+import { miniGameId } from './analytics/games';
 import {
   Neon2048Game,
   Neon2048PreviewArt,
@@ -2494,6 +2496,9 @@ export const GamesModal: React.FC<GamesModalProps> = ({
   const [devilTrapStats, setDevilTrapStats] = useState<DevilTrapStats>(() =>
     readDevilTrapStats()
   );
+
+  // Private analytics: visit + active minutes for the open mini game.
+  useGamePlayTracking(miniGameId(activeGame), activeGame !== null);
 
   // Play soft arcade lounge music while browsing the Games Hub
   useGameMusic('hub', musicEnabled && activeGame === null);

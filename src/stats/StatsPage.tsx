@@ -1,0 +1,286 @@
+import React, { useEffect, useMemo, useState } from 'react';
+import type { User } from 'firebase/auth';
+import { isAnalyticsConfigured, STATS_ADMIN_EMAILS } from '../analytics/config';
+import { periodStart, summarize, type Period, type SessionRecord } from './aggregate';
+import { fetchSessions, signInWithGoogle, signOutUser, watchUser } from './firebaseClient';
+import { makeDemoSessions } from './demoData';
+
+type DemoMode = 'data' | 'denied' | 'signin' | null;
+const demoMode: DemoMode = (() => {
+  if (!import.meta.env.DEV) return null;
+  const v = new URLSearchParams(window.location.search).get('demo');
+  return v === 'data' || v === 'denied' || v === 'signin' ? v : null;
+})();
+
+const PERIODS: { id: Period; label: string }[] = [
+  { id: 'today', label: 'اليوم' },
+  { id: '7d', label: 'آخر ٧ أيام' },
+  { id: '30d', label: 'آخر ٣٠ يوم' },
+  { id: 'all', label: 'الكل' },
+];
+
+const nf = new Intl.NumberFormat('ar-SA-u-nu-latn', { maximumFractionDigits: 1 });
+const fmt = (n: number) => nf.format(n);
+
+function isAdmin(user: User | null): boolean {
+  if (!user || !user.emailVerified || !user.email) return false;
+  return STATS_ADMIN_EMAILS.includes(user.email.toLowerCase());
+}
+
+const Shell: React.FC<{ children: React.ReactNode }> = ({ children }) => (
+  <div
+    dir="rtl"
+    lang="ar"
+    className="min-h-[100dvh] w-full bg-[#0b1020] text-slate-100"
+    style={{ fontFamily: "'Cairo', 'Tajawal', system-ui, sans-serif" }}
+  >
+    {children}
+  </div>
+);
+
+const CenterCard: React.FC<{ title: string; body?: string; children?: React.ReactNode }> = ({
+  title,
+  body,
+  children,
+}) => (
+  <Shell>
+    <div className="flex min-h-[100dvh] items-center justify-center p-4">
+      <div className="w-full max-w-md rounded-3xl border border-white/10 bg-white/5 p-6 text-center shadow-2xl">
+        <div className="mb-3 text-4xl" aria-hidden>📊</div>
+        <h1 className="text-2xl font-extrabold">{title}</h1>
+        {body && <p className="mt-2 text-sm leading-7 text-slate-300">{body}</p>}
+        {children && <div className="mt-5 flex flex-col items-center gap-3">{children}</div>}
+      </div>
+    </div>
+  </Shell>
+);
+
+const StatsPage: React.FC = () => {
+  const [user, setUser] = useState<User | null>(null);
+  const [authReady, setAuthReady] = useState(demoMode !== null);
+  const [period, setPeriod] = useState<Period>('7d');
+  const [records, setRecords] = useState<SessionRecord[] | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [signingIn, setSigningIn] = useState(false);
+
+  useEffect(() => {
+    document.title = 'لوحة الإحصائيات | صياد النقاط';
+    const meta = document.createElement('meta');
+    meta.name = 'robots';
+    meta.content = 'noindex, nofollow';
+    document.head.appendChild(meta);
+    return () => meta.remove();
+  }, []);
+
+  useEffect(() => {
+    if (demoMode || !isAnalyticsConfigured) return;
+    return watchUser((u) => {
+      setUser(u);
+      setAuthReady(true);
+    });
+  }, []);
+
+  const admin = demoMode === 'data' || isAdmin(user);
+
+  useEffect(() => {
+    if (!admin) return;
+    if (demoMode === 'data') {
+      setRecords(makeDemoSessions());
+      return;
+    }
+    let cancelled = false;
+    setLoading(true);
+    setError(null);
+    fetchSessions(periodStart(period))
+      .then((r) => !cancelled && setRecords(r))
+      .catch(() => !cancelled && setError('تعذّر تحميل البيانات. تأكد من نشر قواعد Firestore ثم أعد المحاولة.'))
+      .finally(() => !cancelled && setLoading(false));
+    return () => {
+      cancelled = true;
+    };
+  }, [admin, period]);
+
+  const summary = useMemo(() => summarize(records ?? [], period), [records, period]);
+
+  if (!demoMode && !isAnalyticsConfigured) {
+    return <CenterCard title="اللوحة غير مهيّأة" body="إعدادات Firebase غير موجودة في هذا النشر." />;
+  }
+  if (!authReady) return <CenterCard title="جارٍ التحميل…" />;
+
+  const handleSignIn = async () => {
+    setSigningIn(true);
+    setError(null);
+    try {
+      await signInWithGoogle();
+    } catch (e) {
+      const code = (e as { code?: string }).code ?? 'unknown';
+      console.warn('[stats] sign-in failed:', code);
+      setError(
+        code === 'auth/unauthorized-domain'
+          ? 'هذا النطاق غير مضاف في إعدادات Firebase Authentication.'
+          : 'لم يكتمل تسجيل الدخول. حاول مرة ثانية.'
+      );
+    } finally {
+      setSigningIn(false);
+    }
+  };
+
+  if (demoMode === 'signin' || (!demoMode && !user)) {
+    return (
+      <CenterCard title="لوحة الإحصائيات" body="هذه الصفحة خاصة. سجّل الدخول بحساب Google المسموح له.">
+        <button
+          type="button"
+          onClick={handleSignIn}
+          disabled={signingIn}
+          className="min-h-12 w-full rounded-2xl bg-white px-5 py-3 text-base font-bold text-slate-900 shadow-lg transition active:scale-[0.98] disabled:opacity-60"
+        >
+          {signingIn ? 'جارٍ فتح Google…' : 'تسجيل الدخول بحساب Google'}
+        </button>
+        {error && <p className="text-sm text-rose-300">{error}</p>}
+      </CenterCard>
+    );
+  }
+
+  if (!admin) {
+    return (
+      <CenterCard title="غير مسموح" body="هذا الحساب لا يملك صلاحية عرض الإحصائيات.">
+        <button
+          type="button"
+          onClick={() => void signOutUser()}
+          className="min-h-12 rounded-2xl border border-white/20 px-5 py-2 text-sm font-bold"
+        >
+          تسجيل الخروج
+        </button>
+      </CenterCard>
+    );
+  }
+
+  const maxSeconds = summary.rows[0]?.totalSeconds || 1;
+  const email = demoMode ? 'بيانات تجريبية' : user?.email ?? '';
+
+  return (
+    <Shell>
+      <div className="mx-auto w-full max-w-6xl px-3 pb-6 pt-3 sm:px-5">
+        <header className="sticky top-0 z-10 -mx-3 mb-3 flex flex-wrap items-center justify-between gap-2 bg-[#0b1020]/95 px-3 py-2 backdrop-blur sm:-mx-5 sm:px-5">
+          <div className="min-w-0">
+            <h1 className="text-xl font-extrabold sm:text-2xl">📊 إحصائيات صياد النقاط</h1>
+            <p className="truncate text-xs text-slate-400" dir="auto">{email}</p>
+          </div>
+          <div className="flex items-center gap-2">
+            <div role="tablist" aria-label="الفترة" className="flex rounded-2xl bg-white/5 p-1">
+              {PERIODS.map((p) => (
+                <button
+                  key={p.id}
+                  type="button"
+                  role="tab"
+                  aria-selected={period === p.id}
+                  onClick={() => setPeriod(p.id)}
+                  className={`min-h-10 whitespace-nowrap rounded-xl px-2.5 text-xs font-bold transition sm:px-3 sm:text-sm ${
+                    period === p.id ? 'bg-cyan-400 text-slate-900' : 'text-slate-300'
+                  }`}
+                >
+                  {p.label}
+                </button>
+              ))}
+            </div>
+            {!demoMode && (
+              <button
+                type="button"
+                onClick={() => void signOutUser()}
+                className="min-h-10 rounded-xl border border-white/15 px-3 text-xs font-bold text-slate-300"
+              >
+                خروج
+              </button>
+            )}
+          </div>
+        </header>
+
+        {error && <p className="mb-3 rounded-2xl bg-rose-500/15 p-3 text-sm text-rose-200">{error}</p>}
+
+        <section className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+          <div className="col-span-2 rounded-3xl border border-amber-300/40 bg-gradient-to-l from-amber-400/25 to-fuchsia-500/20 p-4">
+            <p className="text-xs font-bold text-amber-200">🏆 اللعبة الأعلى لعباً بالدقائق</p>
+            {summary.topGame ? (
+              <>
+                <p className="mt-1 text-2xl font-extrabold leading-tight">{summary.topGame.gameName}</p>
+                <p className="mt-1 text-sm text-slate-200">
+                  {fmt(summary.topGame.totalMinutes)} دقيقة · {fmt(summary.topGame.visits)} زيارة
+                </p>
+              </>
+            ) : (
+              <p className="mt-1 text-lg font-bold text-slate-300">لا توجد بيانات بعد</p>
+            )}
+          </div>
+          <div className="rounded-3xl border border-white/10 bg-white/5 p-4">
+            <p className="text-xs font-bold text-slate-400">إجمالي الزيارات</p>
+            <p className="mt-1 text-3xl font-extrabold text-cyan-300">{fmt(summary.totalVisits)}</p>
+          </div>
+          <div className="rounded-3xl border border-white/10 bg-white/5 p-4">
+            <p className="text-xs font-bold text-slate-400">إجمالي الدقائق</p>
+            <p className="mt-1 text-3xl font-extrabold text-lime-300">{fmt(summary.totalMinutes)}</p>
+          </div>
+        </section>
+
+        {loading && <p className="mt-4 text-center text-sm text-slate-400">جارٍ تحميل البيانات…</p>}
+
+        <div className="mt-3 grid grid-cols-1 gap-3 lg:grid-cols-2">
+          <section className="min-w-0 rounded-3xl border border-white/10 bg-white/5 p-4">
+            <h2 className="mb-3 text-base font-extrabold">الدقائق لكل لعبة</h2>
+            {summary.rows.length === 0 ? (
+              <p className="text-sm text-slate-400">لا توجد جلسات في هذه الفترة.</p>
+            ) : (
+              <ul className="space-y-2">
+                {summary.rows.map((r, i) => (
+                  <li key={r.gameId} className="grid grid-cols-[7.5rem_1fr_3.5rem] items-center gap-2 text-xs sm:grid-cols-[9rem_1fr_4rem] sm:text-sm">
+                    <span className="truncate font-bold" title={r.gameName}>{r.gameName}</span>
+                    <span className="h-4 overflow-hidden rounded-full bg-white/10">
+                      <span
+                        className={`block h-full rounded-full ${i === 0 ? 'bg-amber-300' : 'bg-cyan-400'}`}
+                        style={{ width: `${Math.max(2, (r.totalSeconds / maxSeconds) * 100)}%` }}
+                      />
+                    </span>
+                    <span className="text-left tabular-nums text-slate-300">{fmt(r.totalMinutes)}</span>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </section>
+
+          <section className="min-w-0 rounded-3xl border border-white/10 bg-white/5 p-4">
+            <h2 className="mb-3 text-base font-extrabold">تفاصيل الألعاب</h2>
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[20rem] text-right text-xs sm:text-sm">
+                <thead className="text-slate-400">
+                  <tr className="border-b border-white/10">
+                    <th className="py-2 pe-2 font-bold">#</th>
+                    <th className="py-2 pe-2 font-bold">اللعبة</th>
+                    <th className="py-2 pe-2 font-bold">الزيارات</th>
+                    <th className="py-2 pe-2 font-bold">الدقائق</th>
+                    <th className="py-2 font-bold whitespace-nowrap">المتوسط</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {summary.rows.map((r, i) => (
+                    <tr key={r.gameId} className={`border-b border-white/5 ${i === 0 ? 'text-amber-200' : ''}`}>
+                      <td className="py-2 pe-2 tabular-nums text-slate-400">{i + 1}</td>
+                      <td className="py-2 pe-2 font-bold">{r.gameName}</td>
+                      <td className="py-2 pe-2 tabular-nums">{fmt(r.visits)}</td>
+                      <td className="py-2 pe-2 tabular-nums">{fmt(r.totalMinutes)}</td>
+                      <td className="py-2 tabular-nums">{fmt(r.avgMinutesPerVisit)} د</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </section>
+        </div>
+        <p className="mt-4 text-center text-[11px] text-slate-500">
+          الوقت المحسوب هو وقت اللعب الفعلي فقط (لا يُحسب وقت الخلفية). لا تُحفظ أي بيانات شخصية عن اللاعبين.
+        </p>
+      </div>
+    </Shell>
+  );
+};
+
+export default StatsPage;
