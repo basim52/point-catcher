@@ -1,6 +1,6 @@
 import React from 'react';
 
-export type GameMode = 'normal' | 'fruit' | 'gold';
+export type GameMode = 'normal' | 'fruit' | 'gold' | 'space' | 'monster';
 
 export function getFruitStageClearCoins(remainingCorn: number): number {
   if (remainingCorn >= 3) return 18;

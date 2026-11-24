@@ -44,6 +44,17 @@ import { DesertRallyGame, DesertRallyPreviewArt } from './desertRally/DesertRall
 import { readDesertRallyStats, type RallyStats } from './desertRally/types';
 import { ShawarmaGame, ShawarmaPreviewArt } from './shawarmaShop/ShawarmaGame';
 import { readShawarmaStats, type ShawarmaStats } from './shawarmaShop/types';
+import { PlantMergeGame, PlantMergePreviewArt } from './plantMerge/PlantMergeGame';
+import { readPlantMergeStats, type PlantMergeStats } from './plantMerge/types';
+import { MonsterArenaGame, MonsterArenaPreviewArt } from './monsterArena/MonsterArenaGame';
+import { readMonsterArenaStats, type MonsterArenaStats } from './monsterArena/types';
+import {
+  DEVIL_TRAP_TOTAL_LEVELS,
+  DevilTrapGame,
+  DevilTrapPreviewArt,
+  readDevilTrapStats,
+} from './devilTrap/DevilTrapGame';
+import type { DevilTrapStats } from './devilTrap/types';
 
 type Dir = 'UP' | 'DOWN' | 'LEFT' | 'RIGHT';
 type TierKey = 'intro' | 'curved' | 'woven' | 'hard' | 'master' | 'legend';
@@ -1331,6 +1342,9 @@ function HeartIcon({ filled, pulse }: { filled: boolean; pulse: boolean }) {
 }
 
 export type MiniGameId =
+  | 'devil-trap'
+  | 'monster-arena'
+  | 'plant-merge'
   | 'shawarma-shop'
   | 'desert-rally'
   | 'date-catcher'
@@ -1370,6 +1384,18 @@ const HUB_COPY = {
     shawarmaTitle: 'ملك الشاورما 3D',
     shawarmaDesc:
       'قصّ الشاورما من السيخ الدوّار وأضف الثومية والمخلل والبطاطس والشطة حسب طلبات الزبائن واجمع الريالات لتطوير محلك!',
+    plantMergeTag: 'متجر 11 نبتة · 21 وحش · إندكس',
+    plantMergeTitle: 'مزرعة النباتات 3D',
+    plantMergeDesc:
+      'اقتل الوحوش لجمع الفلوس، اشترِ 11 نوعاً من النباتات من المتجر مع أسعارها وفوائدها، احمِ المنزل من الأكل، وواجه العملاق كل 5 دقائق!',
+    monsterArenaTag: 'فواكه · أسلحة · حيوانات · زعيم 3د و10د',
+    monsterArenaTitle: 'حلبة الوحوش 3D',
+    monsterArenaDesc:
+      'قاتل الوحوش في حلبة بركانية 3D، تناول الفواكه لرفع الطاقة، اشترِ 8 أسلحة أقوى و6 حيوانات تقاتل معك، وواجه وحش الـ 3 دقائق ووحش الـ 10 دقائق!',
+    devilTrapTag: '300 مرحلة · عادي · صعب · مستحيل',
+    devilTrapTitle: 'بوابة الشيطان 2D',
+    devilTrapDesc:
+      'لعبة منصات 2D بفكرة Level Devil الأسطورية! 100 مرحلة عادي + 100 صعب + 100 مستحيل بحفر مفاجئة وأشواك مختبئة وأبواب هاربة وجاذبية مقلوبة!',
     arrowGameTitle: 'لغز الأسهم',
     arrowGameDesc:
       'حرّر السهم الذهبي من متاهة الأسهم المنحنية والمتشابكة عبر 25 مرحلة مقفلة بالتسلسل.',
@@ -1421,6 +1447,18 @@ const HUB_COPY = {
     shawarmaTitle: 'Shawarma King 3D',
     shawarmaDesc:
       'Slice roasting meat off the spinning 3D spit, add garlic, pickles, fries & chili to order, earn SAR, and upgrade your shop!',
+    plantMergeTag: '11-Plant Shop · 21 Monsters · Index',
+    plantMergeTitle: 'Plant Defense 3D',
+    plantMergeDesc:
+      'Earn Coins by killing monsters, buy all 11 plants from the Plant Shop with listed prices & abilities, protect your house, and survive the 5-min Colossal Boss!',
+    monsterArenaTag: 'Fruits · 8 Guns · 6 Pets · 3m & 10m Boss',
+    monsterArenaTitle: 'Monster Arena 3D',
+    monsterArenaDesc:
+      'Fight waves of monsters in a 3D colosseum, eat fruits to raise Energy, unlock 8 weapons & 6 companion battle pets, and survive the 3-Min Warlord & 10-Min Dread Titan!',
+    devilTrapTag: '300 Stages · Normal · Hard · Impossible',
+    devilTrapTitle: "Devil's Gate 2D",
+    devilTrapDesc:
+      'Level Devil-style 2D troll platformer! 100 Normal + 100 Hard + 100 Impossible stages packed with collapsing pits, ambush spikes, fleeing doors & gravity flips!',
     arrowGameTitle: 'Arrow Escape',
     arrowGameDesc:
       'Free the Golden Arrow from interlocked curved arrows across 25 locked levels.',
@@ -2447,6 +2485,15 @@ export const GamesModal: React.FC<GamesModalProps> = ({
   const [shawarmaStats, setShawarmaStats] = useState<ShawarmaStats>(() =>
     readShawarmaStats()
   );
+  const [plantMergeStats, setPlantMergeStats] = useState<PlantMergeStats>(() =>
+    readPlantMergeStats()
+  );
+  const [monsterArenaStats, setMonsterArenaStats] = useState<MonsterArenaStats>(() =>
+    readMonsterArenaStats()
+  );
+  const [devilTrapStats, setDevilTrapStats] = useState<DevilTrapStats>(() =>
+    readDevilTrapStats()
+  );
 
   // Play soft arcade lounge music while browsing the Games Hub
   useGameMusic('hub', musicEnabled && activeGame === null);
@@ -2476,8 +2523,23 @@ export const GamesModal: React.FC<GamesModalProps> = ({
     setDateCatcherBest(readDateCatcherBestScore());
     setDesertRallyStats(readDesertRallyStats());
     setShawarmaStats(readShawarmaStats());
+    setPlantMergeStats(readPlantMergeStats());
+    setMonsterArenaStats(readMonsterArenaStats());
+    setDevilTrapStats(readDevilTrapStats());
     setActiveGame(null);
   }, []);
+
+  if (activeGame === 'devil-trap') {
+    return <DevilTrapGame lang={lang} onExit={handleExitGameToHub} />;
+  }
+
+  if (activeGame === 'monster-arena') {
+    return <MonsterArenaGame lang={lang} onExit={handleExitGameToHub} />;
+  }
+
+  if (activeGame === 'plant-merge') {
+    return <PlantMergeGame lang={lang} onExit={handleExitGameToHub} />;
+  }
 
   if (activeGame === 'shawarma-shop') {
     return <ShawarmaGame lang={lang} onExit={handleExitGameToHub} />;
@@ -2619,7 +2681,7 @@ export const GamesModal: React.FC<GamesModalProps> = ({
           {/* Available Games Count + Music Toggle */}
           <div className="flex items-center gap-2.5 shrink-0">
             <div className="text-xs sm:text-sm font-semibold text-sky-300 whitespace-nowrap">
-              {ht.gamesCount(10)}
+              {ht.gamesCount(13)}
             </div>
             <MusicToggleButton
               enabled={musicEnabled}
@@ -3014,6 +3076,121 @@ export const GamesModal: React.FC<GamesModalProps> = ({
                   type="button"
                   onClick={() => setActiveGame('shawarma-shop')}
                   className="w-full h-9 sm:h-11 rounded-lg bg-gradient-to-b from-amber-300 to-orange-500 hover:from-amber-200 hover:to-orange-400 active:scale-[0.99] text-[#261105] font-extrabold text-xs sm:text-base transition-all cursor-pointer"
+                >
+                  {ht.playBtn}
+                </button>
+              </div>
+            </div>
+
+            {/* Game Card 11: Garden Merge 3D (مزرعة الدمج 3D) */}
+            <div className="group rounded-xl sm:rounded-2xl border border-emerald-400/55 bg-[#0f1f17] hover:border-emerald-300/85 transition-colors overflow-hidden shadow-xl flex flex-col">
+              <div className="aspect-[2/1] w-full border-b border-white/10 overflow-hidden bg-[#1a3a24]">
+                <PlantMergePreviewArt />
+              </div>
+
+              <div className="p-2.5 sm:p-4 flex-1 flex flex-col">
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-0.5 sm:gap-2 mb-1 sm:mb-1.5">
+                  <h2 className="text-xs sm:text-lg font-bold text-emerald-100 leading-snug">
+                    {ht.plantMergeTitle}
+                  </h2>
+                  <span className="font-num text-[10px] sm:text-xs font-semibold text-emerald-300 whitespace-nowrap">
+                    {ht.plantMergeTag}
+                  </span>
+                </div>
+
+                <p className="text-[11px] sm:text-sm text-emerald-100/75 leading-snug sm:leading-relaxed mb-2.5 sm:mb-4 flex-1 line-clamp-2 sm:line-clamp-none">
+                  {ht.plantMergeDesc}
+                </p>
+
+                <div className="flex items-center justify-between gap-1 text-[10.5px] sm:text-xs text-emerald-200/75 mb-2 sm:mb-3 pt-2 sm:pt-2.5 border-t border-white/10">
+                  <span className="truncate">{ht.bestScoreLabel}</span>
+                  <span className="font-num font-bold text-emerald-300 whitespace-nowrap">
+                    {plantMergeStats.bestScore > 0
+                      ? `${plantMergeStats.bestScore} · W${plantMergeStats.bestWave}`
+                      : '0'}
+                  </span>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => setActiveGame('plant-merge')}
+                  className="w-full h-9 sm:h-11 rounded-lg bg-gradient-to-b from-emerald-400 to-green-500 hover:from-emerald-300 hover:to-green-400 active:scale-[0.99] text-slate-950 font-extrabold text-xs sm:text-base transition-all cursor-pointer"
+                >
+                  {ht.playBtn}
+                </button>
+              </div>
+            </div>
+
+            {/* Game Card 12: Monster Arena 3D (حلبة الوحوش 3D) */}
+            <div className="group rounded-xl sm:rounded-2xl border border-rose-400/60 bg-[#1a1026] hover:border-amber-300/85 transition-colors overflow-hidden shadow-xl flex flex-col">
+              <div className="aspect-[2/1] w-full border-b border-white/10 overflow-hidden bg-[#241232]">
+                <MonsterArenaPreviewArt />
+              </div>
+
+              <div className="p-2.5 sm:p-4 flex-1 flex flex-col">
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-0.5 sm:gap-2 mb-1 sm:mb-1.5">
+                  <h2 className="text-xs sm:text-lg font-bold text-amber-100 leading-snug">
+                    {ht.monsterArenaTitle}
+                  </h2>
+                  <span className="font-num text-[10px] sm:text-xs font-semibold text-rose-300 whitespace-nowrap">
+                    {ht.monsterArenaTag}
+                  </span>
+                </div>
+
+                <p className="text-[11px] sm:text-sm text-rose-100/80 leading-snug sm:leading-relaxed mb-2.5 sm:mb-4 flex-1 line-clamp-2 sm:line-clamp-none">
+                  {ht.monsterArenaDesc}
+                </p>
+
+                <div className="flex items-center justify-between gap-1 text-[10.5px] sm:text-xs text-amber-200/80 mb-2 sm:mb-3 pt-2 sm:pt-2.5 border-t border-white/10">
+                  <span className="truncate">{ht.bestScoreLabel}</span>
+                  <span className="font-num font-bold text-amber-300 whitespace-nowrap">
+                    {monsterArenaStats.bestScore > 0
+                      ? `${monsterArenaStats.bestScore} · W${monsterArenaStats.bestWave}`
+                      : '0'}
+                  </span>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => setActiveGame('monster-arena')}
+                  className="w-full h-9 sm:h-11 rounded-lg bg-gradient-to-b from-amber-400 to-rose-500 hover:from-amber-300 hover:to-rose-400 active:scale-[0.99] text-slate-950 font-extrabold text-xs sm:text-base transition-all cursor-pointer"
+                >
+                  {ht.playBtn}
+                </button>
+              </div>
+            </div>
+
+            {/* Game Card 13: Devil's Gate 2D (بوابة الشيطان 2D) */}
+            <div className="group rounded-xl sm:rounded-2xl border border-amber-400/65 bg-[#2a150f] hover:border-yellow-300/90 transition-colors overflow-hidden shadow-xl flex flex-col">
+              <div className="aspect-[2/1] w-full border-b border-white/10 overflow-hidden bg-[#381c13]">
+                <DevilTrapPreviewArt />
+              </div>
+
+              <div className="p-2.5 sm:p-4 flex-1 flex flex-col">
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-0.5 sm:gap-2 mb-1 sm:mb-1.5">
+                  <h2 className="text-xs sm:text-lg font-bold text-amber-100 leading-snug">
+                    {ht.devilTrapTitle}
+                  </h2>
+                  <span className="font-num text-[10px] sm:text-xs font-semibold text-amber-300 whitespace-nowrap">
+                    {ht.devilTrapTag}
+                  </span>
+                </div>
+
+                <p className="text-[11px] sm:text-sm text-amber-100/80 leading-snug sm:leading-relaxed mb-2.5 sm:mb-4 flex-1 line-clamp-2 sm:line-clamp-none">
+                  {ht.devilTrapDesc}
+                </p>
+
+                <div className="flex items-center justify-between gap-1 text-[10.5px] sm:text-xs text-amber-200/80 mb-2 sm:mb-3 pt-2 sm:pt-2.5 border-t border-white/10">
+                  <span className="truncate">{ht.progressLabel}</span>
+                  <span className="font-num font-bold text-yellow-300 whitespace-nowrap">
+                    {devilTrapStats.completedLevelIds.length}/{DEVIL_TRAP_TOTAL_LEVELS}
+                  </span>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => setActiveGame('devil-trap')}
+                  className="w-full h-9 sm:h-11 rounded-lg bg-gradient-to-b from-amber-300 to-orange-500 hover:from-amber-200 hover:to-orange-400 active:scale-[0.99] text-stone-950 font-extrabold text-xs sm:text-base transition-all cursor-pointer"
                 >
                   {ht.playBtn}
                 </button>

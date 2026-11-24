@@ -1,6 +1,13 @@
 import React from 'react';
 import { CornIcon } from './fruitWorld';
 import { DIAMOND_COST_COINS, DiamondIcon } from './goldWorld';
+import {
+  SPACE_GALAXY_BONUS_COINS,
+  SPACE_PULSAR_BONUS_COINS,
+  SpaceCoinIcon,
+  SpaceShipSkinId,
+  SpaceStarIcon,
+} from './spaceWorld';
 
 export type CatcherSkinId = 'classic' | 'gold' | 'emerald' | 'royal' | 'ufo';
 export type PlusPointSkinId = 'classic' | 'gems' | 'stars' | 'hearts' | 'coins';
@@ -18,7 +25,8 @@ export type SupplyId =
   | 'one_heart'
   | 'one_corn'
   | 'one_diamond';
-export type ShopTab = 'skins' | 'points' | 'supplies' | 'upgrades';
+export type SpaceSupplyId = 'one_star' | 'space_shield' | 'full_stars';
+export type ShopTab = 'skins' | 'points' | 'supplies' | 'upgrades' | 'space';
 export type PointsSubTab = 'plus' | 'minus';
 
 export interface ShopState {
@@ -30,10 +38,33 @@ export interface ShopState {
   equippedMinusSkin: MinusPointSkinId;
   shields: number;
   maxHeartsUpgrade: number;
+  ownedSpaceSkins: SpaceShipSkinId[];
+  equippedSpaceSkin: SpaceShipSkinId;
+  maxStarsUpgrade: number;
+  spaceMagnetLevel: number;
+  spaceStartShieldLevel: number;
 }
 
 export interface SkinDefinition {
   id: CatcherSkinId;
+  price: number;
+  nameAr: string;
+  nameEn: string;
+  descAr: string;
+  descEn: string;
+}
+
+export interface SpaceSkinDefinition {
+  id: SpaceShipSkinId;
+  price: number;
+  nameAr: string;
+  nameEn: string;
+  descAr: string;
+  descEn: string;
+}
+
+export interface SpaceSupplyDefinition {
+  id: SpaceSupplyId;
   price: number;
   nameAr: string;
   nameEn: string;
@@ -66,6 +97,76 @@ export const SHIELD_DURATION = 2;
 export const MAX_HEARTS_UPGRADE_LEVELS = 5;
 // Expensive progressive Pink Coin costs for +1 Max Heart per level (10 -> 11 -> 12 -> 13 -> 14 -> 15)
 export const MAX_HEARTS_UPGRADE_COSTS: readonly number[] = [180, 300, 450, 675, 975];
+
+export const MAX_STARS_UPGRADE_LEVELS = 5;
+export const MAX_STARS_UPGRADE_COSTS: readonly number[] = [120, 220, 350, 500, 700];
+export const SPACE_MAGNET_LEVELS = 3;
+export const SPACE_MAGNET_COSTS: readonly number[] = [160, 320, 520];
+export const SPACE_START_SHIELD_LEVELS = 3;
+export const SPACE_START_SHIELD_COSTS: readonly number[] = [140, 280, 460];
+export const SPACE_START_SHIELD_DURATIONS: readonly number[] = [0, 3, 5, 8];
+
+export const SPACE_SKIN_CATALOG: SpaceSkinDefinition[] = [
+  {
+    id: 'default',
+    price: 0,
+    nameAr: 'المكوك الكوني',
+    nameEn: 'Cosmic Shuttle',
+    descAr: 'مركبة الفضاء الأصلية بمحركات أيونية زرقاء وهيكل بنفسجي مضيء.',
+    descEn: 'Original deep-space plasma shuttle with blue ion thrusters.',
+  },
+  {
+    id: 'nebula_cruiser',
+    price: 90,
+    nameAr: 'طرادة السديم',
+    nameEn: 'Nebula Cruiser',
+    descAr: 'هيكل سديمي أرجواني-وردي مع شعاع طاقة سماوي ومحركات بلازما فائقة.',
+    descEn: 'Vibrant magenta-violet nebula hull with cyan plasma ribbon.',
+  },
+  {
+    id: 'solar_phoenix',
+    price: 180,
+    nameAr: 'عنقاء الشمس',
+    nameEn: 'Solar Phoenix',
+    descAr: 'مركبة ذهبية ملتهبة بنواة شمسية وشعاع حراري متوهج في عالم الفضاء.',
+    descEn: 'Blazing golden solar-phoenix hull with fiery orange thrusters.',
+  },
+  {
+    id: 'galaxy_emperor',
+    price: 300,
+    nameAr: 'إمبراطور المجرة',
+    nameEn: 'Galaxy Emperor',
+    descAr: 'أفخم مركبة كونية بتاج ذهبي و3 محركات دفع زمردية وشعاع شفق قوس قزح!',
+    descEn: 'Royal triple-thruster flagship crowned in gold with emerald aurora beams!',
+  },
+];
+
+export const SPACE_SUPPLY_CATALOG: SpaceSupplyDefinition[] = [
+  {
+    id: 'one_star',
+    price: 30,
+    nameAr: '+1 نجمة فضاء',
+    nameEn: '+1 Space Star',
+    descAr: 'تضيف نجمة حياة واحدة لعالم الفضاء فوراً (وإذا امتلأت تُخزَّن في الحقيبة).',
+    descEn: 'Adds 1 Star life for Space World immediately (stores in Bag if full).',
+  },
+  {
+    id: 'space_shield',
+    price: 50,
+    nameAr: '+1 درع فضائي',
+    nameEn: '+1 Cosmic Shield',
+    descAr: 'يضيف شحنة درع حماية واحدة تعمل تلقائياً لحمايتك من العوائق لمدة ثانيتين (حتى 5 دروع).',
+    descEn: 'Adds 1 auto-activating protection shield charge blocking hazards for 2s (up to 5).',
+  },
+  {
+    id: 'full_stars',
+    price: 160,
+    nameAr: 'تعبئة نجوم الفضاء بالكامل',
+    nameEn: 'Full Stars Refill',
+    descAr: 'تعبّئ جميع نجوم حياتك في عالم الفضاء إلى الحد الأقصى دفعة واحدة.',
+    descEn: 'Refills your entire Space World Star pool back to maximum capacity.',
+  },
+];
 
 export const SKIN_CATALOG: SkinDefinition[] = [
   {
@@ -260,6 +361,7 @@ export const MINUS_POINT_CATALOG: PointSkinDefinition<MinusPointSkinId>[] = [
 const VALID_SKIN_IDS: CatcherSkinId[] = SKIN_CATALOG.map((s) => s.id);
 const VALID_PLUS_IDS: PlusPointSkinId[] = PLUS_POINT_CATALOG.map((s) => s.id);
 const VALID_MINUS_IDS: MinusPointSkinId[] = MINUS_POINT_CATALOG.map((s) => s.id);
+const VALID_SPACE_SKIN_IDS: SpaceShipSkinId[] = SPACE_SKIN_CATALOG.map((s) => s.id);
 
 export function getDefaultShopState(): ShopState {
   return {
@@ -271,6 +373,11 @@ export function getDefaultShopState(): ShopState {
     equippedMinusSkin: 'classic',
     shields: 0,
     maxHeartsUpgrade: 0,
+    ownedSpaceSkins: ['default'],
+    equippedSpaceSkin: 'default',
+    maxStarsUpgrade: 0,
+    spaceMagnetLevel: 0,
+    spaceStartShieldLevel: 0,
   };
 }
 
@@ -331,11 +438,45 @@ export function readStoredShopState(): ShopState {
         ? (parsed.equippedMinusSkin as MinusPointSkinId)
         : 'classic';
 
+    const rawSpaceOwned = Array.isArray(parsed.ownedSpaceSkins)
+      ? parsed.ownedSpaceSkins
+      : [];
+    const ownedSpaceSet = new Set<SpaceShipSkinId>(['default']);
+    for (const s of rawSpaceOwned) {
+      if (
+        typeof s === 'string' &&
+        VALID_SPACE_SKIN_IDS.includes(s as SpaceShipSkinId)
+      ) {
+        ownedSpaceSet.add(s as SpaceShipSkinId);
+      }
+    }
+    const ownedSpaceSkins = Array.from(ownedSpaceSet);
+    const equippedSpaceSkin: SpaceShipSkinId =
+      typeof parsed.equippedSpaceSkin === 'string' &&
+      ownedSpaceSet.has(parsed.equippedSpaceSkin as SpaceShipSkinId)
+        ? (parsed.equippedSpaceSkin as SpaceShipSkinId)
+        : 'default';
+
     const shields = clampInt(parsed.shields, 0, MAX_SHIELDS);
     const maxHeartsUpgrade = clampInt(
       parsed.maxHeartsUpgrade,
       0,
       MAX_HEARTS_UPGRADE_LEVELS
+    );
+    const maxStarsUpgrade = clampInt(
+      parsed.maxStarsUpgrade,
+      0,
+      MAX_STARS_UPGRADE_LEVELS
+    );
+    const spaceMagnetLevel = clampInt(
+      parsed.spaceMagnetLevel,
+      0,
+      SPACE_MAGNET_LEVELS
+    );
+    const spaceStartShieldLevel = clampInt(
+      parsed.spaceStartShieldLevel,
+      0,
+      SPACE_START_SHIELD_LEVELS
     );
 
     return {
@@ -347,6 +488,11 @@ export function readStoredShopState(): ShopState {
       equippedMinusSkin,
       shields,
       maxHeartsUpgrade,
+      ownedSpaceSkins,
+      equippedSpaceSkin,
+      maxStarsUpgrade,
+      spaceMagnetLevel,
+      spaceStartShieldLevel,
     };
   } catch {
     return fallback;
@@ -1369,16 +1515,53 @@ function MinusPointArt({ id }: { id: MinusPointSkinId }) {
   );
 }
 
+function SpaceShipArt({ id }: { id: SpaceShipSkinId }) {
+  const colors =
+    id === 'nebula_cruiser'
+      ? { hull: '#a855f7', stroke: '#f5d0fe', beam: '#22d3ee', visor: '#f472b6' }
+      : id === 'solar_phoenix'
+      ? { hull: '#ea580c', stroke: '#fde68a', beam: '#fef08a', visor: '#fbbf24' }
+      : id === 'galaxy_emperor'
+      ? { hull: '#0f766e', stroke: '#fde047', beam: '#34d399', visor: '#c084fc' }
+      : { hull: '#4c1d95', stroke: '#c4b5fd', beam: '#38bdf8', visor: '#a5f3fc' };
+
+  return (
+    <svg viewBox="0 0 36 24" className="w-9 h-7">
+      <path
+        d="M3 8 L7 4 L11 10 L25 10 L29 4 L33 8 Q32 18 24 18 L12 18 Q4 18 3 8 Z"
+        fill={colors.hull}
+        stroke={colors.stroke}
+        strokeWidth="1.4"
+        strokeLinejoin="round"
+      />
+      <path
+        d="M9 8 Q18 12 27 8"
+        fill="none"
+        stroke={colors.beam}
+        strokeWidth="1.8"
+        strokeLinecap="round"
+      />
+      <rect x="13" y="12.5" width="10" height="3.2" rx="1.6" fill={colors.visor} />
+      {id === 'galaxy_emperor' && (
+        <polygon points="18,6 20.5,9.5 18,11 15.5,9.5" fill="#fde047" />
+      )}
+    </svg>
+  );
+}
+
 interface ShopModalProps {
   lang: 'ar' | 'en';
   coins: number;
   pinkCoins: number;
+  spaceCoins: number;
   lives: number;
   maxLives: number;
   corn: number;
   maxCorn: number;
   diamonds: number;
   maxDiamonds: number;
+  stars: number;
+  maxStars: number;
   shop: ShopState;
   activeTab: ShopTab;
   pointsSubTab: PointsSubTab;
@@ -1390,18 +1573,26 @@ interface ShopModalProps {
   onSelectOrBuyMinusSkin: (id: MinusPointSkinId) => void;
   onBuySupply: (id: SupplyId) => void;
   onBuyMaxHeartsUpgrade: () => void;
+  onSelectOrBuySpaceSkin: (id: SpaceShipSkinId) => void;
+  onBuySpaceSupply: (id: SpaceSupplyId) => void;
+  onBuyMaxStarsUpgrade: () => void;
+  onBuySpaceMagnetUpgrade: () => void;
+  onBuySpaceStartShieldUpgrade: () => void;
 }
 
 export function ShopModal({
   lang,
   coins,
   pinkCoins,
+  spaceCoins,
   lives,
   maxLives,
   corn,
   maxCorn,
   diamonds,
   maxDiamonds,
+  stars,
+  maxStars,
   shop,
   activeTab,
   pointsSubTab,
@@ -1413,6 +1604,11 @@ export function ShopModal({
   onSelectOrBuyMinusSkin,
   onBuySupply,
   onBuyMaxHeartsUpgrade,
+  onSelectOrBuySpaceSkin,
+  onBuySpaceSupply,
+  onBuyMaxStarsUpgrade,
+  onBuySpaceMagnetUpgrade,
+  onBuySpaceStartShieldUpgrade,
 }: ShopModalProps) {
   const isAr = lang === 'ar';
 
@@ -1421,7 +1617,7 @@ export function ShopModal({
       <div className="w-full max-w-lg max-h-full flex flex-col rounded-xl border border-white/14 bg-[#0f1a2e]/98 shadow-2xl overflow-hidden">
         {/* Header */}
         <div className="flex items-center justify-between gap-3 px-5 py-4 border-b border-white/10 shrink-0">
-          <div className="flex items-center flex-wrap gap-x-3 gap-y-1 min-w-0">
+          <div className="flex items-center flex-wrap gap-x-2.5 gap-y-1 min-w-0">
             <h2 className="text-lg sm:text-xl font-bold text-white whitespace-nowrap">
               {isAr ? 'المتجر' : 'Shop'}
             </h2>
@@ -1429,13 +1625,16 @@ export function ShopModal({
               <span aria-hidden="true">·</span>
               <CoinMiniIcon />
               <span>{coins}</span>
-              <span>{isAr ? 'فلوس' : 'Coins'}</span>
             </span>
             <span className="text-xs sm:text-sm text-pink-300 font-semibold font-num whitespace-nowrap inline-flex items-center gap-1">
               <span aria-hidden="true">·</span>
               <PinkCoinIcon />
               <span>{pinkCoins}</span>
-              <span>{isAr ? 'وردي' : 'Pink'}</span>
+            </span>
+            <span className="text-xs sm:text-sm text-violet-300 font-semibold font-num whitespace-nowrap inline-flex items-center gap-1">
+              <span aria-hidden="true">·</span>
+              <SpaceCoinIcon />
+              <span>{spaceCoins}</span>
             </span>
           </div>
           <button
@@ -1466,7 +1665,7 @@ export function ShopModal({
           <div
             role="tablist"
             aria-label={isAr ? 'أقسام المتجر' : 'Shop categories'}
-            className="grid grid-cols-4 gap-1 p-1 rounded-lg bg-slate-950/75 border border-white/10 mb-4"
+            className="grid grid-cols-5 gap-1 p-1 rounded-lg bg-slate-950/75 border border-white/10 mb-4"
           >
             {(
               [
@@ -1474,6 +1673,7 @@ export function ShopModal({
                 ['points', isAr ? 'النقاط' : 'Points'],
                 ['supplies', isAr ? 'الإمدادات' : 'Supplies'],
                 ['upgrades', isAr ? 'التطويرات' : 'Upgrades'],
+                ['space', isAr ? 'متجر الفضاء' : 'Space'],
               ] as [ShopTab, string][]
             ).map(([tabKey, label]) => (
               <button
@@ -1482,11 +1682,15 @@ export function ShopModal({
                 role="tab"
                 aria-selected={activeTab === tabKey}
                 onClick={() => onChangeTab(tabKey)}
-                className={`h-9 px-1.5 rounded-md text-[11px] sm:text-xs font-bold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400 whitespace-nowrap cursor-pointer ${
+                className={`h-9 px-1 rounded-md text-[10px] sm:text-xs font-bold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400 whitespace-nowrap cursor-pointer ${
                   activeTab === tabKey
-                    ? tabKey === 'upgrades'
+                    ? tabKey === 'space'
+                      ? 'bg-gradient-to-r from-violet-500 to-cyan-400 text-slate-950'
+                      : tabKey === 'upgrades'
                       ? 'bg-pink-400 text-slate-950'
                       : 'bg-amber-400 text-slate-950'
+                    : tabKey === 'space'
+                    ? 'text-violet-200 hover:text-white hover:bg-violet-900/50'
                     : 'text-slate-300 hover:text-white hover:bg-slate-800/70'
                 }`}
               >
@@ -1988,6 +2192,458 @@ export function ShopModal({
                           <span>{isAr ? 'تطوير' : 'Upgrade'}</span>
                           <span className="font-num">{nextCost}</span>
                           <PinkCoinIcon className="w-4 h-4 shrink-0" />
+                        </>
+                      )}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            );
+          })()}
+
+          {/* Space Shop Tab (متجر الفضاء بعملات الفضاء) */}
+          {activeTab === 'space' && (() => {
+            const starsLevel = shop.maxStarsUpgrade;
+            const starsMaxed = starsLevel >= MAX_STARS_UPGRADE_LEVELS;
+            const nextStarsCost = starsMaxed ? 0 : MAX_STARS_UPGRADE_COSTS[starsLevel];
+            const canAffordStars = !starsMaxed && spaceCoins >= nextStarsCost;
+            const baseMaxStars = maxStars - starsLevel;
+            const maxPossibleStars = baseMaxStars + MAX_STARS_UPGRADE_LEVELS;
+
+            const magnetLevel = shop.spaceMagnetLevel;
+            const magnetMaxed = magnetLevel >= SPACE_MAGNET_LEVELS;
+            const nextMagnetCost = magnetMaxed ? 0 : SPACE_MAGNET_COSTS[magnetLevel];
+            const canAffordMagnet = !magnetMaxed && spaceCoins >= nextMagnetCost;
+
+            const startShieldLevel = shop.spaceStartShieldLevel;
+            const startShieldMaxed = startShieldLevel >= SPACE_START_SHIELD_LEVELS;
+            const nextStartShieldCost = startShieldMaxed
+              ? 0
+              : SPACE_START_SHIELD_COSTS[startShieldLevel];
+            const canAffordStartShield =
+              !startShieldMaxed && spaceCoins >= nextStartShieldCost;
+
+            return (
+              <div className="space-y-4" role="tabpanel">
+                {/* How to Get Space Coins Guide */}
+                <div className="p-3.5 rounded-xl border border-violet-400/40 bg-gradient-to-br from-violet-950/60 via-[#150f33]/90 to-cyan-950/40 space-y-2">
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-2">
+                      <SpaceCoinIcon className="w-5 h-5 shrink-0" />
+                      <h3 className="text-xs sm:text-sm font-extrabold text-cyan-200">
+                        {isAr ? 'كيف تجيب عملات الفضاء؟' : 'How to Earn Space Coins?'}
+                      </h3>
+                    </div>
+                    <span className="font-num text-xs font-bold text-violet-200 bg-violet-500/20 border border-violet-400/35 rounded-md px-2 py-0.5 inline-flex items-center gap-1">
+                      <SpaceCoinIcon className="w-3.5 h-3.5 shrink-0" />
+                      {spaceCoins}
+                    </span>
+                  </div>
+                  <ul className="space-y-1 text-[11px] sm:text-xs text-violet-100/95 leading-relaxed list-disc list-inside">
+                    <li>
+                      {isAr
+                        ? 'التقط النقاط الإيجابية في عالم الفضاء: احتمال 70% تسقط لك 1 إلى 3 عملات فضاء مع كل نقطة (حتى عند إعادة المراحل).'
+                        : 'Catch positive points in Space World: 70% chance to drop 1–3 Space Coins per catch (works on replays too).'}
+                    </li>
+                    <li>
+                      {isAr
+                        ? `التقط النقاط الكونية النادرة: نجم النابض (+8) يعطي +${SPACE_PULSAR_BONUS_COINS} عملات، المجرة الأسطورية (+12) تعطي +${SPACE_GALAXY_BONUS_COINS} عملات، وبلورة الأوميغا (+14) تعطي +10 عملات فضاء مضمونة!`
+                        : `Catch rare cosmic orbs: Pulsar Star (+8) gives +${SPACE_PULSAR_BONUS_COINS}, Mythic Galaxy (+12) gives +${SPACE_GALAXY_BONUS_COINS}, and Omega Crystal (+14) guarantees +10 Space Coins!`}
+                    </li>
+                    <li>
+                      {isAr
+                        ? 'أكمل مراحل الفضاء (1–50): أول فوز يمنحك 12 أو 20 أو 32 عملة فضاء حسب نجومك المتبقية (+6 عملات عند إعادة أي مرحلة).'
+                        : 'Clear Space Stages (1–50): first clear awards 12 / 20 / 32 Space Coins based on remaining Stars (+6 on stage replays).'}
+                    </li>
+                    <li className="text-amber-200 font-semibold">
+                      {isAr
+                        ? '👑 اهزم «زعيم الفضاء» كل 5 مراحل (45–240 عملة فضاء) و«🔥 الوحش الأكبر» في المرحلة 49 لمكافأة أسطورية (+450 عملة فضاء، و+140 عند الإعادة)!'
+                        : '👑 Defeat Space Bosses every 5 stages (45–240 Space Coins) and the 🔥 Supreme Beast at Stage 49 for a massive +450 Space Coins (+140 on replays)!'}
+                    </li>
+                  </ul>
+                </div>
+
+                {/* Section 1: Exclusive Space Ship Skins */}
+                <div className="space-y-2.5">
+                  <h3 className="text-xs font-extrabold uppercase tracking-wide text-violet-300">
+                    {isAr ? 'مركبات عالم الفضاء' : 'Space World Starships'}
+                  </h3>
+                  {SPACE_SKIN_CATALOG.map((skin) => {
+                    const owned = shop.ownedSpaceSkins.includes(skin.id);
+                    const equipped = shop.equippedSpaceSkin === skin.id;
+                    const canAfford = !owned && spaceCoins >= skin.price;
+                    return (
+                      <div
+                        key={skin.id}
+                        className={`flex items-center gap-3 p-3 rounded-lg border transition-colors ${
+                          equipped
+                            ? 'border-cyan-400/55 bg-violet-500/15'
+                            : 'border-violet-400/20 bg-slate-900/80'
+                        }`}
+                      >
+                        <div
+                          className="w-12 h-12 rounded-lg border border-violet-400/25 bg-[#0b0820] flex items-center justify-center shrink-0"
+                          aria-hidden="true"
+                        >
+                          <SpaceShipArt id={skin.id} />
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-baseline justify-between gap-2">
+                            <span className="text-sm font-bold text-white truncate">
+                              {isAr ? skin.nameAr : skin.nameEn}
+                            </span>
+                            {equipped && (
+                              <span className="text-[11px] font-bold text-cyan-300 whitespace-nowrap shrink-0">
+                                {isAr ? 'مُجهّزة' : 'Equipped'}
+                              </span>
+                            )}
+                          </div>
+                          <p className="text-xs text-slate-300 mt-0.5 leading-relaxed">
+                            {isAr ? skin.descAr : skin.descEn}
+                          </p>
+                        </div>
+                        <button
+                          type="button"
+                          disabled={equipped || (!owned && !canAfford)}
+                          onClick={() => onSelectOrBuySpaceSkin(skin.id)}
+                          className={`h-8 px-3 rounded-md inline-flex items-center justify-center gap-1.5 text-xs font-bold transition-colors whitespace-nowrap shrink-0 ${
+                            equipped
+                              ? 'bg-emerald-500/15 text-emerald-300 border border-emerald-400/25 cursor-default'
+                              : owned
+                              ? 'bg-cyan-400 hover:bg-cyan-300 text-slate-950 cursor-pointer'
+                              : canAfford
+                              ? 'bg-gradient-to-r from-violet-400 to-cyan-300 hover:brightness-110 active:scale-95 text-slate-950 cursor-pointer'
+                              : 'bg-slate-800 text-slate-500 border border-white/10 cursor-not-allowed'
+                          }`}
+                        >
+                          {equipped ? (
+                            <span>{isAr ? 'مفعّلة' : 'Active'}</span>
+                          ) : owned ? (
+                            <span>{isAr ? 'تجهيز' : 'Equip'}</span>
+                          ) : (
+                            <>
+                              <span className="font-num">{skin.price}</span>
+                              <SpaceCoinIcon />
+                            </>
+                          )}
+                        </button>
+                      </div>
+                    );
+                  })}
+                </div>
+
+                {/* Section 2: Space Supplies */}
+                <div className="space-y-2.5">
+                  <h3 className="text-xs font-extrabold uppercase tracking-wide text-cyan-300">
+                    {isAr ? 'إمدادات الفضاء' : 'Space Supplies'}
+                  </h3>
+                  {SPACE_SUPPLY_CATALOG.map((sup) => {
+                    const isFull =
+                      (sup.id === 'space_shield' && shop.shields >= MAX_SHIELDS) ||
+                      (sup.id === 'full_stars' && stars >= maxStars);
+                    const canAfford = !isFull && spaceCoins >= sup.price;
+                    const stockText =
+                      sup.id === 'space_shield'
+                        ? isAr
+                          ? `لديك ${shop.shields}/${MAX_SHIELDS}`
+                          : `Owned ${shop.shields}/${MAX_SHIELDS}`
+                        : isAr
+                        ? `النجوم ${stars}/${maxStars}`
+                        : `Stars ${stars}/${maxStars}`;
+                    return (
+                      <div
+                        key={sup.id}
+                        className="flex items-center gap-3 p-3 rounded-lg border border-violet-400/25 bg-[#120d28]/85"
+                      >
+                        <div
+                          className="w-12 h-12 rounded-lg border border-violet-400/25 bg-[#0a0820] flex items-center justify-center shrink-0"
+                          aria-hidden="true"
+                        >
+                          {sup.id === 'space_shield' ? (
+                            <svg
+                              viewBox="0 0 24 24"
+                              className="w-7 h-7 text-cyan-300"
+                              fill="none"
+                              stroke="currentColor"
+                              strokeWidth="2"
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                            >
+                              <path
+                                d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"
+                                fill="currentColor"
+                                fillOpacity="0.22"
+                              />
+                            </svg>
+                          ) : (
+                            <SpaceStarIcon className="w-7 h-7" />
+                          )}
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-baseline justify-between gap-2">
+                            <span className="text-sm font-bold text-white truncate">
+                              {sup.id === 'full_stars'
+                                ? isAr
+                                  ? `تعبئة النجوم (${maxStars}/${maxStars})`
+                                  : `Full Stars (${maxStars}/${maxStars})`
+                                : isAr
+                                ? sup.nameAr
+                                : sup.nameEn}
+                            </span>
+                            <span className="font-num text-xs font-semibold text-violet-300 whitespace-nowrap shrink-0">
+                              {stockText}
+                            </span>
+                          </div>
+                          <p className="text-xs text-slate-300 mt-0.5 leading-relaxed">
+                            {isAr ? sup.descAr : sup.descEn}
+                          </p>
+                        </div>
+                        <button
+                          type="button"
+                          disabled={isFull || !canAfford}
+                          onClick={() => onBuySpaceSupply(sup.id)}
+                          className={`h-8 px-3 rounded-md inline-flex items-center justify-center gap-1.5 text-xs font-bold transition-colors whitespace-nowrap shrink-0 ${
+                            isFull
+                              ? 'bg-emerald-500/15 text-emerald-300 border border-emerald-400/25 cursor-default'
+                              : canAfford
+                              ? 'bg-gradient-to-r from-violet-400 to-cyan-300 hover:brightness-110 active:scale-95 text-slate-950 cursor-pointer'
+                              : 'bg-slate-800 text-slate-500 border border-white/10 cursor-not-allowed'
+                          }`}
+                        >
+                          {isFull ? (
+                            <span>{isAr ? 'ممتلئ' : 'Full'}</span>
+                          ) : (
+                            <>
+                              <span className="font-num">{sup.price}</span>
+                              <SpaceCoinIcon />
+                            </>
+                          )}
+                        </button>
+                      </div>
+                    );
+                  })}
+                </div>
+
+                {/* Section 3: Permanent Space Upgrades */}
+                <div className="space-y-3">
+                  <h3 className="text-xs font-extrabold uppercase tracking-wide text-fuchsia-300">
+                    {isAr ? 'تطويرات الفضاء الدائمة' : 'Permanent Space Upgrades'}
+                  </h3>
+
+                  {/* Upgrade A: Max Space Stars 10 -> 15 */}
+                  <div className="p-3.5 rounded-xl border border-violet-400/35 bg-gradient-to-b from-violet-950/40 to-slate-900/90 space-y-3">
+                    <div className="flex items-start gap-3">
+                      <div className="w-12 h-12 rounded-xl border border-violet-400/35 bg-[#120b2a] flex items-center justify-center shrink-0 relative">
+                        <SpaceStarIcon className="w-7 h-7" />
+                        <span className="font-num absolute -bottom-1 -right-1 text-[10px] font-black bg-cyan-300 text-slate-950 rounded px-1 leading-tight">
+                          +1
+                        </span>
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-baseline justify-between gap-2">
+                          <h4 className="text-sm font-bold text-white">
+                            {isAr ? 'زيادة نجوم الفضاء' : 'Max Space Stars'}
+                          </h4>
+                          <span className="font-num text-xs font-bold text-cyan-300 whitespace-nowrap">
+                            {starsLevel}/{MAX_STARS_UPGRADE_LEVELS}
+                          </span>
+                        </div>
+                        <p className="text-xs text-slate-300 mt-0.5 leading-relaxed">
+                          {isAr
+                            ? `ترفع الحد الأقصى لنجوم عالم الفضاء من ${baseMaxStars} حتى ${maxPossibleStars} نجمة (+1 نجمة فورية مع كل تطويرة).`
+                            : `Raises max Space World Stars from ${baseMaxStars} up to ${maxPossibleStars} (+1 immediate Star per tier).`}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-5 gap-1.5">
+                      {MAX_STARS_UPGRADE_COSTS.map((tierCost, idx) => {
+                        const tierNum = idx + 1;
+                        const targetStars = baseMaxStars + tierNum;
+                        const done = starsLevel >= tierNum;
+                        const isNext = starsLevel === idx;
+                        return (
+                          <div
+                            key={tierNum}
+                            className={`rounded-lg border px-1 py-1.5 text-center ${
+                              done
+                                ? 'border-emerald-400/45 bg-emerald-500/15 text-emerald-200'
+                                : isNext
+                                ? 'border-cyan-400/60 bg-violet-500/20 text-white'
+                                : 'border-white/10 bg-slate-950/60 text-slate-500'
+                            }`}
+                          >
+                            <div className="font-num text-xs font-black">
+                              {targetStars} ★
+                            </div>
+                            <div className="font-num text-[10px] font-semibold mt-0.5 flex items-center justify-center gap-0.5">
+                              {done ? (
+                                <span>{isAr ? 'تم' : 'Done'}</span>
+                              ) : (
+                                <>
+                                  <span>{tierCost}</span>
+                                  <SpaceCoinIcon className="w-2.5 h-2.5 shrink-0" />
+                                </>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="font-num text-xs text-violet-200">
+                        {starsMaxed
+                          ? isAr
+                            ? `الحد الأقصى مكتمل (${maxPossibleStars}★)`
+                            : `Max reached (${maxPossibleStars}★)`
+                          : isAr
+                          ? `الحد الحالي: ${maxStars} ← ${maxStars + 1}★`
+                          : `Current: ${maxStars} → ${maxStars + 1}★`}
+                      </span>
+                      <button
+                        type="button"
+                        disabled={starsMaxed || !canAffordStars}
+                        onClick={onBuyMaxStarsUpgrade}
+                        className={`h-8 px-3.5 rounded-lg inline-flex items-center justify-center gap-1.5 text-xs font-bold whitespace-nowrap ${
+                          starsMaxed
+                            ? 'bg-emerald-500/15 text-emerald-300 border border-emerald-400/30 cursor-default'
+                            : canAffordStars
+                            ? 'bg-gradient-to-r from-violet-400 to-cyan-300 hover:brightness-110 active:scale-95 text-slate-950 cursor-pointer'
+                            : 'bg-slate-800 text-slate-500 border border-white/10 cursor-not-allowed'
+                        }`}
+                      >
+                        {starsMaxed ? (
+                          <span>{isAr ? 'مكتمل' : 'Maxed'}</span>
+                        ) : (
+                          <>
+                            <span>{isAr ? 'تطوير' : 'Upgrade'}</span>
+                            <span className="font-num">{nextStarsCost}</span>
+                            <SpaceCoinIcon />
+                          </>
+                        )}
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Upgrade B: Cosmic Magnet Lv.1-3 */}
+                  <div className="flex items-center gap-3 p-3.5 rounded-xl border border-cyan-400/30 bg-[#0d152b]/90">
+                    <div
+                      className="w-12 h-12 rounded-xl border border-cyan-400/35 bg-[#091326] flex items-center justify-center shrink-0"
+                      aria-hidden="true"
+                    >
+                      <svg
+                        viewBox="0 0 24 24"
+                        className="w-6 h-6 text-cyan-300"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2.1"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      >
+                        <path d="M6 4v7a6 6 0 0 0 12 0V4" />
+                        <line x1="4" y1="4" x2="8" y2="4" />
+                        <line x1="16" y1="4" x2="20" y2="4" />
+                      </svg>
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-baseline justify-between gap-2">
+                        <h4 className="text-sm font-bold text-white truncate">
+                          {isAr ? 'مغناطيس الفضاء' : 'Cosmic Magnet'}
+                        </h4>
+                        <span className="font-num text-xs font-bold text-cyan-300 whitespace-nowrap">
+                          {isAr
+                            ? `م${magnetLevel}/${SPACE_MAGNET_LEVELS}`
+                            : `Lv.${magnetLevel}/${SPACE_MAGNET_LEVELS}`}
+                        </span>
+                      </div>
+                      <p className="text-xs text-slate-300 mt-0.5 leading-relaxed">
+                        {isAr
+                          ? 'يجذب النقاط الكونية الإيجابية القريبة نحو مركبتك تلقائياً في عالم الفضاء (3 مستويات).'
+                          : 'Pulls nearby positive cosmic points toward your ship in Space World (3 tiers).'}
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      disabled={magnetMaxed || !canAffordMagnet}
+                      onClick={onBuySpaceMagnetUpgrade}
+                      className={`h-8 px-3 rounded-lg inline-flex items-center justify-center gap-1.5 text-xs font-bold whitespace-nowrap shrink-0 ${
+                        magnetMaxed
+                          ? 'bg-emerald-500/15 text-emerald-300 border border-emerald-400/30 cursor-default'
+                          : canAffordMagnet
+                          ? 'bg-gradient-to-r from-violet-400 to-cyan-300 hover:brightness-110 active:scale-95 text-slate-950 cursor-pointer'
+                          : 'bg-slate-800 text-slate-500 border border-white/10 cursor-not-allowed'
+                      }`}
+                    >
+                      {magnetMaxed ? (
+                        <span>{isAr ? 'مكتمل' : 'Maxed'}</span>
+                      ) : (
+                        <>
+                          <span className="font-num">{nextMagnetCost}</span>
+                          <SpaceCoinIcon />
+                        </>
+                      )}
+                    </button>
+                  </div>
+
+                  {/* Upgrade C: Cosmic Starting Shield Lv.1-3 */}
+                  <div className="flex items-center gap-3 p-3.5 rounded-xl border border-fuchsia-400/30 bg-[#170e2e]/90">
+                    <div
+                      className="w-12 h-12 rounded-xl border border-fuchsia-400/35 bg-[#120826] flex items-center justify-center shrink-0"
+                      aria-hidden="true"
+                    >
+                      <svg
+                        viewBox="0 0 24 24"
+                        className="w-6 h-6 text-fuchsia-300"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2.1"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      >
+                        <path
+                          d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"
+                          fill="currentColor"
+                          fillOpacity="0.2"
+                        />
+                        <path d="M9 12l2 2 4-4" />
+                      </svg>
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-baseline justify-between gap-2">
+                        <h4 className="text-sm font-bold text-white truncate">
+                          {isAr ? 'درع البداية الكوني' : 'Cosmic Start Shield'}
+                        </h4>
+                        <span className="font-num text-xs font-bold text-fuchsia-300 whitespace-nowrap">
+                          {startShieldLevel > 0
+                            ? `${SPACE_START_SHIELD_DURATIONS[startShieldLevel]}s`
+                            : `0/${SPACE_START_SHIELD_LEVELS}`}
+                        </span>
+                      </div>
+                      <p className="text-xs text-slate-300 mt-0.5 leading-relaxed">
+                        {isAr
+                          ? 'تبدأ كل مرحلة في عالم الفضاء بدرع حماية تلقائي (3ث ← 5ث ← 8ث) يحميك من العوائق!'
+                          : 'Start every Space Stage with an automatic protective shield (3s → 5s → 8s)!'}
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      disabled={startShieldMaxed || !canAffordStartShield}
+                      onClick={onBuySpaceStartShieldUpgrade}
+                      className={`h-8 px-3 rounded-lg inline-flex items-center justify-center gap-1.5 text-xs font-bold whitespace-nowrap shrink-0 ${
+                        startShieldMaxed
+                          ? 'bg-emerald-500/15 text-emerald-300 border border-emerald-400/30 cursor-default'
+                          : canAffordStartShield
+                          ? 'bg-gradient-to-r from-violet-400 to-cyan-300 hover:brightness-110 active:scale-95 text-slate-950 cursor-pointer'
+                          : 'bg-slate-800 text-slate-500 border border-white/10 cursor-not-allowed'
+                      }`}
+                    >
+                      {startShieldMaxed ? (
+                        <span>{isAr ? 'مكتمل' : 'Maxed'}</span>
+                      ) : (
+                        <>
+                          <span className="font-num">{nextStartShieldCost}</span>
+                          <SpaceCoinIcon />
                         </>
                       )}
                     </button>

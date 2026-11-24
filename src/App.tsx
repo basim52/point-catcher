@@ -45,6 +45,66 @@ import {
   VALID_GOLD_KINDS,
 } from './goldWorld';
 import {
+  BossLaserBeam,
+  createSpaceBossRuntime,
+  drawBossBeams,
+  drawSpaceBackground,
+  drawSpaceBoss,
+  drawSpaceCanvasItem,
+  drawSpaceShipCatcher,
+  getSpaceBossConfig,
+  getSpaceStageClearCoins,
+  getSpaceStageClearSpaceCoins,
+  initSpaceBgMotifs,
+  MAX_STARS,
+  pickSpaceItemKind,
+  SPACE_COIN_DROP_CHANCE,
+  SPACE_COIN_MAX_DROP,
+  SPACE_COIN_MIN_DROP,
+  SPACE_GALAXY_BONUS_COINS,
+  SPACE_INDEX_CATALOG,
+  SPACE_ITEM_STATS,
+  SPACE_OMEGA_BONUS_COINS,
+  SPACE_PULSAR_BONUS_COINS,
+  SPACE_STAGES,
+  SPACE_UNLOCK_COST,
+  SPACE_UNLOCK_PINK_COST,
+  SpaceBgMotif,
+  SpaceBossRuntime,
+  SpaceCoinIcon,
+  SpaceIndexIcon,
+  SpaceItemKind,
+  SpaceRenderItem,
+  SpaceShipSkinId,
+  SpaceStarIcon,
+  TOTAL_SPACE_STAGES,
+  VALID_SPACE_KINDS,
+} from './spaceWorld';
+import {
+  createMonsterBossRuntime,
+  drawMonsterBackground,
+  drawMonsterBoss,
+  drawMonsterCanvasItem,
+  drawMonsterHunterCatcher,
+  getMonsterBossConfig,
+  getMonsterStageClearCoins,
+  initMonsterBgMotifs,
+  isGrandMonsterStage,
+  MAX_MONSTER_SKULLS,
+  MONSTER_INDEX_CATALOG,
+  MONSTER_ITEM_STATS,
+  MONSTER_STAGES,
+  MonsterBgMotif,
+  MonsterBossRuntime,
+  MonsterIndexIcon,
+  MonsterItemKind,
+  MonsterRenderItem,
+  MonsterSkullIcon,
+  pickMonsterItemKind,
+  TOTAL_MONSTER_STAGES,
+  VALID_MONSTER_KINDS,
+} from './monsterWorld';
+import {
   CatcherSkinId,
   drawCatcherShieldBubble,
   drawCustomMinusPoint,
@@ -54,6 +114,8 @@ import {
   MAX_HEARTS_UPGRADE_COSTS,
   MAX_HEARTS_UPGRADE_LEVELS,
   MAX_SHIELDS,
+  MAX_STARS_UPGRADE_COSTS,
+  MAX_STARS_UPGRADE_LEVELS,
   MINUS_POINT_CATALOG,
   MinusPointSkinId,
   persistShopState,
@@ -67,12 +129,26 @@ import {
   ShopState,
   ShopTab,
   SKIN_CATALOG,
+  SPACE_MAGNET_COSTS,
+  SPACE_MAGNET_LEVELS,
+  SPACE_SKIN_CATALOG,
+  SPACE_START_SHIELD_COSTS,
+  SPACE_START_SHIELD_DURATIONS,
+  SPACE_START_SHIELD_LEVELS,
+  SPACE_SUPPLY_CATALOG,
+  SpaceSupplyId,
   SUPPLY_CATALOG,
   SupplyId,
 } from './shop';
 import { GamesModal, type MiniGameId } from './miniGames';
 import { LandingBoard } from './LandingBoard';
 import { IntroSplash } from './IntroSplash';
+import {
+  PlayerStatsPanel,
+  readPlayerLifetimeStats,
+  savePlayerLifetimeStats,
+  type PlayerLifetimeStats,
+} from './playerStats';
 
 type Lang = 'ar' | 'en';
 type GameStatus =
@@ -110,7 +186,12 @@ type ItemKind =
   | 'hazard_arrow_amber'
   | 'hazard_arrow_violet'
   | BalancedMinusKind;
-type AnyItemKind = ItemKind | FruitItemKind | GoldItemKind;
+type AnyItemKind =
+  | ItemKind
+  | FruitItemKind
+  | GoldItemKind
+  | SpaceItemKind
+  | MonsterItemKind;
 type IndexTab = 'positive' | 'negative';
 
 interface IndexEntry {
@@ -372,6 +453,7 @@ const FREEZE_DURATION = 4.0;
 const BEST_SCORE_STORAGE_KEY = 'point_catcher_best_score_v1';
 const COINS_STORAGE_KEY = 'point_catcher_coins_v1';
 const PINK_COINS_STORAGE_KEY = 'point_catcher_pink_coins_v1';
+const SPACE_COINS_STORAGE_KEY = 'point_catcher_space_coins_v1';
 const PINK_COIN_DROP_CHANCE = 0.85;
 const PINK_COIN_MIN_DROP = 3;
 const PINK_COIN_MAX_DROP = 7;
@@ -386,6 +468,16 @@ const GOLD_UNLOCKED_STORAGE_KEY = 'point_catcher_gold_unlocked_v1';
 const COMPLETED_GOLD_STAGES_STORAGE_KEY = 'point_catcher_completed_gold_stages_v1';
 const DISCOVERED_GOLD_ITEMS_STORAGE_KEY = 'point_catcher_discovered_gold_items_v1';
 const DIAMONDS_STATE_STORAGE_KEY = 'point_catcher_diamonds_state_v1';
+const SPACE_UNLOCKED_STORAGE_KEY = 'point_catcher_space_unlocked_v1';
+const COMPLETED_SPACE_STAGES_STORAGE_KEY = 'point_catcher_completed_space_stages_v1';
+const DISCOVERED_SPACE_ITEMS_STORAGE_KEY = 'point_catcher_discovered_space_items_v1';
+const STARS_STATE_STORAGE_KEY = 'point_catcher_stars_state_v1';
+const COMPLETED_MONSTER_STAGES_STORAGE_KEY =
+  'point_catcher_completed_monster_stages_v1';
+const DISCOVERED_MONSTER_ITEMS_STORAGE_KEY =
+  'point_catcher_discovered_monster_items_v1';
+const MONSTER_SKULLS_STATE_STORAGE_KEY =
+  'point_catcher_monster_skulls_state_v1';
 const BAG_STORAGE_KEY = 'point_catcher_bag_v1';
 const SFX_STORAGE_KEY = 'point_catcher_sfx_v1';
 const MUSIC_STORAGE_KEY = 'point_catcher_music_v1';
@@ -395,6 +487,8 @@ interface BagState {
   hearts: number;
   corn: number;
   diamonds: number;
+  stars: number;
+  skulls: number;
 }
 
 // Ordered strictly from weakest to strongest within both positive (+) and negative (-) categories
@@ -782,6 +876,10 @@ const COPY = {
     bagCornSub: 'لمراحل الفواكه',
     bagDiamondsTitle: 'الألماس المخزّن',
     bagDiamondsSub: 'لمراحل الذهب',
+    bagStarsTitle: 'النجوم المخزّنة',
+    bagStarsSub: 'لمراحل الفضاء',
+    bagSkullsTitle: 'جماجم الوحش المخزّنة',
+    bagSkullsSub: 'لمراحل الوحش',
     settingsBtn: 'الإعدادات',
     settingsTitle: 'الإعدادات',
     musicLabel: 'الموسيقى الحماسية',
@@ -796,6 +894,13 @@ const COPY = {
     pinkCoinShortBenefit: 'لشراء الألماس',
     pinkCoinBenefitTitle: 'فائدة العملة الوردية',
     pinkCoinBenefitDesc: `تُستخدم لشراء الألماس لمراحل الذهب (${DIAMOND_COST_COINS} عملة وردية = +1 ألماسة) ولشراء تطويرات زيادة عدد القلوب في المتجر (حتى 15 قلباً). مع كل نقطة تمسكها احتمال 85% أن تعطيك من 3 إلى 7 عملات وردية (فقط في المراحل التي لم تفز بها بعد).`,
+    spaceCoins: 'عملات الفضاء',
+    spaceShopBtn: 'متجر الفضاء',
+    spaceCoinShortBenefit: 'لمتجر الفضاء',
+    spaceCoinBenefitTitle: 'كيف تجيب عملات الفضاء؟',
+    spaceCoinBenefitDesc: `تُستخدم في «متجر الفضاء» لشراء مركبات فضائية، مغناطيس الفضاء، درع البداية الكوني، ورفع نجوم الفضاء حتى 15 نجمة! طرق الحصول عليها: 1) كل نقطة إيجابية في عالم الفضاء لها فرصة 70% لإسقاط 1–3 عملات فضاء (حتى عند الإعادة). 2) نجم النابض (+8) يعطي +${SPACE_PULSAR_BONUS_COINS} والمجرة الأسطورية (+12) تعطي +${SPACE_GALAXY_BONUS_COINS} مضمونة. 3) إنهاء أي مرحلة فضاء يعطي 12 / 20 / 32 عملة فضاء لأول فوز (+6 عند الإعادة).`,
+    spaceCoinsRewardLine: (earned: number) =>
+      `+${earned} عملة فضاء لمتجر الفضاء!`,
     coinsEarned: (earned: number, remainingLives: number) =>
       earned <= 0
         ? 'تم استلام مكافأة هذه المرحلة مسبقاً (بدون فلوس إضافية)'
@@ -864,6 +969,75 @@ const COPY = {
       earned <= 0
         ? 'تم استلام مكافأة هذه المرحلة مسبقاً (بدون فلوس إضافية)'
         : `+${earned} فلوس مكافأة إنهاء المرحلة (${remainingDiamonds} ألماسة)!`,
+    spaceWorldLabel: 'مراحل الفضاء',
+    starsLabel: 'النجوم',
+    spaceVictoryTitle: 'مبروك! أنهيت عالم الفضاء',
+    spaceVictorySubtitle: `أكملت مراحل الفضاء الـ ${TOTAL_SPACE_STAGES} واستكشفت المجرة بنجاح!`,
+    spaceStageBanner: (n: number) => `الفضاء · المرحلة ${n}`,
+    spaceStageCompleteTitle: (n: number) => `أكملت مرحلة الفضاء ${n}!`,
+    spaceNextStageBtn: (n: number) => `الانتقال إلى مرحلة الفضاء ${n}`,
+    spaceUnlockTitle: `عالم الفضاء (${TOTAL_SPACE_STAGES} مرحلة)`,
+    spaceUnlockDesc: `افتح ${TOTAL_SPACE_STAGES} مرحلة كونية مع 30 نوعاً من النقاط (14 نقطة كونية مفيدة + 16 عائقاً فضائياً متنوعاً)، زعماء فضاء و«الوحش الأكبر» في المرحلة 49 — اختر الفتح بـ ${SPACE_UNLOCK_COST} فلوس أو ${SPACE_UNLOCK_PINK_COST} عملة وردية!`,
+    spaceUnlockCoinsBtn: `فتح بـ ${SPACE_UNLOCK_COST} فلوس`,
+    spaceUnlockPinkBtn: `فتح بـ ${SPACE_UNLOCK_PINK_COST} عملة وردية`,
+    spaceNeedBothHint: (needCoins: number, needPink: number) =>
+      `تحتاج ${needCoins} فلوس إضافية أو ${needPink} عملة وردية إضافية لفتح عالم الفضاء`,
+    spaceStagesModalHint: `${TOTAL_SPACE_STAGES} مرحلة كونية و30 نوعاً من النقاط — اهزم زعماء الفضاء كل 5 مراحل و«🔥 الوحش الأكبر» في المرحلة 49 لجمع عملات الفضاء!`,
+    noStarsNotice: (timer: string) => `نفدت النجوم — تتجدد النجمة القادمة خلال ${timer}`,
+    waitStarBtn: (timer: string) => `انتظر تجدد النجمة (${timer})`,
+    buyStarBtn: `+1 نجمة (${HEART_COST_COINS} فلوس)`,
+    buyStarAria: `شراء نجمة واحدة مقابل ${HEART_COST_COINS} فلوس`,
+    starsFullTip: 'النجوم ممتلئة (10/10)',
+    needCoinsStarTip: `تحتاج ${HEART_COST_COINS} فلوس لشراء نجمة`,
+    spaceIndexWorldBtn: 'اندكس الفضاء',
+    spaceIndexModalHint:
+      '30 نوعاً من نقاط الفضاء (14 كونية مفيدة + 16 عائقاً فضائياً) مرتّبة من الأضعف إلى الأقوى — كل عنصر يبقى مقفلاً حتى تلتقطه في مراحل الفضاء.',
+    spaceIndexPlusTab: 'نقاط الفضاء (+)',
+    spaceIndexMinusTab: 'عوائق الفضاء (-)',
+    spaceCoinsEarned: (earned: number, remainingStars: number) =>
+      earned <= 0
+        ? 'تم استلام مكافأة هذه المرحلة مسبقاً (بدون فلوس إضافية)'
+        : `+${earned} فلوس مكافأة إنهاء المرحلة (${remainingStars} ${
+            remainingStars === 1 ? 'نجمة' : remainingStars === 2 ? 'نجمتان' : 'نجوم'
+          })!`,
+    spaceBossBadge: '👑 زعيم',
+    spaceSupremeBossBadge: '🔥 الوحش الأكبر',
+    spaceBossBanner: (name: string) => `👑 زعيم الفضاء · ${name}`,
+    spaceBossGoal: (hp: number) => `التقط النقاط لإطلاق الليزر · طاقة الزعيم ${hp}`,
+    spaceBossDefeated: (name: string) => `👑 هزمت زعيم الفضاء: ${name}!`,
+    monsterWorldLabel: 'مراحل الوحش',
+    monsterSkullsLabel: 'أرواح الوحش',
+    monsterVictoryTitle: 'مبروك! هزمت ملك الوحوش',
+    monsterVictorySubtitle: `أكملت مراحل الوحش الـ ${TOTAL_MONSTER_STAGES} وهزمت جميع الوحوش الكبار!`,
+    monsterStageBanner: (n: number) => `مراحل الوحش · المرحلة ${n}`,
+    monsterStageCompleteTitle: (n: number) => `أكملت مرحلة الوحش ${n}!`,
+    monsterNextStageBtn: (n: number) => `الانتقال إلى مرحلة الوحش ${n}`,
+    monsterStagesModalHint: `${TOTAL_MONSTER_STAGES} مرحلة قتال وحوش مفتوحة مجاناً — كل 10 مراحل يظهر «🔥 الوحش الأكبر» (أضعف بـ 150% من الوحش الأكبر في الفضاء)!`,
+    noSkullsNotice: (timer: string) =>
+      `نفدت أرواح الوحش — تتجدد الروح القادمة خلال ${timer}`,
+    waitSkullBtn: (timer: string) => `انتظر تجدد روح الوحش (${timer})`,
+    buySkullBtn: `+1 جمجمة (${HEART_COST_COINS} فلوس)`,
+    buySkullAria: `شراء روح وحش واحدة مقابل ${HEART_COST_COINS} فلوس`,
+    skullsFullTip: 'أرواح الوحش ممتلئة (10/10)',
+    needCoinsSkullTip: `تحتاج ${HEART_COST_COINS} فلوس لشراء روح وحش`,
+    monsterIndexWorldBtn: 'اندكس الوحش',
+    monsterIndexModalHint:
+      '12 عنصراً خاصاً بمراحل الوحش (6 آثار صياد تضرب الوحش + 6 هجمات وحوش) — كل عنصر يُفتح عند التقاطه أو لمسه.',
+    monsterIndexPlusTab: 'آثار الصياد (+)',
+    monsterIndexMinusTab: 'هجمات الوحش (-)',
+    monsterCoinsEarned: (earned: number, remainingSkulls: number) =>
+      earned <= 0
+        ? 'تم استلام مكافأة الفلوس لهذه المرحلة مسبقاً'
+        : `+${earned} فلوس مكافأة القضاء على الوحش (${remainingSkulls} أرواح)!`,
+    monsterPinkRewardLine: (earned: number) =>
+      `+${earned} عملة وردية غنيمة الوحش!`,
+    monsterBadge: '👹 وحش',
+    grandMonsterBadge: '🔥 الوحش الأكبر',
+    monsterBossBanner: (name: string) => `👹 وحش · ${name}`,
+    grandMonsterBanner: (name: string) => `🔥 الوحش الأكبر · ${name}`,
+    monsterBossGoal: (hp: number) => `التقط الآثار لضرب الوحش · طاقة الوحش ${hp}`,
+    monsterBossDefeated: (name: string) => `👹 قضيت على الوحش: ${name}!`,
+    grandMonsterDefeated: (name: string) => `🔥 هزمت الوحش الأكبر: ${name}!`,
   },
   en: {
     title: 'Point Catcher',
@@ -941,6 +1115,10 @@ const COPY = {
     bagCornSub: 'For Fruit Stages',
     bagDiamondsTitle: 'Stored Diamonds',
     bagDiamondsSub: 'For Gold Stages',
+    bagStarsTitle: 'Stored Stars',
+    bagStarsSub: 'For Space Stages',
+    bagSkullsTitle: 'Stored Monster Skulls',
+    bagSkullsSub: 'For Monster Stages',
     settingsBtn: 'Settings',
     settingsTitle: 'Settings',
     musicLabel: 'Energetic Music',
@@ -955,6 +1133,13 @@ const COPY = {
     pinkCoinShortBenefit: 'For Diamonds',
     pinkCoinBenefitTitle: 'Pink Coin Benefit',
     pinkCoinBenefitDesc: `Used to buy Diamonds for Gold Stages (${DIAMOND_COST_COINS} Pink Coins = +1 Diamond) and permanent Max Hearts Upgrades in the Shop (up to 15 hearts). Every point you catch has an 85% chance to drop 3–7 Pink Coins (only in stages you haven't cleared yet).`,
+    spaceCoins: 'Space Coins',
+    spaceShopBtn: 'Space Shop',
+    spaceCoinShortBenefit: 'Space Shop',
+    spaceCoinBenefitTitle: 'How to Earn Space Coins',
+    spaceCoinBenefitDesc: `Spend Space Coins in the Space Shop for exclusive starships, Cosmic Magnet, Starting Shield, and up to 15 Max Stars! How to earn them: 1) Every positive point caught in Space World has a 70% chance to drop 1–3 Space Coins (works on replays too). 2) Pulsar Star (+8) guarantees +${SPACE_PULSAR_BONUS_COINS} and Mythic Galaxy (+12) guarantees +${SPACE_GALAXY_BONUS_COINS}. 3) Clearing Space Stages awards 12 / 20 / 32 Space Coins on first clear (+6 on replays).`,
+    spaceCoinsRewardLine: (earned: number) =>
+      `+${earned} Space Coins for the Space Shop!`,
     coinsEarned: (earned: number, remainingLives: number) =>
       earned <= 0
         ? 'Stage coin reward already claimed (no extra coins)'
@@ -1025,6 +1210,77 @@ const COPY = {
         : `+${earned} ${earned === 1 ? 'Coin' : 'Coins'} Reward (${remainingDiamonds} ${
             remainingDiamonds === 1 ? 'Diamond' : 'Diamonds'
           })!`,
+    spaceWorldLabel: 'Space Stages',
+    starsLabel: 'Stars',
+    spaceVictoryTitle: `Victory! All ${TOTAL_SPACE_STAGES} Space Stages Cleared`,
+    spaceVictorySubtitle: `You conquered all ${TOTAL_SPACE_STAGES} Cosmic Galaxy stages!`,
+    spaceStageBanner: (n: number) => `Space · Stage ${n}`,
+    spaceStageCompleteTitle: (n: number) => `Space Stage ${n} Complete!`,
+    spaceNextStageBtn: (n: number) => `Continue to Space Stage ${n}`,
+    spaceUnlockTitle: `Cosmic Galaxy (${TOTAL_SPACE_STAGES} Stages)`,
+    spaceUnlockDesc: `Unlock ${TOTAL_SPACE_STAGES} cosmic stages with 30 unique item types (14 positive cosmic points + 16 space hazards), Space Bosses & the Stage 49 Supreme Beast — unlock with ${SPACE_UNLOCK_COST} Coins OR ${SPACE_UNLOCK_PINK_COST} Pink Coins!`,
+    spaceUnlockCoinsBtn: `Unlock (${SPACE_UNLOCK_COST} Coins)`,
+    spaceUnlockPinkBtn: `Unlock (${SPACE_UNLOCK_PINK_COST} Pink Coins)`,
+    spaceNeedBothHint: (needCoins: number, needPink: number) =>
+      `Need ${needCoins} more coins or ${needPink} more Pink Coins to unlock Space World`,
+    spaceStagesModalHint: `${TOTAL_SPACE_STAGES} Cosmic stages & 30 item types — defeat Space Bosses every 5 stages & the 🔥 Supreme Beast at Stage 49 for massive Space Coins!`,
+    noStarsNotice: (timer: string) => `Out of stars — next star regenerates in ${timer}`,
+    waitStarBtn: (timer: string) => `Next Star in ${timer}`,
+    buyStarBtn: `Buy +1 Star (${HEART_COST_COINS} Coins)`,
+    buyStarAria: `Buy 1 star for ${HEART_COST_COINS} coins`,
+    starsFullTip: 'Stars full (10/10)',
+    needCoinsStarTip: `Need ${HEART_COST_COINS} coins to buy a star`,
+    spaceIndexWorldBtn: 'Space Index',
+    spaceIndexModalHint:
+      '30 Cosmic item types (14 positive + 16 hazards) ordered from weakest to strongest — each stays locked until you catch or touch it in Space Stages.',
+    spaceIndexPlusTab: 'Cosmic (+)',
+    spaceIndexMinusTab: 'Hazards (-)',
+    spaceCoinsEarned: (earned: number, remainingStars: number) =>
+      earned <= 0
+        ? 'Stage coin reward already claimed (no extra coins)'
+        : `+${earned} ${earned === 1 ? 'Coin' : 'Coins'} Reward (${remainingStars} ${
+            remainingStars === 1 ? 'Star' : 'Stars'
+          })!`,
+    spaceBossBadge: '👑 BOSS',
+    spaceSupremeBossBadge: '🔥 SUPREME',
+    spaceBossBanner: (name: string) => `👑 SPACE BOSS · ${name}`,
+    spaceBossGoal: (hp: number) => `Catch points to fire lasers · Boss HP ${hp}`,
+    spaceBossDefeated: (name: string) => `👑 Space Boss Defeated: ${name}!`,
+    monsterWorldLabel: 'Monster Stages',
+    monsterSkullsLabel: 'Monster Skulls',
+    monsterVictoryTitle: `Victory! King of Monsters Slain`,
+    monsterVictorySubtitle: `You conquered all ${TOTAL_MONSTER_STAGES} Monster Stages and every Grand Monster!`,
+    monsterStageBanner: (n: number) => `Monster · Stage ${n}`,
+    monsterStageCompleteTitle: (n: number) => `Monster Stage ${n} Cleared!`,
+    monsterNextStageBtn: (n: number) => `Continue to Monster Stage ${n}`,
+    monsterStagesModalHint: `${TOTAL_MONSTER_STAGES} Monster boss battles, free to play — every 10 stages a 🔥 Grand Monster appears (150% weaker than Space's Stage 49 Supreme Beast)!`,
+    noSkullsNotice: (timer: string) =>
+      `Out of Monster Skulls — next skull regenerates in ${timer}`,
+    waitSkullBtn: (timer: string) => `Next Skull in ${timer}`,
+    buySkullBtn: `Buy +1 Skull (${HEART_COST_COINS} Coins)`,
+    buySkullAria: `Buy 1 Monster Skull for ${HEART_COST_COINS} coins`,
+    skullsFullTip: 'Monster Skulls full (10/10)',
+    needCoinsSkullTip: `Need ${HEART_COST_COINS} coins to buy a Monster Skull`,
+    monsterIndexWorldBtn: 'Monster Index',
+    monsterIndexModalHint:
+      '12 Monster Arena items (6 hunter relics that damage Monsters + 6 Monster attacks) — unlock each by catching or touching it.',
+    monsterIndexPlusTab: 'Relics (+)',
+    monsterIndexMinusTab: 'Attacks (-)',
+    monsterCoinsEarned: (earned: number, remainingSkulls: number) =>
+      earned <= 0
+        ? 'Stage coin reward already claimed (no extra coins)'
+        : `+${earned} ${earned === 1 ? 'Coin' : 'Coins'} Monster Bounty (${remainingSkulls} ${
+            remainingSkulls === 1 ? 'Skull' : 'Skulls'
+          })!`,
+    monsterPinkRewardLine: (earned: number) =>
+      `+${earned} Pink Coins Monster Loot!`,
+    monsterBadge: '👹 MONSTER',
+    grandMonsterBadge: '🔥 GRAND MONSTER',
+    monsterBossBanner: (name: string) => `👹 MONSTER · ${name}`,
+    grandMonsterBanner: (name: string) => `🔥 GRAND MONSTER · ${name}`,
+    monsterBossGoal: (hp: number) => `Catch relics to strike · Monster HP ${hp}`,
+    monsterBossDefeated: (name: string) => `👹 Monster Slain: ${name}!`,
+    grandMonsterDefeated: (name: string) => `🔥 Grand Monster Slain: ${name}!`,
   },
 } as const;
 
@@ -1431,6 +1687,63 @@ class ArcadeAudio {
       osc.stop(start + 0.35);
     });
   }
+
+  public playBossWarning(): void {
+    const ctx = this.ensureContext();
+    if (!ctx) return;
+    const now = ctx.currentTime;
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = 'sawtooth';
+    osc.frequency.setValueAtTime(220, now);
+    osc.frequency.exponentialRampToValueAtTime(520, now + 0.24);
+    gain.gain.setValueAtTime(0.001, now);
+    gain.gain.exponentialRampToValueAtTime(0.065, now + 0.03);
+    gain.gain.exponentialRampToValueAtTime(0.0008, now + 0.28);
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.start(now);
+    osc.stop(now + 0.3);
+  }
+
+  public playBossHit(): void {
+    const ctx = this.ensureContext();
+    if (!ctx) return;
+    const now = ctx.currentTime;
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = 'triangle';
+    osc.frequency.setValueAtTime(760, now);
+    osc.frequency.exponentialRampToValueAtTime(260, now + 0.12);
+    gain.gain.setValueAtTime(0.001, now);
+    gain.gain.exponentialRampToValueAtTime(0.08, now + 0.01);
+    gain.gain.exponentialRampToValueAtTime(0.0008, now + 0.13);
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.start(now);
+    osc.stop(now + 0.14);
+  }
+
+  public playBossDefeat(): void {
+    const ctx = this.ensureContext();
+    if (!ctx) return;
+    const now = ctx.currentTime;
+    const notes = [392.0, 523.25, 659.25, 783.99, 1046.5, 1318.51];
+    notes.forEach((freq, idx) => {
+      const start = now + idx * 0.07;
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = idx < 2 ? 'sawtooth' : 'triangle';
+      osc.frequency.setValueAtTime(freq, start);
+      gain.gain.setValueAtTime(0.001, start);
+      gain.gain.exponentialRampToValueAtTime(0.09, start + 0.018);
+      gain.gain.exponentialRampToValueAtTime(0.0008, start + 0.32);
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start(start);
+      osc.stop(start + 0.34);
+    });
+  }
 }
 
 function readStoredNumber(key: string, fallback: number): number {
@@ -1696,10 +2009,141 @@ function persistDiamondsState(diamonds: number, lastRegenAt: number): void {
   }
 }
 
+function readStoredCompletedSpaceStages(): number[] {
+  try {
+    const raw = window.localStorage.getItem(COMPLETED_SPACE_STAGES_STORAGE_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return [];
+    return parsed.filter(
+      (n): n is number =>
+        typeof n === 'number' &&
+        Number.isInteger(n) &&
+        n >= 1 &&
+        n <= TOTAL_SPACE_STAGES
+    );
+  } catch {
+    return [];
+  }
+}
+
+function readStoredDiscoveredSpaceItems(): SpaceItemKind[] {
+  try {
+    const raw = window.localStorage.getItem(DISCOVERED_SPACE_ITEMS_STORAGE_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return [];
+    return parsed.filter(
+      (k): k is SpaceItemKind =>
+        typeof k === 'string' && VALID_SPACE_KINDS.includes(k as SpaceItemKind)
+    );
+  } catch {
+    return [];
+  }
+}
+
+function readStoredStarsState(maxStars: number = MAX_STARS): StoredLivesState {
+  const now = Date.now();
+  try {
+    const raw = window.localStorage.getItem(STARS_STATE_STORAGE_KEY);
+    if (!raw) return { lives: maxStars, lastRegenAt: 0 };
+    const parsed = JSON.parse(raw);
+    if (
+      parsed &&
+      typeof parsed.lives === 'number' &&
+      typeof parsed.lastRegenAt === 'number'
+    ) {
+      return computeSyncedLivesState(parsed.lives, parsed.lastRegenAt, now, maxStars);
+    }
+    return { lives: maxStars, lastRegenAt: 0 };
+  } catch {
+    return { lives: maxStars, lastRegenAt: 0 };
+  }
+}
+
+function persistStarsState(stars: number, lastRegenAt: number): void {
+  try {
+    window.localStorage.setItem(
+      STARS_STATE_STORAGE_KEY,
+      JSON.stringify({ lives: stars, lastRegenAt })
+    );
+  } catch {
+    // Ignore storage errors
+  }
+}
+
+function readStoredCompletedMonsterStages(): number[] {
+  try {
+    const raw = window.localStorage.getItem(COMPLETED_MONSTER_STAGES_STORAGE_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return [];
+    return parsed.filter(
+      (n): n is number =>
+        typeof n === 'number' &&
+        Number.isInteger(n) &&
+        n >= 1 &&
+        n <= TOTAL_MONSTER_STAGES
+    );
+  } catch {
+    return [];
+  }
+}
+
+function readStoredDiscoveredMonsterItems(): MonsterItemKind[] {
+  try {
+    const raw = window.localStorage.getItem(DISCOVERED_MONSTER_ITEMS_STORAGE_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return [];
+    return parsed.filter(
+      (k): k is MonsterItemKind =>
+        typeof k === 'string' && VALID_MONSTER_KINDS.includes(k as MonsterItemKind)
+    );
+  } catch {
+    return [];
+  }
+}
+
+function readStoredMonsterSkullsState(): StoredLivesState {
+  const now = Date.now();
+  try {
+    const raw = window.localStorage.getItem(MONSTER_SKULLS_STATE_STORAGE_KEY);
+    if (!raw) return { lives: MAX_MONSTER_SKULLS, lastRegenAt: 0 };
+    const parsed = JSON.parse(raw);
+    if (
+      parsed &&
+      typeof parsed.lives === 'number' &&
+      typeof parsed.lastRegenAt === 'number'
+    ) {
+      return computeSyncedLivesState(
+        parsed.lives,
+        parsed.lastRegenAt,
+        now,
+        MAX_MONSTER_SKULLS
+      );
+    }
+    return { lives: MAX_MONSTER_SKULLS, lastRegenAt: 0 };
+  } catch {
+    return { lives: MAX_MONSTER_SKULLS, lastRegenAt: 0 };
+  }
+}
+
+function persistMonsterSkullsState(skulls: number, lastRegenAt: number): void {
+  try {
+    window.localStorage.setItem(
+      MONSTER_SKULLS_STATE_STORAGE_KEY,
+      JSON.stringify({ lives: skulls, lastRegenAt })
+    );
+  } catch {
+    // Ignore storage errors
+  }
+}
+
 function readStoredBagState(): BagState {
   try {
     const raw = window.localStorage.getItem(BAG_STORAGE_KEY);
-    if (!raw) return { hearts: 0, corn: 0, diamonds: 0 };
+    if (!raw) return { hearts: 0, corn: 0, diamonds: 0, stars: 0, skulls: 0 };
     const parsed = JSON.parse(raw);
     return {
       hearts:
@@ -1714,9 +2158,17 @@ function readStoredBagState(): BagState {
         typeof parsed?.diamonds === 'number' && Number.isFinite(parsed.diamonds)
           ? Math.max(0, Math.floor(parsed.diamonds))
           : 0,
+      stars:
+        typeof parsed?.stars === 'number' && Number.isFinite(parsed.stars)
+          ? Math.max(0, Math.floor(parsed.stars))
+          : 0,
+      skulls:
+        typeof parsed?.skulls === 'number' && Number.isFinite(parsed.skulls)
+          ? Math.max(0, Math.floor(parsed.skulls))
+          : 0,
     };
   } catch {
-    return { hearts: 0, corn: 0, diamonds: 0 };
+    return { hearts: 0, corn: 0, diamonds: 0, stars: 0, skulls: 0 };
   }
 }
 
@@ -1742,6 +2194,7 @@ export default function App() {
   }
   const initialShopState = initialShopRef.current;
   const initialMaxLives = MAX_LIVES + initialShopState.maxHeartsUpgrade;
+  const initialMaxStars = MAX_STARS + initialShopState.maxStarsUpgrade;
 
   const initialLivesRef = useRef<StoredLivesState | null>(null);
   if (initialLivesRef.current === null) {
@@ -1761,6 +2214,18 @@ export default function App() {
   }
   const initialDiamondsState = initialDiamondsRef.current;
 
+  const initialStarsRef = useRef<StoredLivesState | null>(null);
+  if (initialStarsRef.current === null) {
+    initialStarsRef.current = readStoredStarsState(initialMaxStars);
+  }
+  const initialStarsState = initialStarsRef.current;
+
+  const initialMonsterSkullsRef = useRef<StoredLivesState | null>(null);
+  if (initialMonsterSkullsRef.current === null) {
+    initialMonsterSkullsRef.current = readStoredMonsterSkullsState();
+  }
+  const initialMonsterSkullsState = initialMonsterSkullsRef.current;
+
   const [lang, setLang] = useState<Lang>(() => readStoredLang());
   const [gameMode, setGameMode] = useState<GameMode>('normal');
   const [status, setStatus] = useState<GameStatus>('START');
@@ -1775,8 +2240,14 @@ export default function App() {
   const [pinkCoins, setPinkCoins] = useState<number>(() =>
     readStoredNumber(PINK_COINS_STORAGE_KEY, 0)
   );
+  const [spaceCoins, setSpaceCoins] = useState<number>(() =>
+    readStoredNumber(SPACE_COINS_STORAGE_KEY, 0)
+  );
   const [pinkCoinInfoOpen, setPinkCoinInfoOpen] = useState<boolean>(false);
+  const [spaceCoinInfoOpen, setSpaceCoinInfoOpen] = useState<boolean>(false);
   const [lastEarnedCoins, setLastEarnedCoins] = useState<number>(4);
+  const [lastEarnedSpaceCoins, setLastEarnedSpaceCoins] = useState<number>(0);
+  const [lastEarnedPinkCoins, setLastEarnedPinkCoins] = useState<number>(0);
   const [completedStages, setCompletedStages] = useState<number[]>(() =>
     readStoredCompletedStages()
   );
@@ -1803,6 +2274,23 @@ export default function App() {
   const [discoveredGoldItems, setDiscoveredGoldItems] = useState<GoldItemKind[]>(
     () => readStoredDiscoveredGoldItems()
   );
+  const [spaceUnlocked, setSpaceUnlocked] = useState<boolean>(() =>
+    SPACE_UNLOCK_COST <= 0 && SPACE_UNLOCK_PINK_COST <= 0
+      ? true
+      : readStoredBoolean(SPACE_UNLOCKED_STORAGE_KEY, false)
+  );
+  const [completedSpaceStages, setCompletedSpaceStages] = useState<number[]>(() =>
+    readStoredCompletedSpaceStages()
+  );
+  const [discoveredSpaceItems, setDiscoveredSpaceItems] = useState<
+    SpaceItemKind[]
+  >(() => readStoredDiscoveredSpaceItems());
+  const [completedMonsterStages, setCompletedMonsterStages] = useState<number[]>(
+    () => readStoredCompletedMonsterStages()
+  );
+  const [discoveredMonsterItems, setDiscoveredMonsterItems] = useState<
+    MonsterItemKind[]
+  >(() => readStoredDiscoveredMonsterItems());
   const [lives, setLives] = useState<number>(initialLivesState.lives);
   const [nextHeartInMs, setNextHeartInMs] = useState<number>(() =>
     initialLivesState.lives < initialMaxLives
@@ -1824,6 +2312,23 @@ export default function App() {
         )
       : 0
   );
+  const [stars, setStars] = useState<number>(initialStarsState.lives);
+  const [nextStarInMs, setNextStarInMs] = useState<number>(() =>
+    initialStarsState.lives < initialMaxStars
+      ? Math.max(0, HEART_REGEN_MS - (Date.now() - initialStarsState.lastRegenAt))
+      : 0
+  );
+  const [monsterSkulls, setMonsterSkulls] = useState<number>(
+    initialMonsterSkullsState.lives
+  );
+  const [nextSkullInMs, setNextSkullInMs] = useState<number>(() =>
+    initialMonsterSkullsState.lives < MAX_MONSTER_SKULLS
+      ? Math.max(
+          0,
+          HEART_REGEN_MS - (Date.now() - initialMonsterSkullsState.lastRegenAt)
+        )
+      : 0
+  );
   const [stageNum, setStageNum] = useState<number>(1);
   const [stagesModalOpen, setStagesModalOpen] = useState<boolean>(false);
   const [stagesModalTab, setStagesModalTab] = useState<GameMode>('normal');
@@ -1837,6 +2342,11 @@ export default function App() {
   const [shopPointsSubTab, setShopPointsSubTab] = useState<PointsSubTab>('plus');
   const [shop, setShop] = useState<ShopState>(initialShopState);
   const [settingsModalOpen, setSettingsModalOpen] = useState<boolean>(false);
+  const [settingsTab, setSettingsTab] = useState<'general' | 'stats'>('general');
+  const [lifetimeStats, setLifetimeStats] = useState<PlayerLifetimeStats>(() =>
+    readPlayerLifetimeStats()
+  );
+  const [sessionSeconds, setSessionSeconds] = useState<number>(0);
   const [gamesModalOpen, setGamesModalOpen] = useState<boolean>(false);
   const [showIntro, setShowIntro] = useState<boolean>(true);
   const [showLanding, setShowLanding] = useState<boolean>(true);
@@ -1872,6 +2382,7 @@ export default function App() {
   const bestScoreRef = useRef<number>(bestScore);
   const coinsRef = useRef<number>(coins);
   const pinkCoinsRef = useRef<number>(pinkCoins);
+  const spaceCoinsRef = useRef<number>(spaceCoins);
   const completedStagesRef = useRef<number[]>(completedStages);
   const discoveredItemsRef = useRef<ItemKind[]>(discoveredItems);
   const fruitUnlockedRef = useRef<boolean>(fruitUnlocked);
@@ -1880,12 +2391,25 @@ export default function App() {
   const goldUnlockedRef = useRef<boolean>(goldUnlocked);
   const completedGoldStagesRef = useRef<number[]>(completedGoldStages);
   const discoveredGoldItemsRef = useRef<GoldItemKind[]>(discoveredGoldItems);
+  const spaceUnlockedRef = useRef<boolean>(spaceUnlocked);
+  const completedSpaceStagesRef = useRef<number[]>(completedSpaceStages);
+  const discoveredSpaceItemsRef = useRef<SpaceItemKind[]>(discoveredSpaceItems);
+  const completedMonsterStagesRef = useRef<number[]>(completedMonsterStages);
+  const discoveredMonsterItemsRef = useRef<MonsterItemKind[]>(
+    discoveredMonsterItems
+  );
   const livesRef = useRef<number>(initialLivesState.lives);
   const lastHeartRegenAtRef = useRef<number>(initialLivesState.lastRegenAt);
   const cornRef = useRef<number>(initialCornState.lives);
   const lastCornRegenAtRef = useRef<number>(initialCornState.lastRegenAt);
   const diamondsRef = useRef<number>(initialDiamondsState.lives);
   const lastDiamondRegenAtRef = useRef<number>(initialDiamondsState.lastRegenAt);
+  const starsRef = useRef<number>(initialStarsState.lives);
+  const lastStarRegenAtRef = useRef<number>(initialStarsState.lastRegenAt);
+  const monsterSkullsRef = useRef<number>(initialMonsterSkullsState.lives);
+  const lastSkullRegenAtRef = useRef<number>(
+    initialMonsterSkullsState.lastRegenAt
+  );
   const stageNumRef = useRef<number>(1);
   const streakRef = useRef<number>(0);
 
@@ -1921,6 +2445,11 @@ export default function App() {
     stars: [] as AmbientStar[],
     fruitMotifs: [] as FruitBgMotif[],
     goldMotifs: [] as GoldBgMotif[],
+    spaceMotifs: [] as SpaceBgMotif[],
+    monsterMotifs: [] as MonsterBgMotif[],
+    spaceBoss: null as SpaceBossRuntime | null,
+    monsterBoss: null as MonsterBossRuntime | null,
+    bossBeams: [] as BossLaserBeam[],
     input: {
       leftKey: false,
       rightKey: false,
@@ -1943,22 +2472,45 @@ export default function App() {
   const t = COPY[lang];
   const isFruitMode = gameMode === 'fruit';
   const isGoldMode = gameMode === 'gold';
+  const isSpaceMode = gameMode === 'space';
+  const isMonsterMode = gameMode === 'monster';
   const activeTotalStages = isFruitMode
     ? TOTAL_FRUIT_STAGES
     : isGoldMode
     ? TOTAL_GOLD_STAGES
+    : isSpaceMode
+    ? TOTAL_SPACE_STAGES
+    : isMonsterMode
+    ? TOTAL_MONSTER_STAGES
     : TOTAL_STAGES;
   const effectiveMaxLives = MAX_LIVES + shop.maxHeartsUpgrade;
-  const activeLives = isFruitMode ? corn : isGoldMode ? diamonds : lives;
+  const effectiveMaxStars = MAX_STARS + shop.maxStarsUpgrade;
+  const activeLives = isFruitMode
+    ? corn
+    : isGoldMode
+    ? diamonds
+    : isSpaceMode
+    ? stars
+    : isMonsterMode
+    ? monsterSkulls
+    : lives;
   const activeMaxLives = isFruitMode
     ? MAX_CORN
     : isGoldMode
     ? MAX_DIAMONDS
+    : isSpaceMode
+    ? effectiveMaxStars
+    : isMonsterMode
+    ? MAX_MONSTER_SKULLS
     : effectiveMaxLives;
   const activeNextRegenMs = isFruitMode
     ? nextCornInMs
     : isGoldMode
     ? nextDiamondInMs
+    : isSpaceMode
+    ? nextStarInMs
+    : isMonsterMode
+    ? nextSkullInMs
     : nextHeartInMs;
   const activeLifeBuyCost = isGoldMode ? DIAMOND_COST_COINS : HEART_COST_COINS;
   const activeLifeCurrencyBalance = isGoldMode ? pinkCoins : coins;
@@ -1966,6 +2518,10 @@ export default function App() {
     ? FRUIT_STAGES[Math.min(stageNum - 1, TOTAL_FRUIT_STAGES - 1)]
     : isGoldMode
     ? GOLD_STAGES[Math.min(stageNum - 1, TOTAL_GOLD_STAGES - 1)]
+    : isSpaceMode
+    ? SPACE_STAGES[Math.min(stageNum - 1, TOTAL_SPACE_STAGES - 1)]
+    : isMonsterMode
+    ? MONSTER_STAGES[Math.min(stageNum - 1, TOTAL_MONSTER_STAGES - 1)]
     : STAGES[Math.min(stageNum - 1, TOTAL_STAGES - 1)];
   const nextStageConfig = isFruitMode
     ? stageNum < TOTAL_FRUIT_STAGES
@@ -1974,6 +2530,14 @@ export default function App() {
     : isGoldMode
     ? stageNum < TOTAL_GOLD_STAGES
       ? GOLD_STAGES[stageNum]
+      : currentStageConfig
+    : isSpaceMode
+    ? stageNum < TOTAL_SPACE_STAGES
+      ? SPACE_STAGES[stageNum]
+      : currentStageConfig
+    : isMonsterMode
+    ? stageNum < TOTAL_MONSTER_STAGES
+      ? MONSTER_STAGES[stageNum]
       : currentStageConfig
     : stageNum < TOTAL_STAGES
     ? STAGES[stageNum]
@@ -2014,6 +2578,82 @@ export default function App() {
       // Ignore storage failures
     }
   }, [musicEnabled]);
+
+  // Track lifetime play sessions, active play duration, and per-currency spend/earn stats
+  const lifetimeStatsRef = useRef<PlayerLifetimeStats>(lifetimeStats);
+  lifetimeStatsRef.current = lifetimeStats;
+  const prevTrackedCurrenciesRef = useRef<{
+    coins: number;
+    pinkCoins: number;
+    spaceCoins: number;
+  }>({ coins, pinkCoins, spaceCoins });
+
+  useEffect(() => {
+    setLifetimeStats((prev) => {
+      const next: PlayerLifetimeStats = {
+        ...prev,
+        totalSessions: prev.totalSessions + 1,
+      };
+      savePlayerLifetimeStats(next);
+      return next;
+    });
+
+    let ticksSinceSave = 0;
+    const timer = window.setInterval(() => {
+      if (document.visibilityState !== 'visible') return;
+      ticksSinceSave += 1;
+      setSessionSeconds((s) => s + 1);
+      setLifetimeStats((prev) => {
+        const next: PlayerLifetimeStats = {
+          ...prev,
+          totalPlaySeconds: prev.totalPlaySeconds + 1,
+        };
+        if (ticksSinceSave >= 5) {
+          ticksSinceSave = 0;
+          savePlayerLifetimeStats(next);
+        }
+        return next;
+      });
+    }, 1000);
+
+    const flush = () => savePlayerLifetimeStats(lifetimeStatsRef.current);
+    window.addEventListener('beforeunload', flush);
+    return () => {
+      window.clearInterval(timer);
+      window.removeEventListener('beforeunload', flush);
+      flush();
+    };
+  }, []);
+
+  useEffect(() => {
+    const prev = prevTrackedCurrenciesRef.current;
+    const dCoins = coins - prev.coins;
+    const dPink = pinkCoins - prev.pinkCoins;
+    const dSpace = spaceCoins - prev.spaceCoins;
+    prevTrackedCurrenciesRef.current = { coins, pinkCoins, spaceCoins };
+
+    if (dCoins === 0 && dPink === 0 && dSpace === 0) return;
+
+    setLifetimeStats((cur) => {
+      let purchasesAdded = 0;
+      if (dCoins < 0) purchasesAdded += 1;
+      if (dPink < 0) purchasesAdded += 1;
+      if (dSpace < 0) purchasesAdded += 1;
+
+      const next: PlayerLifetimeStats = {
+        ...cur,
+        coinsSpent: cur.coinsSpent + (dCoins < 0 ? -dCoins : 0),
+        coinsEarned: cur.coinsEarned + (dCoins > 0 ? dCoins : 0),
+        pinkCoinsSpent: cur.pinkCoinsSpent + (dPink < 0 ? -dPink : 0),
+        pinkCoinsEarned: cur.pinkCoinsEarned + (dPink > 0 ? dPink : 0),
+        spaceCoinsSpent: cur.spaceCoinsSpent + (dSpace < 0 ? -dSpace : 0),
+        spaceCoinsEarned: cur.spaceCoinsEarned + (dSpace > 0 ? dSpace : 0),
+        totalPurchases: cur.totalPurchases + purchasesAdded,
+      };
+      savePlayerLifetimeStats(next);
+      return next;
+    });
+  }, [coins, pinkCoins, spaceCoins]);
 
   // Keep energetic background music cleanly synced with active gameplay & Settings toggle
   useEffect(() => {
@@ -2066,6 +2706,8 @@ export default function App() {
     simRef.current.stars = stars;
     simRef.current.fruitMotifs = initFruitBgMotifs(width, height);
     simRef.current.goldMotifs = initGoldBgMotifs(width, height);
+    simRef.current.spaceMotifs = initSpaceBgMotifs(width, height);
+    simRef.current.monsterMotifs = initMonsterBgMotifs(width, height);
   }, []);
 
   // Automatic +1 heart, +1 corn, & +1 diamond regeneration every 5 minutes when below 10
@@ -2161,6 +2803,67 @@ export default function App() {
             : 0
         );
       }
+
+      // Space mode cosmic stars lives pool
+      const currentMaxStars = MAX_STARS + shopRef.current.maxStarsUpgrade;
+      if (starsRef.current >= currentMaxStars) {
+        if (lastStarRegenAtRef.current !== 0) {
+          lastStarRegenAtRef.current = 0;
+          persistStarsState(currentMaxStars, 0);
+        }
+        setNextStarInMs(0);
+      } else {
+        const syncedStars = computeSyncedLivesState(
+          starsRef.current,
+          lastStarRegenAtRef.current,
+          now,
+          currentMaxStars
+        );
+        if (
+          syncedStars.lives !== starsRef.current ||
+          syncedStars.lastRegenAt !== lastStarRegenAtRef.current
+        ) {
+          starsRef.current = syncedStars.lives;
+          lastStarRegenAtRef.current = syncedStars.lastRegenAt;
+          setStars(syncedStars.lives);
+          persistStarsState(syncedStars.lives, syncedStars.lastRegenAt);
+        }
+        setNextStarInMs(
+          syncedStars.lives < currentMaxStars
+            ? Math.max(0, HEART_REGEN_MS - (now - syncedStars.lastRegenAt))
+            : 0
+        );
+      }
+
+      // Monster mode skulls lives pool
+      if (monsterSkullsRef.current >= MAX_MONSTER_SKULLS) {
+        if (lastSkullRegenAtRef.current !== 0) {
+          lastSkullRegenAtRef.current = 0;
+          persistMonsterSkullsState(MAX_MONSTER_SKULLS, 0);
+        }
+        setNextSkullInMs(0);
+      } else {
+        const syncedSkulls = computeSyncedLivesState(
+          monsterSkullsRef.current,
+          lastSkullRegenAtRef.current,
+          now,
+          MAX_MONSTER_SKULLS
+        );
+        if (
+          syncedSkulls.lives !== monsterSkullsRef.current ||
+          syncedSkulls.lastRegenAt !== lastSkullRegenAtRef.current
+        ) {
+          monsterSkullsRef.current = syncedSkulls.lives;
+          lastSkullRegenAtRef.current = syncedSkulls.lastRegenAt;
+          setMonsterSkulls(syncedSkulls.lives);
+          persistMonsterSkullsState(syncedSkulls.lives, syncedSkulls.lastRegenAt);
+        }
+        setNextSkullInMs(
+          syncedSkulls.lives < MAX_MONSTER_SKULLS
+            ? Math.max(0, HEART_REGEN_MS - (now - syncedSkulls.lastRegenAt))
+            : 0
+        );
+      }
     };
 
     syncPools();
@@ -2217,6 +2920,51 @@ export default function App() {
         setNextCornInMs(0);
       }
       persistCornState(nextCorn, lastCornRegenAtRef.current);
+      audioRef.current.playBuyHeart();
+      return;
+    }
+
+    if (mode === 'space') {
+      const currentMaxStars = MAX_STARS + shopRef.current.maxStarsUpgrade;
+      if (starsRef.current >= currentMaxStars) return;
+      const nextCoins = coinsRef.current - HEART_COST_COINS;
+      coinsRef.current = nextCoins;
+      setCoins(nextCoins);
+      try {
+        window.localStorage.setItem(COINS_STORAGE_KEY, String(nextCoins));
+      } catch {
+        // Ignore storage errors
+      }
+      const nextStars = Math.min(currentMaxStars, starsRef.current + 1);
+      starsRef.current = nextStars;
+      setStars(nextStars);
+      if (nextStars >= currentMaxStars) {
+        lastStarRegenAtRef.current = 0;
+        setNextStarInMs(0);
+      }
+      persistStarsState(nextStars, lastStarRegenAtRef.current);
+      audioRef.current.playBuyHeart();
+      return;
+    }
+
+    if (mode === 'monster') {
+      if (monsterSkullsRef.current >= MAX_MONSTER_SKULLS) return;
+      const nextCoins = coinsRef.current - HEART_COST_COINS;
+      coinsRef.current = nextCoins;
+      setCoins(nextCoins);
+      try {
+        window.localStorage.setItem(COINS_STORAGE_KEY, String(nextCoins));
+      } catch {
+        // Ignore storage errors
+      }
+      const nextSkulls = Math.min(MAX_MONSTER_SKULLS, monsterSkullsRef.current + 1);
+      monsterSkullsRef.current = nextSkulls;
+      setMonsterSkulls(nextSkulls);
+      if (nextSkulls >= MAX_MONSTER_SKULLS) {
+        lastSkullRegenAtRef.current = 0;
+        setNextSkullInMs(0);
+      }
+      persistMonsterSkullsState(nextSkulls, lastSkullRegenAtRef.current);
       audioRef.current.playBuyHeart();
       return;
     }
@@ -2293,6 +3041,51 @@ export default function App() {
       return;
     }
 
+    if (mode === 'space') {
+      const currentMaxStars = MAX_STARS + shopRef.current.maxStarsUpgrade;
+      if (starsRef.current <= 1) return;
+      const wasFull = starsRef.current >= currentMaxStars;
+      const nextStars = starsRef.current - 1;
+      starsRef.current = nextStars;
+      setStars(nextStars);
+      if (wasFull) {
+        lastStarRegenAtRef.current = now;
+        setNextStarInMs(HEART_REGEN_MS);
+      }
+      persistStarsState(nextStars, lastStarRegenAtRef.current);
+      const nextBag: BagState = {
+        ...bagRef.current,
+        stars: bagRef.current.stars + 1,
+      };
+      bagRef.current = nextBag;
+      setBag(nextBag);
+      persistBagState(nextBag);
+      audioRef.current.playBuyHeart();
+      return;
+    }
+
+    if (mode === 'monster') {
+      if (monsterSkullsRef.current <= 1) return;
+      const wasFull = monsterSkullsRef.current >= MAX_MONSTER_SKULLS;
+      const nextSkulls = monsterSkullsRef.current - 1;
+      monsterSkullsRef.current = nextSkulls;
+      setMonsterSkulls(nextSkulls);
+      if (wasFull) {
+        lastSkullRegenAtRef.current = now;
+        setNextSkullInMs(HEART_REGEN_MS);
+      }
+      persistMonsterSkullsState(nextSkulls, lastSkullRegenAtRef.current);
+      const nextBag: BagState = {
+        ...bagRef.current,
+        skulls: bagRef.current.skulls + 1,
+      };
+      bagRef.current = nextBag;
+      setBag(nextBag);
+      persistBagState(nextBag);
+      audioRef.current.playBuyHeart();
+      return;
+    }
+
     const currentMaxLives = MAX_LIVES + shopRef.current.maxHeartsUpgrade;
     if (livesRef.current <= 1) return;
     const wasFull = livesRef.current >= currentMaxLives;
@@ -2351,6 +3144,10 @@ export default function App() {
     const nextBag: BagState =
       mode === 'fruit'
         ? { ...bagRef.current, corn: bagRef.current.corn + 1 }
+        : mode === 'space'
+        ? { ...bagRef.current, stars: bagRef.current.stars + 1 }
+        : mode === 'monster'
+        ? { ...bagRef.current, skulls: bagRef.current.skulls + 1 }
         : { ...bagRef.current, hearts: bagRef.current.hearts + 1 };
     bagRef.current = nextBag;
     setBag(nextBag);
@@ -2401,6 +3198,56 @@ export default function App() {
         setNextCornInMs(0);
       }
       persistCornState(nextCorn, lastCornRegenAtRef.current);
+      audioRef.current.playStageUp();
+      return;
+    }
+
+    if (mode === 'space') {
+      const currentMaxStars = MAX_STARS + shopRef.current.maxStarsUpgrade;
+      if (bagRef.current.stars <= 0 || starsRef.current >= currentMaxStars) return;
+      const nextBag: BagState = {
+        ...bagRef.current,
+        stars: bagRef.current.stars - 1,
+      };
+      bagRef.current = nextBag;
+      setBag(nextBag);
+      persistBagState(nextBag);
+
+      const nextStars = Math.min(currentMaxStars, starsRef.current + 1);
+      starsRef.current = nextStars;
+      setStars(nextStars);
+      if (nextStars >= currentMaxStars) {
+        lastStarRegenAtRef.current = 0;
+        setNextStarInMs(0);
+      }
+      persistStarsState(nextStars, lastStarRegenAtRef.current);
+      audioRef.current.playStageUp();
+      return;
+    }
+
+    if (mode === 'monster') {
+      if (
+        bagRef.current.skulls <= 0 ||
+        monsterSkullsRef.current >= MAX_MONSTER_SKULLS
+      ) {
+        return;
+      }
+      const nextBag: BagState = {
+        ...bagRef.current,
+        skulls: bagRef.current.skulls - 1,
+      };
+      bagRef.current = nextBag;
+      setBag(nextBag);
+      persistBagState(nextBag);
+
+      const nextSkulls = Math.min(MAX_MONSTER_SKULLS, monsterSkullsRef.current + 1);
+      monsterSkullsRef.current = nextSkulls;
+      setMonsterSkulls(nextSkulls);
+      if (nextSkulls >= MAX_MONSTER_SKULLS) {
+        lastSkullRegenAtRef.current = 0;
+        setNextSkullInMs(0);
+      }
+      persistMonsterSkullsState(nextSkulls, lastSkullRegenAtRef.current);
       audioRef.current.playStageUp();
       return;
     }
@@ -2462,8 +3309,200 @@ export default function App() {
     audioRef.current.playStageUp();
   }, []);
 
+  const unlockSpaceWorldWithCoins = useCallback(() => {
+    if (spaceUnlockedRef.current || coinsRef.current < SPACE_UNLOCK_COST) {
+      return;
+    }
+    const nextCoins = coinsRef.current - SPACE_UNLOCK_COST;
+    coinsRef.current = nextCoins;
+    setCoins(nextCoins);
+    spaceUnlockedRef.current = true;
+    setSpaceUnlocked(true);
+    try {
+      window.localStorage.setItem(COINS_STORAGE_KEY, String(nextCoins));
+      window.localStorage.setItem(SPACE_UNLOCKED_STORAGE_KEY, 'true');
+    } catch {
+      // Ignore storage errors
+    }
+    audioRef.current.playStageUp();
+  }, []);
+
+  const unlockSpaceWorldWithPinkCoins = useCallback(() => {
+    if (spaceUnlockedRef.current || pinkCoinsRef.current < SPACE_UNLOCK_PINK_COST) {
+      return;
+    }
+    const nextPink = pinkCoinsRef.current - SPACE_UNLOCK_PINK_COST;
+    pinkCoinsRef.current = nextPink;
+    setPinkCoins(nextPink);
+    spaceUnlockedRef.current = true;
+    setSpaceUnlocked(true);
+    try {
+      window.localStorage.setItem(PINK_COINS_STORAGE_KEY, String(nextPink));
+      window.localStorage.setItem(SPACE_UNLOCKED_STORAGE_KEY, 'true');
+    } catch {
+      // Ignore storage errors
+    }
+    audioRef.current.playStageUp();
+  }, []);
+
   const startAtStage = useCallback((targetStage: number, targetMode?: GameMode) => {
     const mode = targetMode ?? gameModeRef.current;
+    if (mode === 'monster') {
+      const safeStage = Math.max(1, Math.min(TOTAL_MONSTER_STAGES, targetStage));
+      if (!isStageUnlocked(safeStage, completedMonsterStagesRef.current)) return;
+      if (monsterSkullsRef.current <= 0) return;
+
+      const sim = simRef.current;
+      const activeCopy = COPY[langRef.current];
+
+      gameModeRef.current = 'monster';
+      setGameMode('monster');
+
+      sim.items = [];
+      sim.particles = [];
+      sim.floatingTexts = [];
+      sim.bossBeams = [];
+      sim.spaceBoss = null;
+      sim.monsterBoss = createMonsterBossRuntime(safeStage, sim.width);
+      sim.playerX = sim.width / 2;
+      sim.playerVx = 0;
+      sim.playerBounce = 0;
+      sim.playerGlowAlpha = 0;
+      sim.invulnTimer = 0;
+      sim.shieldTimer = 0;
+      sim.freezeTimer = 0;
+      sim.slowTimer = 0;
+      sim.heavySlowTimer = 0;
+      sim.speedBoostTimer = 0;
+      sim.shakeTimer = 0;
+      sim.hitFlashAlpha = 0;
+
+      const mName =
+        langRef.current === 'ar'
+          ? sim.monsterBoss.config.nameAr
+          : sim.monsterBoss.config.nameEn;
+      sim.stageBannerTimer = sim.monsterBoss.config.isGrandMonster ? 2.6 : 1.9;
+      sim.stageBannerText = sim.monsterBoss.config.isGrandMonster
+        ? activeCopy.grandMonsterBanner(mName)
+        : activeCopy.monsterBossBanner(mName);
+      sim.stageBannerSub = activeCopy.monsterBossGoal(sim.monsterBoss.maxHp);
+      sim.spawnTimer = 0.28;
+      sim.lastHazardX = -999;
+      sim.input.pointerActive = false;
+      sim.input.pointerId = null;
+      sim.input.leftBtn = false;
+      sim.input.rightBtn = false;
+
+      scoreRef.current = 0;
+      stagePointsRef.current = 0;
+      stageNumRef.current = safeStage;
+      streakRef.current = 0;
+      stagesModalOpenRef.current = false;
+      indexModalOpenRef.current = false;
+      shopModalOpenRef.current = false;
+      bagModalOpenRef.current = false;
+      settingsModalOpenRef.current = false;
+      gamesModalOpenRef.current = false;
+      statusRef.current = 'PLAYING';
+
+      setScore(0);
+      setStagePoints(0);
+      setStageNum(safeStage);
+      setStagesModalOpen(false);
+      setIndexModalOpen(false);
+      setShopModalOpen(false);
+      setBagModalOpen(false);
+      setSettingsModalOpen(false);
+      setGamesModalOpen(false);
+      setIsNewBest(false);
+      setStatus('PLAYING');
+
+      audioRef.current.playStart();
+      audioRef.current.startMusic(safeStage + 10);
+      return;
+    }
+
+    if (mode === 'space') {
+      if (!spaceUnlockedRef.current) return;
+      const safeStage = Math.max(1, Math.min(TOTAL_SPACE_STAGES, targetStage));
+      if (!isStageUnlocked(safeStage, completedSpaceStagesRef.current)) return;
+      if (starsRef.current <= 0) return;
+
+      const cfg = SPACE_STAGES[safeStage - 1];
+      const sim = simRef.current;
+      const activeCopy = COPY[langRef.current];
+
+      gameModeRef.current = 'space';
+      setGameMode('space');
+
+      sim.items = [];
+      sim.particles = [];
+      sim.floatingTexts = [];
+      sim.bossBeams = [];
+      sim.monsterBoss = null;
+      sim.spaceBoss = createSpaceBossRuntime(safeStage, sim.width);
+      sim.playerX = sim.width / 2;
+      sim.playerVx = 0;
+      sim.playerBounce = 0;
+      sim.playerGlowAlpha = 0;
+      sim.invulnTimer = 0;
+      sim.shieldTimer =
+        SPACE_START_SHIELD_DURATIONS[shopRef.current.spaceStartShieldLevel] ?? 0;
+      sim.freezeTimer = 0;
+      sim.slowTimer = 0;
+      sim.heavySlowTimer = 0;
+      sim.speedBoostTimer = 0;
+      sim.shakeTimer = 0;
+      sim.hitFlashAlpha = 0;
+      if (sim.spaceBoss) {
+        const bName =
+          langRef.current === 'ar'
+            ? sim.spaceBoss.config.nameAr
+            : sim.spaceBoss.config.nameEn;
+        sim.stageBannerTimer = 2.5;
+        sim.stageBannerText = activeCopy.spaceBossBanner(bName);
+        sim.stageBannerSub = activeCopy.spaceBossGoal(sim.spaceBoss.maxHp);
+      } else {
+        sim.stageBannerTimer = 1.5;
+        sim.stageBannerText = activeCopy.spaceStageBanner(safeStage);
+        sim.stageBannerSub = activeCopy.stageGoalLabel(cfg.pointsNeeded);
+      }
+      sim.spawnTimer = 0.28;
+      sim.lastHazardX = -999;
+      sim.input.pointerActive = false;
+      sim.input.pointerId = null;
+      sim.input.leftBtn = false;
+      sim.input.rightBtn = false;
+
+      scoreRef.current = 0;
+      stagePointsRef.current = 0;
+      stageNumRef.current = safeStage;
+      streakRef.current = 0;
+      stagesModalOpenRef.current = false;
+      indexModalOpenRef.current = false;
+      shopModalOpenRef.current = false;
+      bagModalOpenRef.current = false;
+      settingsModalOpenRef.current = false;
+      gamesModalOpenRef.current = false;
+      statusRef.current = 'PLAYING';
+
+      setScore(0);
+      setStagePoints(0);
+      setStageNum(safeStage);
+      setStagesModalOpen(false);
+      setIndexModalOpen(false);
+      setShopModalOpen(false);
+      setBagModalOpen(false);
+      setSettingsModalOpen(false);
+      setGamesModalOpen(false);
+      setIsNewBest(false);
+      setStatus('PLAYING');
+
+      audioRef.current.playStart();
+      audioRef.current.startMusic(safeStage);
+      return;
+    }
+
     if (mode === 'gold') {
       if (!goldUnlockedRef.current) return;
       const safeStage = Math.max(1, Math.min(TOTAL_GOLD_STAGES, targetStage));
@@ -2480,6 +3519,9 @@ export default function App() {
       sim.items = [];
       sim.particles = [];
       sim.floatingTexts = [];
+      sim.spaceBoss = null;
+      sim.monsterBoss = null;
+      sim.bossBeams = [];
       sim.playerX = sim.width / 2;
       sim.playerVx = 0;
       sim.playerBounce = 0;
@@ -2547,6 +3589,9 @@ export default function App() {
       sim.items = [];
       sim.particles = [];
       sim.floatingTexts = [];
+      sim.spaceBoss = null;
+      sim.monsterBoss = null;
+      sim.bossBeams = [];
       sim.playerX = sim.width / 2;
       sim.playerVx = 0;
       sim.playerBounce = 0;
@@ -2612,6 +3657,9 @@ export default function App() {
     sim.items = [];
     sim.particles = [];
     sim.floatingTexts = [];
+    sim.spaceBoss = null;
+    sim.monsterBoss = null;
+    sim.bossBeams = [];
     sim.playerX = sim.width / 2;
     sim.playerVx = 0;
     sim.playerBounce = 0;
@@ -2674,11 +3722,17 @@ export default function App() {
     if (statusRef.current !== 'STAGE_CLEAR') return;
     const isFruit = gameModeRef.current === 'fruit';
     const isGold = gameModeRef.current === 'gold';
+    const isSpace = gameModeRef.current === 'space';
+    const isMonster = gameModeRef.current === 'monster';
     if (
       isFruit
         ? cornRef.current <= 0
         : isGold
         ? diamondsRef.current <= 0
+        : isSpace
+        ? starsRef.current <= 0
+        : isMonster
+        ? monsterSkullsRef.current <= 0
         : livesRef.current <= 0
     ) {
       return;
@@ -2689,19 +3743,34 @@ export default function App() {
       ? TOTAL_FRUIT_STAGES
       : isGold
       ? TOTAL_GOLD_STAGES
+      : isSpace
+      ? TOTAL_SPACE_STAGES
+      : isMonster
+      ? TOTAL_MONSTER_STAGES
       : TOTAL_STAGES;
     const nextStage = Math.min(maxStages, stageNumRef.current + 1);
     const nextCfg = isFruit
       ? FRUIT_STAGES[nextStage - 1]
       : isGold
       ? GOLD_STAGES[nextStage - 1]
+      : isSpace
+      ? SPACE_STAGES[nextStage - 1]
+      : isMonster
+      ? MONSTER_STAGES[nextStage - 1]
       : STAGES[nextStage - 1];
     const activeCopy = COPY[langRef.current];
 
     sim.items = [];
+    sim.bossBeams = [];
+    sim.spaceBoss = isSpace ? createSpaceBossRuntime(nextStage, sim.width) : null;
+    sim.monsterBoss = isMonster
+      ? createMonsterBossRuntime(nextStage, sim.width)
+      : null;
     sim.playerVx = 0;
     sim.invulnTimer = 0;
-    sim.shieldTimer = 0;
+    sim.shieldTimer = isSpace
+      ? SPACE_START_SHIELD_DURATIONS[shopRef.current.spaceStartShieldLevel] ?? 0
+      : 0;
     sim.freezeTimer = 0;
     sim.slowTimer = 0;
     sim.heavySlowTimer = 0;
@@ -2712,13 +3781,35 @@ export default function App() {
     sim.input.pointerId = null;
     sim.input.leftBtn = false;
     sim.input.rightBtn = false;
-    sim.stageBannerText = isFruit
-      ? activeCopy.fruitStageBanner(nextStage)
-      : isGold
-      ? activeCopy.goldStageBanner(nextStage)
-      : activeCopy.stageBanner(nextStage);
-    sim.stageBannerSub = activeCopy.stageGoalLabel(nextCfg.pointsNeeded);
-    sim.stageBannerTimer = 1.5;
+    if (isSpace && sim.spaceBoss) {
+      const bName =
+        langRef.current === 'ar'
+          ? sim.spaceBoss.config.nameAr
+          : sim.spaceBoss.config.nameEn;
+      sim.stageBannerText = activeCopy.spaceBossBanner(bName);
+      sim.stageBannerSub = activeCopy.spaceBossGoal(sim.spaceBoss.maxHp);
+      sim.stageBannerTimer = 2.5;
+    } else if (isMonster && sim.monsterBoss) {
+      const mName =
+        langRef.current === 'ar'
+          ? sim.monsterBoss.config.nameAr
+          : sim.monsterBoss.config.nameEn;
+      sim.stageBannerText = sim.monsterBoss.config.isGrandMonster
+        ? activeCopy.grandMonsterBanner(mName)
+        : activeCopy.monsterBossBanner(mName);
+      sim.stageBannerSub = activeCopy.monsterBossGoal(sim.monsterBoss.maxHp);
+      sim.stageBannerTimer = sim.monsterBoss.config.isGrandMonster ? 2.6 : 1.9;
+    } else {
+      sim.stageBannerText = isFruit
+        ? activeCopy.fruitStageBanner(nextStage)
+        : isGold
+        ? activeCopy.goldStageBanner(nextStage)
+        : isSpace
+        ? activeCopy.spaceStageBanner(nextStage)
+        : activeCopy.stageBanner(nextStage);
+      sim.stageBannerSub = activeCopy.stageGoalLabel(nextCfg.pointsNeeded);
+      sim.stageBannerTimer = 1.5;
+    }
 
     stagePointsRef.current = 0;
     stageNumRef.current = nextStage;
@@ -2728,7 +3819,9 @@ export default function App() {
     setStatus('PLAYING');
 
     audioRef.current.playStart();
-    audioRef.current.startMusic(isFruit || isGold ? nextStage * 2 : nextStage);
+    audioRef.current.startMusic(
+      isFruit || isGold ? nextStage * 2 : isMonster ? nextStage + 10 : nextStage
+    );
   }, []);
 
   const selectOrBuySkin = useCallback((id: CatcherSkinId) => {
@@ -3002,6 +4095,174 @@ export default function App() {
     audioRef.current.playStageUp();
   }, []);
 
+  const persistSpaceCoins = useCallback((nextValue: number) => {
+    spaceCoinsRef.current = nextValue;
+    setSpaceCoins(nextValue);
+    try {
+      window.localStorage.setItem(SPACE_COINS_STORAGE_KEY, String(nextValue));
+    } catch {
+      // Ignore storage errors
+    }
+  }, []);
+
+  const selectOrBuySpaceSkin = useCallback(
+    (id: SpaceShipSkinId) => {
+      const def = SPACE_SKIN_CATALOG.find((s) => s.id === id);
+      if (!def) return;
+      const cur = shopRef.current;
+      const owned = cur.ownedSpaceSkins.includes(id);
+
+      if (owned) {
+        if (cur.equippedSpaceSkin === id) return;
+        const nextShop: ShopState = { ...cur, equippedSpaceSkin: id };
+        shopRef.current = nextShop;
+        setShop(nextShop);
+        persistShopState(nextShop);
+        audioRef.current.playStart();
+        return;
+      }
+
+      if (spaceCoinsRef.current < def.price) return;
+      persistSpaceCoins(spaceCoinsRef.current - def.price);
+
+      const nextShop: ShopState = {
+        ...cur,
+        ownedSpaceSkins: [...cur.ownedSpaceSkins, id],
+        equippedSpaceSkin: id,
+      };
+      shopRef.current = nextShop;
+      setShop(nextShop);
+      persistShopState(nextShop);
+      audioRef.current.playStageUp();
+    },
+    [persistSpaceCoins]
+  );
+
+  const buySpaceSupply = useCallback(
+    (id: SpaceSupplyId) => {
+      const def = SPACE_SUPPLY_CATALOG.find((s) => s.id === id);
+      if (!def || spaceCoinsRef.current < def.price) return;
+      const currentMaxStars = MAX_STARS + shopRef.current.maxStarsUpgrade;
+
+      if (id === 'one_star') {
+        persistSpaceCoins(spaceCoinsRef.current - def.price);
+        if (starsRef.current < currentMaxStars) {
+          const nextStars = Math.min(currentMaxStars, starsRef.current + 1);
+          starsRef.current = nextStars;
+          setStars(nextStars);
+          if (nextStars >= currentMaxStars) {
+            lastStarRegenAtRef.current = 0;
+            setNextStarInMs(0);
+          }
+          persistStarsState(nextStars, lastStarRegenAtRef.current);
+        } else {
+          const nextBag: BagState = {
+            ...bagRef.current,
+            stars: bagRef.current.stars + 1,
+          };
+          bagRef.current = nextBag;
+          setBag(nextBag);
+          persistBagState(nextBag);
+        }
+        audioRef.current.playBuyHeart();
+        return;
+      }
+
+      if (id === 'space_shield') {
+        const cur = shopRef.current;
+        if (cur.shields >= MAX_SHIELDS) return;
+        persistSpaceCoins(spaceCoinsRef.current - def.price);
+        const nextShop: ShopState = {
+          ...cur,
+          shields: Math.min(MAX_SHIELDS, cur.shields + 1),
+        };
+        shopRef.current = nextShop;
+        setShop(nextShop);
+        persistShopState(nextShop);
+        audioRef.current.playBuyHeart();
+        return;
+      }
+
+      if (id === 'full_stars') {
+        if (starsRef.current >= currentMaxStars) return;
+        persistSpaceCoins(spaceCoinsRef.current - def.price);
+        starsRef.current = currentMaxStars;
+        lastStarRegenAtRef.current = 0;
+        setStars(currentMaxStars);
+        setNextStarInMs(0);
+        persistStarsState(currentMaxStars, 0);
+        audioRef.current.playStageUp();
+      }
+    },
+    [persistSpaceCoins]
+  );
+
+  const buyMaxStarsUpgrade = useCallback(() => {
+    const cur = shopRef.current;
+    if (cur.maxStarsUpgrade >= MAX_STARS_UPGRADE_LEVELS) return;
+    const cost = MAX_STARS_UPGRADE_COSTS[cur.maxStarsUpgrade];
+    if (spaceCoinsRef.current < cost) return;
+
+    persistSpaceCoins(spaceCoinsRef.current - cost);
+    const nextLevel = cur.maxStarsUpgrade + 1;
+    const nextShop: ShopState = {
+      ...cur,
+      maxStarsUpgrade: nextLevel,
+    };
+    shopRef.current = nextShop;
+    setShop(nextShop);
+    persistShopState(nextShop);
+
+    const newMaxStars = MAX_STARS + nextLevel;
+    const nextStars = Math.min(newMaxStars, starsRef.current + 1);
+    starsRef.current = nextStars;
+    setStars(nextStars);
+    if (nextStars >= newMaxStars) {
+      lastStarRegenAtRef.current = 0;
+      setNextStarInMs(0);
+    } else if (lastStarRegenAtRef.current === 0) {
+      const now = Date.now();
+      lastStarRegenAtRef.current = now;
+      setNextStarInMs(HEART_REGEN_MS);
+    }
+    persistStarsState(nextStars, lastStarRegenAtRef.current);
+    audioRef.current.playStageUp();
+  }, [persistSpaceCoins]);
+
+  const buySpaceMagnetUpgrade = useCallback(() => {
+    const cur = shopRef.current;
+    if (cur.spaceMagnetLevel >= SPACE_MAGNET_LEVELS) return;
+    const cost = SPACE_MAGNET_COSTS[cur.spaceMagnetLevel];
+    if (spaceCoinsRef.current < cost) return;
+
+    persistSpaceCoins(spaceCoinsRef.current - cost);
+    const nextShop: ShopState = {
+      ...cur,
+      spaceMagnetLevel: cur.spaceMagnetLevel + 1,
+    };
+    shopRef.current = nextShop;
+    setShop(nextShop);
+    persistShopState(nextShop);
+    audioRef.current.playStageUp();
+  }, [persistSpaceCoins]);
+
+  const buySpaceStartShieldUpgrade = useCallback(() => {
+    const cur = shopRef.current;
+    if (cur.spaceStartShieldLevel >= SPACE_START_SHIELD_LEVELS) return;
+    const cost = SPACE_START_SHIELD_COSTS[cur.spaceStartShieldLevel];
+    if (spaceCoinsRef.current < cost) return;
+
+    persistSpaceCoins(spaceCoinsRef.current - cost);
+    const nextShop: ShopState = {
+      ...cur,
+      spaceStartShieldLevel: cur.spaceStartShieldLevel + 1,
+    };
+    shopRef.current = nextShop;
+    setShop(nextShop);
+    persistShopState(nextShop);
+    audioRef.current.playStageUp();
+  }, [persistSpaceCoins]);
+
   const openStagesModal = useCallback(() => {
     if (stagesModalOpenRef.current) {
       stagesModalOpenRef.current = false;
@@ -3113,6 +4374,54 @@ export default function App() {
     simRef.current.input.pointerActive = false;
     simRef.current.input.leftBtn = false;
     simRef.current.input.rightBtn = false;
+    if (gameModeRef.current === 'space') {
+      setShopTab('space');
+    }
+    shopModalOpenRef.current = true;
+    setShopModalOpen(true);
+  }, []);
+
+  const openSpaceShopModal = useCallback(() => {
+    setShopTab('space');
+    if (shopModalOpenRef.current) return;
+    const hadModalOpen =
+      stagesModalOpenRef.current ||
+      indexModalOpenRef.current ||
+      bagModalOpenRef.current ||
+      settingsModalOpenRef.current ||
+      gamesModalOpenRef.current;
+    if (stagesModalOpenRef.current) {
+      stagesModalOpenRef.current = false;
+      setStagesModalOpen(false);
+    }
+    if (indexModalOpenRef.current) {
+      indexModalOpenRef.current = false;
+      setIndexModalOpen(false);
+    }
+    if (bagModalOpenRef.current) {
+      bagModalOpenRef.current = false;
+      setBagModalOpen(false);
+    }
+    if (settingsModalOpenRef.current) {
+      settingsModalOpenRef.current = false;
+      setSettingsModalOpen(false);
+    }
+    if (gamesModalOpenRef.current) {
+      gamesModalOpenRef.current = false;
+      setGamesModalOpen(false);
+    }
+    if (!hadModalOpen) {
+      statusBeforeModalRef.current = statusRef.current;
+      if (statusRef.current === 'PLAYING') {
+        statusRef.current = 'PAUSED';
+        setStatus('PAUSED');
+      }
+    }
+    simRef.current.input.pointerActive = false;
+    simRef.current.input.leftBtn = false;
+    simRef.current.input.rightBtn = false;
+    setSpaceCoinInfoOpen(false);
+    setPinkCoinInfoOpen(false);
     shopModalOpenRef.current = true;
     setShopModalOpen(true);
   }, []);
@@ -3423,6 +4732,38 @@ export default function App() {
         }
         return;
       }
+      if (mode === 'space') {
+        if (spaceUnlockedRef.current && starsRef.current > 0) {
+          let highest = 1;
+          while (
+            highest < TOTAL_SPACE_STAGES &&
+            completedSpaceStagesRef.current.includes(highest)
+          ) {
+            highest++;
+          }
+          startAtStage(highest, 'space');
+        } else {
+          setStagesModalTab('space');
+          openStagesModal();
+        }
+        return;
+      }
+      if (mode === 'monster') {
+        if (monsterSkullsRef.current > 0) {
+          let highest = 1;
+          while (
+            highest < TOTAL_MONSTER_STAGES &&
+            completedMonsterStagesRef.current.includes(highest)
+          ) {
+            highest++;
+          }
+          startAtStage(highest, 'monster');
+        } else {
+          setStagesModalTab('monster');
+          openStagesModal();
+        }
+        return;
+      }
       if (mode === 'normal') {
         gameModeRef.current = 'normal';
         setGameMode('normal');
@@ -3454,6 +4795,27 @@ export default function App() {
 
   const handleLandingOpenShawarma = useCallback(() => {
     setInitialMiniGame('shawarma-shop');
+    if (!gamesModalOpenRef.current) {
+      openGamesModal();
+    }
+  }, [openGamesModal]);
+
+  const handleLandingOpenPlantMerge = useCallback(() => {
+    setInitialMiniGame('plant-merge');
+    if (!gamesModalOpenRef.current) {
+      openGamesModal();
+    }
+  }, [openGamesModal]);
+
+  const handleLandingOpenMonsterArena = useCallback(() => {
+    setInitialMiniGame('monster-arena');
+    if (!gamesModalOpenRef.current) {
+      openGamesModal();
+    }
+  }, [openGamesModal]);
+
+  const handleLandingOpenDevilTrap = useCallback(() => {
+    setInitialMiniGame('devil-trap');
     if (!gamesModalOpenRef.current) {
       openGamesModal();
     }
@@ -3692,6 +5054,22 @@ export default function App() {
             m.y = Math.min(h, m.y);
           }
         }
+        if (sim.spaceMotifs.length === 0) {
+          sim.spaceMotifs = initSpaceBgMotifs(w, h);
+        } else {
+          for (const m of sim.spaceMotifs) {
+            m.x = Math.min(w, m.x);
+            m.y = Math.min(h, m.y);
+          }
+        }
+        if (sim.monsterMotifs.length === 0) {
+          sim.monsterMotifs = initMonsterBgMotifs(w, h);
+        } else {
+          for (const m of sim.monsterMotifs) {
+            m.x = Math.min(w, m.x);
+            m.y = Math.min(h, m.y);
+          }
+        }
       }
     };
 
@@ -3744,6 +5122,10 @@ export default function App() {
           ? completedGoldStagesRef.current.includes(currentStage)
           : gameModeRef.current === 'fruit'
           ? completedFruitStagesRef.current.includes(currentStage)
+          : gameModeRef.current === 'space'
+          ? completedSpaceStagesRef.current.includes(currentStage)
+          : gameModeRef.current === 'monster'
+          ? completedMonsterStagesRef.current.includes(currentStage)
           : completedStagesRef.current.includes(currentStage);
       if (alreadyWonStage) return;
 
@@ -3777,8 +5159,201 @@ export default function App() {
       });
     };
 
+    const tryAwardSpaceCoins = (x: number, y: number, sKind: SpaceItemKind) => {
+      let drop = 0;
+      if (sKind === 'space_omega_crystal') {
+        drop = SPACE_OMEGA_BONUS_COINS;
+      } else if (sKind === 'space_galaxy') {
+        drop = SPACE_GALAXY_BONUS_COINS;
+      } else if (sKind === 'space_pulsar') {
+        drop = SPACE_PULSAR_BONUS_COINS;
+      } else if (Math.random() < SPACE_COIN_DROP_CHANCE) {
+        drop =
+          SPACE_COIN_MIN_DROP +
+          Math.floor(
+            Math.random() * (SPACE_COIN_MAX_DROP - SPACE_COIN_MIN_DROP + 1)
+          );
+      }
+      if (drop <= 0) return;
+
+      const nextSpaceCoins = spaceCoinsRef.current + drop;
+      spaceCoinsRef.current = nextSpaceCoins;
+      setSpaceCoins(nextSpaceCoins);
+      try {
+        window.localStorage.setItem(
+          SPACE_COINS_STORAGE_KEY,
+          String(nextSpaceCoins)
+        );
+      } catch {
+        // Ignore storage errors
+      }
+      spawnBurst(x, y, '#a78bfa', drop >= 4 ? 14 : 8, 0.92);
+      simRef.current.floatingTexts.push({
+        x,
+        y: y - 50,
+        vy: -52,
+        text:
+          langRef.current === 'ar'
+            ? `+${drop} عملة فضاء`
+            : `+${drop} Space`,
+        color: '#67e8f9',
+        life: 0.95,
+        maxLife: 0.95,
+      });
+    };
+
     const spawnFallingObject = () => {
       const sim = simRef.current;
+
+      if (gameModeRef.current === 'monster') {
+        const mStage = Math.min(stageNumRef.current, TOTAL_MONSTER_STAGES);
+        const mCfg = MONSTER_STAGES[mStage - 1];
+        const isGrand = isGrandMonsterStage(mStage);
+        // Keep a lively stream of positive hunter relics so every Monster fight feels crisp and responsive
+        const effectiveHazardChance = isGrand
+          ? mCfg.hazardChance * 0.64
+          : mCfg.hazardChance * 0.54;
+        const isHazard = Math.random() < effectiveHazardChance;
+        const mKind = pickMonsterItemKind(mStage, isHazard);
+        const mStat = MONSTER_ITEM_STATS[mKind];
+
+        const margin = Math.max(30, sim.playerWidth * 0.42);
+        const usableW = Math.max(80, sim.width - margin * 2);
+        let spawnX = margin + Math.random() * usableW;
+        for (let attempt = 0; attempt < 6; attempt++) {
+          const candidate = margin + Math.random() * usableW;
+          const tooCloseToRecentTop = sim.items.some(
+            (item) => item.y < 105 && Math.abs(item.x - candidate) < 62
+          );
+          const tooCloseToHazard =
+            isHazard && Math.abs(candidate - sim.lastHazardX) < 58;
+          if (!tooCloseToRecentTop && !tooCloseToHazard) {
+            spawnX = candidate;
+            break;
+          }
+        }
+        if (isHazard) {
+          sim.lastHazardX = spawnX;
+        }
+
+        const speedVariance = mStat.speedMul * (0.9 + Math.random() * 0.2);
+        const heightFactor = Math.max(0.82, Math.min(1.22, sim.height / 540));
+        const speed = mCfg.baseSpeed * speedVariance * heightFactor;
+        const radius =
+          mKind === 'monster_dragon_heart' ||
+          mKind === 'monster_hell_meteor' ||
+          mKind === 'monster_curse'
+            ? Math.max(17, Math.min(21, sim.width * 0.027))
+            : Math.max(15, Math.min(19, sim.width * 0.024));
+        const driftRange = isHazard
+          ? mCfg.lateralDrift
+          : mCfg.lateralDrift * 0.68;
+
+        sim.items.push({
+          id: sim.nextId++,
+          kind: mKind,
+          x: spawnX,
+          y: -radius - 10,
+          radius,
+          speed,
+          vx: driftRange > 0 ? (Math.random() * 2 - 1) * driftRange : 0,
+          rotation: 0,
+          rotSpeed: isHazard ? (Math.random() > 0.5 ? 1 : -1) * 1.5 : 0.4,
+          pulsePhase: Math.random() * Math.PI * 2,
+        });
+        return;
+      }
+
+      if (gameModeRef.current === 'space') {
+        const sStage = Math.min(stageNumRef.current, TOTAL_SPACE_STAGES);
+        const sCfg = SPACE_STAGES[sStage - 1];
+        const bossActive = sim.spaceBoss !== null && sim.spaceBoss.hp > 0;
+        const supremeBossActive = Boolean(
+          bossActive && sim.spaceBoss?.config.isSupreme
+        );
+        const effectiveHazardChance = supremeBossActive
+          ? sCfg.hazardChance * 0.72
+          : bossActive
+          ? sCfg.hazardChance * 0.56
+          : sCfg.hazardChance;
+        const isHazard = Math.random() < effectiveHazardChance;
+        const sKind = pickSpaceItemKind(sStage, isHazard);
+        const sStat = SPACE_ITEM_STATS[sKind];
+
+        const margin = Math.max(30, sim.playerWidth * 0.42);
+        const usableW = Math.max(80, sim.width - margin * 2);
+        let spawnX = margin + Math.random() * usableW;
+        for (let attempt = 0; attempt < 6; attempt++) {
+          const candidate = margin + Math.random() * usableW;
+          const tooCloseToRecentTop = sim.items.some(
+            (item) => item.y < 105 && Math.abs(item.x - candidate) < 62
+          );
+          const tooCloseToHazard =
+            isHazard && Math.abs(candidate - sim.lastHazardX) < 58;
+          if (!tooCloseToRecentTop && !tooCloseToHazard) {
+            spawnX = candidate;
+            break;
+          }
+        }
+        if (isHazard) {
+          sim.lastHazardX = spawnX;
+        }
+
+        const speedVariance = sStat.speedMul * (0.9 + Math.random() * 0.22);
+        const heightFactor = Math.max(0.82, Math.min(1.22, sim.height / 540));
+        const speed = sCfg.baseSpeed * speedVariance * heightFactor;
+        const radius =
+          sKind === 'space_omega_crystal' ||
+          sKind === 'space_galaxy' ||
+          sKind === 'space_blackhole' ||
+          sKind === 'space_supernova_core' ||
+          sKind === 'space_antimatter' ||
+          sKind === 'space_void_crystal'
+            ? Math.max(18, Math.min(22, sim.width * 0.028))
+            : sKind === 'space_crown_nova' ||
+              sKind === 'space_diamond_meteor' ||
+              sKind === 'space_quasar_orb' ||
+              sKind === 'space_saturn' ||
+              sKind === 'space_solar' ||
+              sKind === 'space_gravity_orb' ||
+              sKind === 'space_rogue_satellite' ||
+              sKind === 'space_emp_ring'
+            ? Math.max(16, Math.min(20, sim.width * 0.025))
+            : Math.max(15, Math.min(19, sim.width * 0.024));
+        const driftRange = isHazard ? sCfg.lateralDrift : sCfg.lateralDrift * 0.72;
+
+        sim.items.push({
+          id: sim.nextId++,
+          kind: sKind,
+          x: spawnX,
+          y: -radius - 10,
+          radius,
+          speed,
+          vx: driftRange > 0 ? (Math.random() * 2 - 1) * driftRange : 0,
+          rotation: 0,
+          rotSpeed:
+            sKind === 'space_omega_crystal' ||
+            sKind === 'space_quasar_orb' ||
+            sKind === 'space_emerald_star' ||
+            sKind === 'space_galaxy' ||
+            sKind === 'space_blackhole' ||
+            sKind === 'space_pulsar' ||
+            sKind === 'space_debris' ||
+            sKind === 'space_meteor' ||
+            sKind === 'space_cryo_mine' ||
+            sKind === 'space_solar' ||
+            sKind === 'space_emp_ring' ||
+            sKind === 'space_solar_flare' ||
+            sKind === 'space_rogue_satellite' ||
+            sKind === 'space_gravity_orb' ||
+            sKind === 'space_antimatter' ||
+            sKind === 'space_supernova_core'
+              ? (Math.random() > 0.5 ? 1 : -1) * 1.4
+              : 0,
+          pulsePhase: Math.random() * Math.PI * 2,
+        });
+        return;
+      }
 
       if (gameModeRef.current === 'gold') {
         const gCfg =
@@ -4179,6 +5754,23 @@ export default function App() {
           m.x = Math.random() * sim.width;
         }
       }
+      for (const m of sim.spaceMotifs) {
+        m.y += m.speed * starSpeedMul * dt;
+        m.rotation += m.rotSpeed * dt;
+        if (m.y > sim.height + m.size + 24) {
+          m.y = -m.size - 24;
+          m.x = Math.random() * sim.width;
+        }
+      }
+      for (const m of sim.monsterMotifs) {
+        // Volcanic embers rise upward
+        m.y -= m.speed * starSpeedMul * dt;
+        m.rotation += m.rotSpeed * dt;
+        if (m.y < -m.size - 24) {
+          m.y = sim.height + m.size + 24;
+          m.x = Math.random() * sim.width;
+        }
+      }
 
       if (statusRef.current !== 'PLAYING') {
         if (
@@ -4206,6 +5798,12 @@ export default function App() {
               continue;
             }
             ft.y += ft.vy * dt;
+          }
+          for (let i = sim.bossBeams.length - 1; i >= 0; i--) {
+            sim.bossBeams[i].life -= dt;
+            if (sim.bossBeams[i].life <= 0) {
+              sim.bossBeams.splice(i, 1);
+            }
           }
           if (sim.shakeTimer > 0) sim.shakeTimer = Math.max(0, sim.shakeTimer - dt);
           if (sim.hitFlashAlpha > 0)
@@ -4306,12 +5904,272 @@ export default function App() {
           : gameModeRef.current === 'gold'
           ? GOLD_STAGES[Math.min(stageNumRef.current - 1, TOTAL_GOLD_STAGES - 1)]
               .spawnInterval
+          : gameModeRef.current === 'space'
+          ? SPACE_STAGES[Math.min(stageNumRef.current - 1, TOTAL_SPACE_STAGES - 1)]
+              .spawnInterval
+          : gameModeRef.current === 'monster'
+          ? MONSTER_STAGES[
+              Math.min(stageNumRef.current - 1, TOTAL_MONSTER_STAGES - 1)
+            ].spawnInterval
           : STAGES[Math.min(stageNumRef.current - 1, TOTAL_STAGES - 1)]
               .spawnInterval;
       sim.spawnTimer -= simDt;
       if (sim.spawnTimer <= 0) {
         spawnFallingObject();
         sim.spawnTimer = activeSpawnInterval * (0.82 + Math.random() * 0.36);
+      }
+
+      // Tick Boss counter-attack plasma beams
+      for (let i = sim.bossBeams.length - 1; i >= 0; i--) {
+        sim.bossBeams[i].life -= dt;
+        if (sim.bossBeams[i].life <= 0) {
+          sim.bossBeams.splice(i, 1);
+        }
+      }
+
+      // Space Boss patrol, telegraph charge, and aimed cosmic barrage
+      if (
+        gameModeRef.current === 'space' &&
+        sim.spaceBoss &&
+        sim.spaceBoss.hp > 0
+      ) {
+        const boss = sim.spaceBoss;
+        const bCfg = boss.config;
+        boss.pulsePhase += dt * (boss.enraged ? 4.4 : 2.8);
+        if (boss.hitFlash > 0) {
+          boss.hitFlash = Math.max(0, boss.hitFlash - dt * 6.5);
+        }
+        if (boss.recoilY > 0) {
+          boss.recoilY = Math.max(0, boss.recoilY - dt * 7.5);
+        }
+
+        const bossMargin = Math.min(76, Math.max(54, sim.width * 0.14));
+        const patrolMul = boss.enraged ? 1.38 : 1;
+        const speedSign = boss.vx >= 0 ? 1 : -1;
+        boss.vx = speedSign * bCfg.patrolSpeed * patrolMul;
+        boss.x += boss.vx * dt;
+        if (boss.x < bossMargin) {
+          boss.x = bossMargin;
+          boss.vx = Math.abs(boss.vx);
+        } else if (boss.x > sim.width - bossMargin) {
+          boss.x = sim.width - bossMargin;
+          boss.vx = -Math.abs(boss.vx);
+        }
+        boss.y =
+          boss.baseY + Math.sin(boss.pulsePhase * 1.45) * 5 - boss.recoilY * 9;
+
+        if (boss.telegraphTimer > 0) {
+          boss.telegraphTimer -= dt;
+          if (boss.telegraphTimer <= 0) {
+            boss.telegraphTimer = 0;
+            const stageCfg =
+              SPACE_STAGES[
+                Math.min(stageNumRef.current - 1, TOTAL_SPACE_STAGES - 1)
+              ];
+            const heightFactor = Math.max(0.82, Math.min(1.22, sim.height / 540));
+            const count = bCfg.barrageCount + (boss.enraged ? 1 : 0);
+            const spreadStep = Math.min(82, Math.max(56, sim.width * 0.13));
+            const aimCenter = Math.max(
+              70,
+              Math.min(sim.width - 70, boss.x * 0.6 + sim.playerX * 0.4)
+            );
+            for (let k = 0; k < count; k++) {
+              const offsetIdx = k - (count - 1) / 2;
+              const kind =
+                bCfg.attackKinds[
+                  Math.floor(Math.random() * bCfg.attackKinds.length)
+                ];
+              const stat = SPACE_ITEM_STATS[kind];
+              const launchX = Math.max(
+                26,
+                Math.min(sim.width - 26, boss.x + offsetIdx * 24)
+              );
+              const targetX = aimCenter + offsetIdx * spreadStep;
+              const vx = Math.max(
+                -140,
+                Math.min(140, (targetX - launchX) * 0.65)
+              );
+              const speed =
+                stageCfg.baseSpeed *
+                Math.min(1.32, stat.speedMul) *
+                (boss.enraged ? 1.06 : 0.96) *
+                heightFactor;
+              sim.items.push({
+                id: sim.nextId++,
+                kind,
+                x: launchX,
+                y: boss.y + 24,
+                radius: Math.max(15, Math.min(19, sim.width * 0.025)),
+                speed,
+                vx,
+                rotation: 0,
+                rotSpeed: (Math.random() > 0.5 ? 1 : -1) * 1.8,
+                pulsePhase: Math.random() * Math.PI * 2,
+              });
+            }
+            // Drop 1-2 flank positive cosmic orbs so the player always has ammo to counter-fire
+            const orbCount = boss.enraged || bCfg.isSupreme ? 2 : 1;
+            for (let m = 0; m < orbCount; m++) {
+              const posKind = pickSpaceItemKind(stageNumRef.current, false);
+              const posStat = SPACE_ITEM_STATS[posKind];
+              const flankSide = m === 0 ? (Math.random() > 0.5 ? 1 : -1) : -1;
+              const orbX = Math.max(
+                30,
+                Math.min(
+                  sim.width - 30,
+                  boss.x + flankSide * (70 + Math.random() * 75)
+                )
+              );
+              sim.items.push({
+                id: sim.nextId++,
+                kind: posKind,
+                x: orbX,
+                y: boss.y + 18,
+                radius: Math.max(15, Math.min(19, sim.width * 0.024)),
+                speed: stageCfg.baseSpeed * posStat.speedMul * 0.92 * heightFactor,
+                vx: flankSide * 28,
+                rotation: 0,
+                rotSpeed: 1.2,
+                pulsePhase: Math.random() * Math.PI * 2,
+              });
+            }
+            spawnBurst(boss.x, boss.y + 22, bCfg.primaryColor, bCfg.isSupreme ? 22 : 14, 1.05);
+            boss.attackTimer =
+              bCfg.attackInterval * (boss.enraged ? 0.78 : 1);
+          }
+        } else {
+          boss.attackTimer -= dt;
+          if (boss.attackTimer <= 0) {
+            boss.telegraphTimer = bCfg.isSupreme ? 0.62 : 0.72;
+            audioRef.current.playBossWarning();
+          }
+        }
+      }
+
+      // Monster Stages Boss patrol, roar telegraph, and aimed beast barrage
+      if (
+        gameModeRef.current === 'monster' &&
+        sim.monsterBoss &&
+        sim.monsterBoss.hp > 0
+      ) {
+        const boss = sim.monsterBoss;
+        const mCfg = boss.config;
+        boss.pulsePhase += dt * (boss.enraged ? 4.2 : 2.7);
+        if (boss.hitFlash > 0) {
+          boss.hitFlash = Math.max(0, boss.hitFlash - dt * 6.5);
+        }
+        if (boss.recoilY > 0) {
+          boss.recoilY = Math.max(0, boss.recoilY - dt * 7.5);
+        }
+
+        const bossMargin = Math.min(78, Math.max(56, sim.width * 0.14));
+        const patrolMul = boss.enraged ? 1.42 : 1;
+        const speedSign = boss.vx >= 0 ? 1 : -1;
+        boss.vx = speedSign * mCfg.patrolSpeed * patrolMul;
+        boss.x += boss.vx * dt;
+        if (boss.x < bossMargin) {
+          boss.x = bossMargin;
+          boss.vx = Math.abs(boss.vx);
+        } else if (boss.x > sim.width - bossMargin) {
+          boss.x = sim.width - bossMargin;
+          boss.vx = -Math.abs(boss.vx);
+        }
+        boss.y =
+          boss.baseY + Math.sin(boss.pulsePhase * 1.35) * 4.5 - boss.recoilY * 8;
+
+        if (boss.telegraphTimer > 0) {
+          boss.telegraphTimer -= dt;
+          if (boss.telegraphTimer <= 0) {
+            boss.telegraphTimer = 0;
+            const stageCfg =
+              MONSTER_STAGES[
+                Math.min(stageNumRef.current - 1, TOTAL_MONSTER_STAGES - 1)
+              ];
+            const heightFactor = Math.max(0.82, Math.min(1.22, sim.height / 540));
+            const count =
+              mCfg.barrageCount + (boss.enraged ? (mCfg.isGrandMonster ? 2 : 1) : 0);
+            const spreadStep = Math.min(84, Math.max(54, sim.width * 0.135));
+            const aimCenter = Math.max(
+              70,
+              Math.min(sim.width - 70, boss.x * 0.48 + sim.playerX * 0.52)
+            );
+            for (let k = 0; k < count; k++) {
+              const offsetIdx = k - (count - 1) / 2;
+              const kind =
+                mCfg.attackKinds[
+                  Math.floor(Math.random() * mCfg.attackKinds.length)
+                ];
+              const stat = MONSTER_ITEM_STATS[kind];
+              const launchX = Math.max(
+                26,
+                Math.min(sim.width - 26, boss.x + offsetIdx * 24)
+              );
+              const targetX = aimCenter + offsetIdx * spreadStep;
+              const vx = Math.max(
+                -155,
+                Math.min(155, (targetX - launchX) * 0.72)
+              );
+              const speed =
+                stageCfg.baseSpeed *
+                Math.min(1.38, stat.speedMul) *
+                (boss.enraged ? 1.2 : 1.08) *
+                heightFactor;
+              sim.items.push({
+                id: sim.nextId++,
+                kind,
+                x: launchX,
+                y: boss.y + 26,
+                radius: Math.max(15, Math.min(19, sim.width * 0.025)),
+                speed,
+                vx,
+                rotation: 0,
+                rotSpeed: (Math.random() > 0.5 ? 1 : -1) * 2.1,
+                pulsePhase: Math.random() * Math.PI * 2,
+              });
+            }
+            // Drop 1-2 flank positive hunter relics so the player always has ammo to strike back
+            const orbCount = boss.enraged || mCfg.isGrandMonster ? 2 : 1;
+            for (let m = 0; m < orbCount; m++) {
+              const posKind = pickMonsterItemKind(stageNumRef.current, false);
+              const posStat = MONSTER_ITEM_STATS[posKind];
+              const flankSide = m === 0 ? (Math.random() > 0.5 ? 1 : -1) : -1;
+              const orbX = Math.max(
+                30,
+                Math.min(
+                  sim.width - 30,
+                  boss.x + flankSide * (68 + Math.random() * 72)
+                )
+              );
+              sim.items.push({
+                id: sim.nextId++,
+                kind: posKind,
+                x: orbX,
+                y: boss.y + 18,
+                radius: Math.max(15, Math.min(19, sim.width * 0.024)),
+                speed: stageCfg.baseSpeed * posStat.speedMul * 0.92 * heightFactor,
+                vx: flankSide * 26,
+                rotation: 0,
+                rotSpeed: 0.7,
+                pulsePhase: Math.random() * Math.PI * 2,
+              });
+            }
+            spawnBurst(
+              boss.x,
+              boss.y + 24,
+              mCfg.primaryColor,
+              mCfg.isGrandMonster ? 22 : 14,
+              1.12
+            );
+            boss.attackTimer =
+              mCfg.attackInterval * (boss.enraged ? 0.76 : 1);
+          }
+        } else {
+          boss.attackTimer -= dt;
+          if (boss.attackTimer <= 0) {
+            boss.telegraphTimer = mCfg.isGrandMonster ? 0.54 : 0.62;
+            audioRef.current.playBossWarning();
+          }
+        }
       }
 
       // Collision checks
@@ -4338,11 +6196,39 @@ export default function App() {
 
         const isFruitWorld = gameModeRef.current === 'fruit';
         const isGoldWorld = gameModeRef.current === 'gold';
+        const isSpaceWorld = gameModeRef.current === 'space';
+        const isMonsterWorld = gameModeRef.current === 'monster';
         const isPoint = isFruitWorld
           ? FRUIT_ITEM_STATS[item.kind as FruitItemKind]?.isFruit ?? false
           : isGoldWorld
           ? GOLD_ITEM_STATS[item.kind as GoldItemKind]?.isTreasure ?? false
+          : isSpaceWorld
+          ? SPACE_ITEM_STATS[item.kind as SpaceItemKind]?.isPositive ?? false
+          : isMonsterWorld
+          ? MONSTER_ITEM_STATS[item.kind as MonsterItemKind]?.category === 'positive'
           : isPositiveNormalKind(item.kind);
+
+        // Cosmic Magnet upgrade: pulls nearby positive cosmic items toward the spaceship
+        if (isSpaceWorld && isPoint && shopRef.current.spaceMagnetLevel > 0) {
+          const magnetLvl = shopRef.current.spaceMagnetLevel;
+          const magnetRadius =
+            magnetLvl === 1 ? 145 : magnetLvl === 2 ? 205 : 270;
+          const magnetPull =
+            magnetLvl === 1 ? 220 : magnetLvl === 2 ? 340 : 460;
+          const mdx = sim.playerX - item.x;
+          const mdy = sim.playerY - item.y;
+          const distSq = mdx * mdx + mdy * mdy;
+          if (
+            distSq > 16 &&
+            distSq < magnetRadius * magnetRadius &&
+            item.y < sim.playerY + 14
+          ) {
+            const dist = Math.sqrt(distSq);
+            const strength = (1 - dist / magnetRadius) * magnetPull * simDt;
+            item.x += (mdx / dist) * strength;
+            item.y += (mdy / dist) * strength * 0.45;
+          }
+        }
 
         if (item.y - item.radius > sim.height + 24) {
           if (isPoint) {
@@ -4367,6 +6253,811 @@ export default function App() {
 
         if (dx * dx + dy * dy <= effectiveRadius * effectiveRadius) {
           sim.items.splice(i, 1);
+
+          if (isMonsterWorld) {
+            const mKind = item.kind as MonsterItemKind;
+            const mStats = MONSTER_ITEM_STATS[mKind];
+
+            // Discover & unlock this item in Monster Index
+            if (!discoveredMonsterItemsRef.current.includes(mKind)) {
+              const updated = [...discoveredMonsterItemsRef.current, mKind];
+              discoveredMonsterItemsRef.current = updated;
+              setDiscoveredMonsterItems(updated);
+              try {
+                window.localStorage.setItem(
+                  DISCOVERED_MONSTER_ITEMS_STORAGE_KEY,
+                  JSON.stringify(updated)
+                );
+              } catch {
+                // Ignore storage errors
+              }
+            }
+
+            if (mStats.category === 'positive') {
+              const value = mStats.points;
+              const nextScore = scoreRef.current + value;
+              scoreRef.current = nextScore;
+              setScore(nextScore);
+
+              const activeMonster =
+                sim.monsterBoss && sim.monsterBoss.hp > 0
+                  ? sim.monsterBoss
+                  : null;
+              let nextStagePoints = stagePointsRef.current + value;
+
+              if (activeMonster) {
+                activeMonster.hp = Math.max(0, activeMonster.hp - value);
+                activeMonster.hitFlash = 1;
+                activeMonster.recoilY = 1;
+                nextStagePoints = activeMonster.maxHp - activeMonster.hp;
+
+                sim.bossBeams.push({
+                  fromX: sim.playerX,
+                  fromY: sim.playerY - 14,
+                  toX: activeMonster.x,
+                  toY: activeMonster.y + 18,
+                  color: mStats.color,
+                  life: 0.24,
+                  maxLife: 0.24,
+                });
+                spawnBurst(
+                  activeMonster.x,
+                  activeMonster.y + 12,
+                  mStats.color,
+                  value >= 9 ? 16 : 10,
+                  1.05
+                );
+                sim.floatingTexts.push({
+                  x: activeMonster.x + (Math.random() - 0.5) * 34,
+                  y: activeMonster.y + 28,
+                  vy: -42,
+                  text: `-${value}`,
+                  color: '#fef08a',
+                  life: 0.65,
+                  maxLife: 0.65,
+                });
+
+                if (
+                  activeMonster.hp > 0 &&
+                  activeMonster.hp / activeMonster.maxHp <= 0.4 &&
+                  !activeMonster.enrageAnnounced
+                ) {
+                  activeMonster.enraged = true;
+                  activeMonster.enrageAnnounced = true;
+                  sim.shakeTimer = 0.28;
+                  sim.shakeIntensity = 6.5;
+                  spawnBurst(
+                    activeMonster.x,
+                    activeMonster.y,
+                    '#f43f5e',
+                    22,
+                    1.25
+                  );
+                  sim.floatingTexts.push({
+                    x: activeMonster.x,
+                    y: activeMonster.y + 44,
+                    vy: -32,
+                    text: langRef.current === 'ar' ? '🔥 هائج!' : '🔥 ENRAGED!',
+                    color: '#fde047',
+                    life: 1.25,
+                    maxLife: 1.25,
+                  });
+                  audioRef.current.playBossWarning();
+                }
+              }
+
+              stagePointsRef.current = nextStagePoints;
+              setStagePoints(nextStagePoints);
+
+              if (nextScore > bestScoreRef.current) {
+                bestScoreRef.current = nextScore;
+                setBestScore(nextScore);
+                setIsNewBest(true);
+                try {
+                  window.localStorage.setItem(
+                    BEST_SCORE_STORAGE_KEY,
+                    String(nextScore)
+                  );
+                } catch {
+                  // Ignore storage errors
+                }
+              }
+
+              if (mStats.clearsSlow) {
+                sim.slowTimer = 0;
+                sim.heavySlowTimer = 0;
+                sim.freezeTimer = 0;
+              }
+              if (mStats.grantsShield) {
+                sim.shieldTimer = Math.max(sim.shieldTimer, mStats.grantsShield);
+              }
+
+              sim.playerBounce = 1;
+              sim.playerGlowColor = mStats.color;
+              sim.playerGlowAlpha = 1;
+
+              spawnBurst(item.x, item.y, mStats.color, value >= 9 ? 20 : 12, 1.06);
+              const bonusLabel = mStats.grantsShield
+                ? langRef.current === 'ar'
+                  ? `+${value} · درع ${mStats.grantsShield}ث!`
+                  : `+${value} · ${mStats.grantsShield}s Shield!`
+                : mStats.clearsSlow
+                ? langRef.current === 'ar'
+                  ? `+${value} · فك البطء!`
+                  : `+${value} · Cleansed!`
+                : `+${value}`;
+              sim.floatingTexts.push({
+                x: item.x,
+                y: item.y - 10,
+                vy: -56,
+                text: bonusLabel,
+                color: '#fef08a',
+                life: 0.78,
+                maxLife: 0.78,
+              });
+              tryAwardPinkCoins(item.x, item.y);
+
+              const currentMonsterCfg =
+                MONSTER_STAGES[
+                  Math.min(stageNumRef.current - 1, TOTAL_MONSTER_STAGES - 1)
+                ];
+              const stageCleared = activeMonster
+                ? activeMonster.hp <= 0
+                : nextStagePoints >= currentMonsterCfg.pointsNeeded;
+
+              if (stageCleared) {
+                const clearedStage = stageNumRef.current;
+                const alreadyCompleted =
+                  completedMonsterStagesRef.current.includes(clearedStage);
+                const bossCfg =
+                  activeMonster?.config ?? getMonsterBossConfig(clearedStage);
+                const earnedCoins = alreadyCompleted
+                  ? 0
+                  : Math.max(
+                      bossCfg.firstClearCoins,
+                      getMonsterStageClearCoins(monsterSkullsRef.current)
+                    );
+                setLastEarnedCoins(earnedCoins);
+                if (earnedCoins > 0) {
+                  const nextCoins = coinsRef.current + earnedCoins;
+                  coinsRef.current = nextCoins;
+                  setCoins(nextCoins);
+                  try {
+                    window.localStorage.setItem(
+                      COINS_STORAGE_KEY,
+                      String(nextCoins)
+                    );
+                  } catch {
+                    // Ignore storage errors
+                  }
+                }
+
+                const earnedPink = alreadyCompleted
+                  ? bossCfg.replayPinkCoins
+                  : bossCfg.firstClearPinkCoins;
+                setLastEarnedPinkCoins(earnedPink);
+                if (earnedPink > 0) {
+                  const nextPink = pinkCoinsRef.current + earnedPink;
+                  pinkCoinsRef.current = nextPink;
+                  setPinkCoins(nextPink);
+                  try {
+                    window.localStorage.setItem(
+                      PINK_COINS_STORAGE_KEY,
+                      String(nextPink)
+                    );
+                  } catch {
+                    // Ignore storage errors
+                  }
+                }
+
+                if (!alreadyCompleted) {
+                  const updated = [
+                    ...completedMonsterStagesRef.current,
+                    clearedStage,
+                  ];
+                  completedMonsterStagesRef.current = updated;
+                  setCompletedMonsterStages(updated);
+                  try {
+                    window.localStorage.setItem(
+                      COMPLETED_MONSTER_STAGES_STORAGE_KEY,
+                      JSON.stringify(updated)
+                    );
+                  } catch {
+                    // Ignore storage errors
+                  }
+                }
+
+                if (activeMonster) {
+                  const bx = activeMonster.x;
+                  const by = activeMonster.y;
+                  sim.shakeTimer = bossCfg.isGrandMonster ? 0.58 : 0.38;
+                  sim.shakeIntensity = bossCfg.isGrandMonster ? 12 : 8;
+                  sim.items = [];
+                  spawnBurst(bx, by, bossCfg.primaryColor, 34, 1.55);
+                  spawnBurst(bx, by, bossCfg.secondaryColor, 26, 1.35);
+                  spawnBurst(bx, by, '#fde047', 18, 1.25);
+                }
+
+                sim.input.pointerActive = false;
+                sim.input.pointerId = null;
+                sim.input.leftBtn = false;
+                sim.input.rightBtn = false;
+
+                if (clearedStage >= TOTAL_MONSTER_STAGES) {
+                  statusRef.current = 'VICTORY';
+                  setStatus('VICTORY');
+                  spawnBurst(sim.width * 0.35, sim.height * 0.4, '#f43f5e', 26, 1.35);
+                  spawnBurst(sim.width * 0.65, sim.height * 0.4, '#fbbf24', 26, 1.35);
+                  audioRef.current.playBossDefeat();
+                } else {
+                  statusRef.current = 'STAGE_CLEAR';
+                  setStatus('STAGE_CLEAR');
+                  spawnBurst(sim.width * 0.35, sim.height * 0.42, '#f43f5e', 18, 1.2);
+                  spawnBurst(sim.width * 0.65, sim.height * 0.42, '#fb923c', 18, 1.2);
+                  audioRef.current.playBossDefeat();
+                }
+                streakRef.current = Math.min(streakRef.current + 1, 10);
+                break;
+              } else {
+                audioRef.current.playBossHit();
+                streakRef.current = Math.min(streakRef.current + 1, 10);
+              }
+            } else {
+              // Active shield barrier blocks monster attacks
+              if (sim.shieldTimer > 0) {
+                sim.playerGlowColor = '#34d399';
+                sim.playerGlowAlpha = 0.9;
+                spawnBurst(item.x, item.y, '#6ee7b7', 16, 1.1);
+                sim.floatingTexts.push({
+                  x: item.x,
+                  y: item.y - 12,
+                  vy: -50,
+                  text: langRef.current === 'ar' ? 'محمي!' : 'Shielded!',
+                  color: '#a7f3d0',
+                  life: 0.75,
+                  maxLife: 0.75,
+                });
+                audioRef.current.playBuyHeart();
+                continue;
+              }
+
+              // Shop Shield auto-activates on monster attack contact
+              if (sim.invulnTimer <= 0 && shopRef.current.shields > 0) {
+                const nextShop: ShopState = {
+                  ...shopRef.current,
+                  shields: Math.max(0, shopRef.current.shields - 1),
+                };
+                shopRef.current = nextShop;
+                setShop(nextShop);
+                persistShopState(nextShop);
+
+                sim.shieldTimer = SHIELD_DURATION;
+                sim.playerGlowColor = '#38bdf8';
+                sim.playerGlowAlpha = 1;
+                spawnBurst(item.x, item.y, '#7dd3fc', 22, 1.25);
+                sim.floatingTexts.push({
+                  x: item.x,
+                  y: item.y - 12,
+                  vy: -52,
+                  text:
+                    langRef.current === 'ar'
+                      ? `درع الحماية · ${SHIELD_DURATION}ث!`
+                      : `Shield · ${SHIELD_DURATION}s!`,
+                  color: '#bae6fd',
+                  life: 0.95,
+                  maxLife: 0.95,
+                });
+                audioRef.current.playBuyHeart();
+                continue;
+              }
+
+              // Monster attack hit (never heals the Monster!)
+              const penalty = Math.abs(mStats.points);
+              const nextScore = Math.max(0, scoreRef.current - penalty);
+              scoreRef.current = nextScore;
+              setScore(nextScore);
+              streakRef.current = 0;
+
+              if (mStats.slowDuration > 0) {
+                if (mStats.slowFactor <= 0.48) {
+                  sim.heavySlowTimer = Math.max(
+                    sim.heavySlowTimer,
+                    mStats.slowDuration
+                  );
+                } else {
+                  sim.slowTimer = Math.max(sim.slowTimer, mStats.slowDuration);
+                }
+              }
+              if (mStats.freezeDuration > 0) {
+                sim.freezeTimer = Math.max(sim.freezeTimer, mStats.freezeDuration);
+              }
+
+              if (mStats.skullDamage > 0 && sim.invulnTimer <= 0) {
+                const prevSkulls = monsterSkullsRef.current;
+                const nextSkulls = Math.max(0, prevSkulls - mStats.skullDamage);
+                monsterSkullsRef.current = nextSkulls;
+                setMonsterSkulls(nextSkulls);
+                if (
+                  prevSkulls >= MAX_MONSTER_SKULLS &&
+                  nextSkulls < MAX_MONSTER_SKULLS
+                ) {
+                  lastSkullRegenAtRef.current = Date.now();
+                  setNextSkullInMs(HEART_REGEN_MS);
+                }
+                persistMonsterSkullsState(nextSkulls, lastSkullRegenAtRef.current);
+
+                const isHeavyHaz = mStats.skullDamage >= 2;
+                sim.shakeTimer = isHeavyHaz ? 0.34 : 0.24;
+                sim.shakeIntensity = isHeavyHaz ? 10 : 7;
+                sim.hitFlashAlpha = isHeavyHaz ? 0.42 : 0.28;
+                sim.invulnTimer = 0.78;
+
+                spawnBurst(item.x, item.y, mStats.color, isHeavyHaz ? 22 : 14, 1.2);
+                const hazText = mStats.freezeDuration
+                  ? langRef.current === 'ar'
+                    ? `-${penalty} · تجميد · -${mStats.skullDamage} 💀`
+                    : `-${penalty} · Freeze · -${mStats.skullDamage} 💀`
+                  : mStats.slowDuration > 0
+                  ? langRef.current === 'ar'
+                    ? `-${penalty} · سم مبطئ · -${mStats.skullDamage} 💀`
+                    : `-${penalty} · Venom Slow · -${mStats.skullDamage} 💀`
+                  : langRef.current === 'ar'
+                  ? `-${penalty} · -${mStats.skullDamage} روح وحش`
+                  : `-${penalty} · -${mStats.skullDamage} 💀`;
+                sim.floatingTexts.push({
+                  x: item.x,
+                  y: item.y - 12,
+                  vy: -52,
+                  text: hazText,
+                  color: '#fecaca',
+                  life: 0.95,
+                  maxLife: 0.95,
+                });
+
+                if (nextSkulls <= 0) {
+                  statusRef.current = 'GAME_OVER';
+                  setStatus('GAME_OVER');
+                  audioRef.current.playGameOver();
+                  break;
+                } else {
+                  audioRef.current.playHazardHit(isHeavyHaz);
+                }
+              } else {
+                sim.shakeTimer = 0.16;
+                sim.shakeIntensity = 4.5;
+                spawnBurst(item.x, item.y, mStats.color, 12, 0.95);
+                sim.floatingTexts.push({
+                  x: item.x,
+                  y: item.y - 12,
+                  vy: -50,
+                  text:
+                    mStats.slowDuration > 0
+                      ? langRef.current === 'ar'
+                        ? `-${penalty} · تبطيء!`
+                        : `-${penalty} · Slow!`
+                      : `-${penalty}`,
+                  color: '#d9f99d',
+                  life: 0.85,
+                  maxLife: 0.85,
+                });
+                audioRef.current.playHazardHit(false);
+              }
+            }
+            continue;
+          }
+
+          if (isSpaceWorld) {
+            const sKind = item.kind as SpaceItemKind;
+            const sStats = SPACE_ITEM_STATS[sKind];
+
+            // Discover & unlock this item in the Space Index on catch/touch
+            if (!discoveredSpaceItemsRef.current.includes(sKind)) {
+              const updated = [...discoveredSpaceItemsRef.current, sKind];
+              discoveredSpaceItemsRef.current = updated;
+              setDiscoveredSpaceItems(updated);
+              try {
+                window.localStorage.setItem(
+                  DISCOVERED_SPACE_ITEMS_STORAGE_KEY,
+                  JSON.stringify(updated)
+                );
+              } catch {
+                // Ignore storage errors
+              }
+            }
+
+            if (sStats.isPositive) {
+              const value = sStats.pointsDelta;
+              const nextScore = scoreRef.current + value;
+              scoreRef.current = nextScore;
+              setScore(nextScore);
+
+              const activeBoss =
+                sim.spaceBoss && sim.spaceBoss.hp > 0 ? sim.spaceBoss : null;
+              let nextStagePoints = stagePointsRef.current + value;
+
+              if (activeBoss) {
+                activeBoss.hp = Math.max(0, activeBoss.hp - value);
+                activeBoss.hitFlash = 1;
+                activeBoss.recoilY = 1;
+                nextStagePoints = activeBoss.maxHp - activeBoss.hp;
+
+                sim.bossBeams.push({
+                  fromX: sim.playerX,
+                  fromY: sim.playerY - 14,
+                  toX: activeBoss.x,
+                  toY: activeBoss.y + 16,
+                  color: sStats.color,
+                  life: 0.24,
+                  maxLife: 0.24,
+                });
+                spawnBurst(
+                  activeBoss.x,
+                  activeBoss.y + 12,
+                  sStats.color,
+                  value >= 8 ? 16 : 10,
+                  1.05
+                );
+                sim.floatingTexts.push({
+                  x: activeBoss.x + (Math.random() - 0.5) * 34,
+                  y: activeBoss.y + 26,
+                  vy: -42,
+                  text: `-${value}`,
+                  color: '#fef08a',
+                  life: 0.65,
+                  maxLife: 0.65,
+                });
+
+                if (
+                  activeBoss.hp > 0 &&
+                  activeBoss.hp / activeBoss.maxHp <= 0.4 &&
+                  !activeBoss.enrageAnnounced
+                ) {
+                  activeBoss.enraged = true;
+                  activeBoss.enrageAnnounced = true;
+                  sim.shakeTimer = 0.3;
+                  sim.shakeIntensity = 7;
+                  spawnBurst(activeBoss.x, activeBoss.y, '#ef4444', 24, 1.3);
+                  sim.floatingTexts.push({
+                    x: activeBoss.x,
+                    y: activeBoss.y + 42,
+                    vy: -32,
+                    text: langRef.current === 'ar' ? '⚡ غاضب!' : '⚡ ENRAGED!',
+                    color: '#fca5a5',
+                    life: 1.25,
+                    maxLife: 1.25,
+                  });
+                  audioRef.current.playBossWarning();
+                }
+              }
+
+              stagePointsRef.current = nextStagePoints;
+              setStagePoints(nextStagePoints);
+
+              if (nextScore > bestScoreRef.current) {
+                bestScoreRef.current = nextScore;
+                setBestScore(nextScore);
+                setIsNewBest(true);
+                try {
+                  window.localStorage.setItem(
+                    BEST_SCORE_STORAGE_KEY,
+                    String(nextScore)
+                  );
+                } catch {
+                  // Ignore storage errors
+                }
+              }
+
+              if (sStats.clearsSlow) {
+                sim.slowTimer = 0;
+                sim.heavySlowTimer = 0;
+                sim.freezeTimer = 0;
+              }
+              if (sStats.shieldDuration) {
+                sim.shieldTimer = Math.max(sim.shieldTimer, sStats.shieldDuration);
+              }
+
+              sim.playerBounce = 1;
+              sim.playerGlowColor = sStats.color;
+              sim.playerGlowAlpha = 1;
+
+              spawnBurst(item.x, item.y, sStats.color, value >= 8 ? 22 : 14, 1.08);
+              if (value >= 7) {
+                spawnBurst(item.x, item.y, '#fef08a', 8, 0.85);
+              }
+              const bonusLabel = sStats.shieldDuration
+                ? langRef.current === 'ar'
+                  ? `+${value} · درع ${sStats.shieldDuration}ث!`
+                  : `+${value} · ${sStats.shieldDuration}s Shield!`
+                : sStats.clearsSlow
+                ? langRef.current === 'ar'
+                  ? `+${value} · تسريع!`
+                  : `+${value} · Cleared!`
+                : `+${value}`;
+              sim.floatingTexts.push({
+                x: item.x,
+                y: item.y - 10,
+                vy: -56,
+                text: bonusLabel,
+                color: sStats.textColor,
+                life: 0.78,
+                maxLife: 0.78,
+              });
+              tryAwardPinkCoins(item.x, item.y);
+              tryAwardSpaceCoins(item.x, item.y, sKind);
+
+              const currentSpaceCfg =
+                SPACE_STAGES[
+                  Math.min(stageNumRef.current - 1, TOTAL_SPACE_STAGES - 1)
+                ];
+
+              const stageCleared = activeBoss
+                ? activeBoss.hp <= 0
+                : nextStagePoints >= currentSpaceCfg.pointsNeeded;
+
+              if (stageCleared) {
+                const clearedStage = stageNumRef.current;
+                const alreadyCompleted =
+                  completedSpaceStagesRef.current.includes(clearedStage);
+                const bossDefeated = activeBoss !== null;
+                const earnedCoins = alreadyCompleted
+                  ? 0
+                  : bossDefeated
+                  ? activeBoss.config.firstClearCoins
+                  : getSpaceStageClearCoins(starsRef.current);
+                setLastEarnedCoins(earnedCoins);
+                if (earnedCoins > 0) {
+                  const nextCoins = coinsRef.current + earnedCoins;
+                  coinsRef.current = nextCoins;
+                  setCoins(nextCoins);
+                  try {
+                    window.localStorage.setItem(
+                      COINS_STORAGE_KEY,
+                      String(nextCoins)
+                    );
+                  } catch {
+                    // Ignore storage errors
+                  }
+                }
+
+                const earnedSpaceCoins = bossDefeated
+                  ? alreadyCompleted
+                    ? activeBoss.config.replaySpaceCoins
+                    : activeBoss.config.firstClearSpaceCoins
+                  : getSpaceStageClearSpaceCoins(
+                      starsRef.current,
+                      !alreadyCompleted
+                    );
+                setLastEarnedSpaceCoins(earnedSpaceCoins);
+                if (earnedSpaceCoins > 0) {
+                  const nextSpaceCoins = spaceCoinsRef.current + earnedSpaceCoins;
+                  spaceCoinsRef.current = nextSpaceCoins;
+                  setSpaceCoins(nextSpaceCoins);
+                  try {
+                    window.localStorage.setItem(
+                      SPACE_COINS_STORAGE_KEY,
+                      String(nextSpaceCoins)
+                    );
+                  } catch {
+                    // Ignore storage errors
+                  }
+                }
+
+                if (!alreadyCompleted) {
+                  const updated = [
+                    ...completedSpaceStagesRef.current,
+                    clearedStage,
+                  ];
+                  completedSpaceStagesRef.current = updated;
+                  setCompletedSpaceStages(updated);
+                  try {
+                    window.localStorage.setItem(
+                      COMPLETED_SPACE_STAGES_STORAGE_KEY,
+                      JSON.stringify(updated)
+                    );
+                  } catch {
+                    // Ignore storage errors
+                  }
+                }
+
+                if (bossDefeated) {
+                  const bx = activeBoss.x;
+                  const by = activeBoss.y;
+                  sim.shakeTimer = 0.55;
+                  sim.shakeIntensity = 12;
+                  sim.items = [];
+                  spawnBurst(bx, by, activeBoss.config.primaryColor, 36, 1.65);
+                  spawnBurst(bx, by, activeBoss.config.secondaryColor, 28, 1.45);
+                  spawnBurst(bx - 28, by + 10, '#ffffff', 18, 1.25);
+                  spawnBurst(bx + 28, by - 10, '#fde047', 18, 1.25);
+                }
+
+                sim.input.pointerActive = false;
+                sim.input.pointerId = null;
+                sim.input.leftBtn = false;
+                sim.input.rightBtn = false;
+
+                if (clearedStage >= TOTAL_SPACE_STAGES) {
+                  statusRef.current = 'VICTORY';
+                  setStatus('VICTORY');
+                  spawnBurst(sim.width * 0.35, sim.height * 0.4, '#c084fc', 26, 1.35);
+                  spawnBurst(sim.width * 0.65, sim.height * 0.4, '#38bdf8', 26, 1.35);
+                  if (bossDefeated) {
+                    audioRef.current.playBossDefeat();
+                  } else {
+                    audioRef.current.playVictory();
+                  }
+                } else {
+                  statusRef.current = 'STAGE_CLEAR';
+                  setStatus('STAGE_CLEAR');
+                  spawnBurst(sim.width * 0.35, sim.height * 0.42, '#c084fc', 18, 1.2);
+                  spawnBurst(sim.width * 0.65, sim.height * 0.42, '#38bdf8', 18, 1.2);
+                  if (bossDefeated) {
+                    audioRef.current.playBossDefeat();
+                  } else {
+                    audioRef.current.playStageUp();
+                  }
+                }
+                streakRef.current = Math.min(streakRef.current + 1, 10);
+                break;
+              } else {
+                if (activeBoss) {
+                  audioRef.current.playBossHit();
+                } else {
+                  audioRef.current.playCatch(streakRef.current, value >= 6);
+                }
+                streakRef.current = Math.min(streakRef.current + 1, 10);
+              }
+            } else {
+              // Active shield barrier blocks all cosmic hazards cleanly
+              if (sim.shieldTimer > 0) {
+                sim.playerGlowColor = '#34d399';
+                sim.playerGlowAlpha = 0.9;
+                spawnBurst(item.x, item.y, '#6ee7b7', 16, 1.1);
+                sim.floatingTexts.push({
+                  x: item.x,
+                  y: item.y - 12,
+                  vy: -50,
+                  text: langRef.current === 'ar' ? 'محمي!' : 'Shielded!',
+                  color: '#a7f3d0',
+                  life: 0.75,
+                  maxLife: 0.75,
+                });
+                audioRef.current.playBuyHeart();
+                continue;
+              }
+
+              // Shop Shield auto-activates on cosmic hazard contact
+              if (sim.invulnTimer <= 0 && shopRef.current.shields > 0) {
+                const nextShop: ShopState = {
+                  ...shopRef.current,
+                  shields: Math.max(0, shopRef.current.shields - 1),
+                };
+                shopRef.current = nextShop;
+                setShop(nextShop);
+                persistShopState(nextShop);
+
+                sim.shieldTimer = SHIELD_DURATION;
+                sim.playerGlowColor = '#38bdf8';
+                sim.playerGlowAlpha = 1;
+                spawnBurst(item.x, item.y, '#7dd3fc', 22, 1.25);
+                sim.floatingTexts.push({
+                  x: item.x,
+                  y: item.y - 12,
+                  vy: -52,
+                  text:
+                    langRef.current === 'ar'
+                      ? `درع الحماية · ${SHIELD_DURATION}ث!`
+                      : `Shield · ${SHIELD_DURATION}s!`,
+                  color: '#bae6fd',
+                  life: 0.95,
+                  maxLife: 0.95,
+                });
+                audioRef.current.playBuyHeart();
+                continue;
+              }
+
+              // Cosmic hazard hit (on Boss Stages, hazards hurt score/stars without healing the Boss)
+              const penalty = Math.abs(sStats.pointsDelta);
+              if (!sim.spaceBoss || sim.spaceBoss.hp <= 0) {
+                const nextStagePoints = Math.max(0, stagePointsRef.current - penalty);
+                stagePointsRef.current = nextStagePoints;
+                setStagePoints(nextStagePoints);
+              }
+
+              const nextScore = Math.max(0, scoreRef.current - penalty);
+              scoreRef.current = nextScore;
+              setScore(nextScore);
+              streakRef.current = 0;
+
+              if (sStats.slowDuration) {
+                sim.slowTimer = Math.max(sim.slowTimer, sStats.slowDuration);
+              }
+              if (sStats.heavySlowDuration) {
+                sim.heavySlowTimer = Math.max(
+                  sim.heavySlowTimer,
+                  sStats.heavySlowDuration
+                );
+              }
+              if (sStats.freezeDuration) {
+                sim.freezeTimer = Math.max(sim.freezeTimer, sStats.freezeDuration);
+              }
+
+              if (sStats.starDamage > 0 && sim.invulnTimer <= 0) {
+                const prevStars = starsRef.current;
+                const nextStars = Math.max(0, prevStars - sStats.starDamage);
+                starsRef.current = nextStars;
+                setStars(nextStars);
+                const currentMaxStars = MAX_STARS + shopRef.current.maxStarsUpgrade;
+                if (prevStars >= currentMaxStars && nextStars < currentMaxStars) {
+                  lastStarRegenAtRef.current = Date.now();
+                  setNextStarInMs(HEART_REGEN_MS);
+                }
+                persistStarsState(nextStars, lastStarRegenAtRef.current);
+
+                const isHeavyHaz = sStats.starDamage >= 2;
+                sim.shakeTimer = isHeavyHaz ? 0.34 : 0.24;
+                sim.shakeIntensity = isHeavyHaz ? 10 : 7;
+                sim.hitFlashAlpha = isHeavyHaz ? 0.42 : 0.28;
+                sim.invulnTimer = 0.75;
+
+                spawnBurst(item.x, item.y, sStats.color, isHeavyHaz ? 24 : 16, 1.2);
+                spawnBurst(item.x, item.y, '#c084fc', 8, 0.9);
+                const hazText = sStats.freezeDuration
+                  ? langRef.current === 'ar'
+                    ? `-${penalty} · تجميد ${sStats.freezeDuration}ث · -${sStats.starDamage}★`
+                    : `-${penalty} · Freeze ${sStats.freezeDuration}s · -${sStats.starDamage}★`
+                  : sStats.heavySlowDuration
+                  ? langRef.current === 'ar'
+                    ? `-${penalty} · تبطيء شديد · -${sStats.starDamage}★`
+                    : `-${penalty} · Heavy Slow · -${sStats.starDamage}★`
+                  : langRef.current === 'ar'
+                  ? `-${penalty} · -${sStats.starDamage} نجمة`
+                  : `-${penalty} · -${sStats.starDamage}★`;
+                sim.floatingTexts.push({
+                  x: item.x,
+                  y: item.y - 12,
+                  vy: -52,
+                  text: hazText,
+                  color: '#fecaca',
+                  life: 0.95,
+                  maxLife: 0.95,
+                });
+
+                if (nextStars <= 0) {
+                  statusRef.current = 'GAME_OVER';
+                  setStatus('GAME_OVER');
+                  audioRef.current.playGameOver();
+                  break;
+                } else {
+                  audioRef.current.playHazardHit(isHeavyHaz);
+                }
+              } else {
+                // Non-star hazard (debris, dust, ice shard, acid comet, EMP ring) or during invuln
+                sim.shakeTimer = sStats.heavySlowDuration ? 0.22 : 0.16;
+                sim.shakeIntensity = sStats.heavySlowDuration ? 6 : 4;
+                spawnBurst(item.x, item.y, sStats.color, 12, 0.95);
+                sim.floatingTexts.push({
+                  x: item.x,
+                  y: item.y - 12,
+                  vy: -50,
+                  text: sStats.heavySlowDuration
+                    ? langRef.current === 'ar'
+                      ? `-${penalty} · تبطيء شديد!`
+                      : `-${penalty} · Heavy Slow!`
+                    : sStats.slowDuration
+                    ? langRef.current === 'ar'
+                      ? `-${penalty} · تبطيء!`
+                      : `-${penalty} · Slow!`
+                    : `-${penalty}`,
+                  color: sStats.textColor,
+                  life: 0.85,
+                  maxLife: 0.85,
+                });
+                audioRef.current.playHazardHit(false);
+              }
+            }
+            continue;
+          }
 
           if (isGoldWorld) {
             const gKind = item.kind as GoldItemKind;
@@ -7033,6 +9724,57 @@ export default function App() {
       const scaleX = 1 + sim.playerBounce * 0.11;
       const scaleY = 1 - sim.playerBounce * 0.13;
 
+      if (gameModeRef.current === 'monster') {
+        drawMonsterHunterCatcher(
+          ctx,
+          sim.playerX,
+          sim.playerY,
+          w,
+          h,
+          performance.now() * 0.001,
+          sim.slowTimer > 0 || sim.heavySlowTimer > 0,
+          isFrozen
+        );
+        drawCatcherShieldBubble(
+          ctx,
+          sim.playerX,
+          sim.playerY,
+          w,
+          h,
+          shopRef.current.shields,
+          false,
+          sim.shieldTimer
+        );
+        return;
+      }
+
+      if (gameModeRef.current === 'space') {
+        drawSpaceShipCatcher(
+          ctx,
+          sim.playerX,
+          sim.playerY,
+          w,
+          h,
+          tilt,
+          scaleX,
+          scaleY,
+          sim.playerGlowColor,
+          sim.playerGlowAlpha,
+          shopRef.current.equippedSpaceSkin
+        );
+        drawCatcherShieldBubble(
+          ctx,
+          sim.playerX,
+          sim.playerY,
+          w,
+          h,
+          shopRef.current.shields,
+          false,
+          sim.shieldTimer
+        );
+        return;
+      }
+
       if (gameModeRef.current === 'gold') {
         drawGoldTreasureCatcher(
           ctx,
@@ -7428,9 +10170,13 @@ export default function App() {
 
       const isFruitRender = gameModeRef.current === 'fruit';
       const isGoldRender = gameModeRef.current === 'gold';
+      const isSpaceRender = gameModeRef.current === 'space';
+      const isMonsterRender = gameModeRef.current === 'monster';
       const isSpeedBoost =
         !isFruitRender &&
         !isGoldRender &&
+        !isSpaceRender &&
+        !isMonsterRender &&
         sim.speedBoostTimer > 0 &&
         statusRef.current === 'PLAYING';
 
@@ -7438,6 +10184,17 @@ export default function App() {
         drawFruitBackground(ctx, width, height, sim.fruitMotifs);
       } else if (isGoldRender) {
         drawGoldBackground(ctx, width, height, sim.goldMotifs);
+      } else if (isSpaceRender) {
+        drawSpaceBackground(ctx, width, height, sim.spaceMotifs);
+      } else if (isMonsterRender) {
+        drawMonsterBackground(
+          ctx,
+          width,
+          height,
+          sim.monsterMotifs,
+          performance.now() * 0.001,
+          Boolean(sim.monsterBoss?.config.isGrandMonster)
+        );
       } else {
         const bgGrad = ctx.createLinearGradient(0, 0, 0, height);
         bgGrad.addColorStop(0, '#070f1e');
@@ -7492,10 +10249,13 @@ export default function App() {
       }
 
       const railY = sim.playerY + sim.playerHeight / 2 + 10;
-      ctx.strokeStyle =
-        isFruitRender || isGoldRender
-          ? 'rgba(250, 204, 21, 0.28)'
-          : 'rgba(148, 163, 184, 0.2)';
+      ctx.strokeStyle = isMonsterRender
+        ? 'rgba(244, 63, 94, 0.38)'
+        : isSpaceRender
+        ? 'rgba(192, 132, 252, 0.34)'
+        : isFruitRender || isGoldRender
+        ? 'rgba(250, 204, 21, 0.28)'
+        : 'rgba(148, 163, 184, 0.2)';
       ctx.lineWidth = 2;
       ctx.beginPath();
       ctx.moveTo(20, railY);
@@ -7511,7 +10271,11 @@ export default function App() {
       );
       railGlow.addColorStop(
         0,
-        isFruitRender || isGoldRender
+        isMonsterRender
+          ? 'rgba(244, 63, 94, 0)'
+          : isSpaceRender
+          ? 'rgba(192, 132, 252, 0)'
+          : isFruitRender || isGoldRender
           ? 'rgba(250, 204, 21, 0)'
           : isSpeedBoost
           ? 'rgba(16, 185, 129, 0)'
@@ -7519,7 +10283,11 @@ export default function App() {
       );
       railGlow.addColorStop(
         0.5,
-        isGoldRender
+        isMonsterRender
+          ? 'rgba(251, 146, 60, 0.96)'
+          : isSpaceRender
+          ? 'rgba(192, 132, 252, 0.96)'
+          : isGoldRender
           ? 'rgba(251, 191, 36, 0.96)'
           : isFruitRender
           ? 'rgba(250, 204, 21, 0.92)'
@@ -7529,7 +10297,11 @@ export default function App() {
       );
       railGlow.addColorStop(
         1,
-        isFruitRender || isGoldRender
+        isMonsterRender
+          ? 'rgba(244, 63, 94, 0)'
+          : isSpaceRender
+          ? 'rgba(56, 189, 248, 0)'
+          : isFruitRender || isGoldRender
           ? 'rgba(250, 204, 21, 0)'
           : isSpeedBoost
           ? 'rgba(16, 185, 129, 0)'
@@ -7550,6 +10322,10 @@ export default function App() {
           drawFruitCanvasItem(ctx, item as FruitRenderItem);
         } else if (isGoldRender) {
           drawGoldCanvasItem(ctx, item as GoldRenderItem);
+        } else if (isSpaceRender) {
+          drawSpaceCanvasItem(ctx, item as SpaceRenderItem);
+        } else if (isMonsterRender) {
+          drawMonsterCanvasItem(ctx, item as MonsterRenderItem);
         } else if (isPositiveNormalKind(item.kind)) {
           if (activePlusSkin !== 'classic') {
             drawCustomPlusPoint(ctx, item, activePlusSkin);
@@ -7589,6 +10365,34 @@ export default function App() {
         }
       }
 
+      if ((isSpaceRender || isMonsterRender) && sim.bossBeams.length > 0) {
+        drawBossBeams(ctx, sim.bossBeams);
+      }
+
+      if (
+        isSpaceRender &&
+        statusRef.current !== 'START' &&
+        sim.spaceBoss &&
+        sim.spaceBoss.hp > 0
+      ) {
+        drawSpaceBoss(ctx, sim.spaceBoss, width, langRef.current);
+      }
+
+      if (
+        isMonsterRender &&
+        statusRef.current !== 'START' &&
+        sim.monsterBoss &&
+        sim.monsterBoss.hp > 0
+      ) {
+        drawMonsterBoss(
+          ctx,
+          sim.monsterBoss,
+          width,
+          performance.now() * 0.001,
+          langRef.current
+        );
+      }
+
       drawPlayer();
 
       for (const p of sim.particles) {
@@ -7614,29 +10418,40 @@ export default function App() {
       // Non-blocking Stage Banner notification on stage transitions
       if (sim.stageBannerTimer > 0 && statusRef.current === 'PLAYING') {
         const fade = Math.min(1, sim.stageBannerTimer / 0.35);
+        const hasLiveBoss =
+          (isSpaceRender && sim.spaceBoss !== null && sim.spaceBoss.hp > 0) ||
+          (isMonsterRender && sim.monsterBoss !== null && sim.monsterBoss.hp > 0);
         ctx.save();
         ctx.globalAlpha = fade;
-        const bannerW = Math.min(240, width - 40);
-        const bannerH = 54;
+        const bannerW = Math.min(hasLiveBoss ? 300 : 240, width - 32);
+        const bannerH = 56;
         const bx = (width - bannerW) / 2;
-        const by = Math.max(24, height * 0.14);
+        const by = hasLiveBoss
+          ? Math.max(138, height * 0.27)
+          : Math.max(24, height * 0.14);
 
         drawRoundedRectPath(ctx, bx, by, bannerW, bannerH, 10);
-        ctx.fillStyle = 'rgba(15, 26, 46, 0.88)';
+        ctx.fillStyle = hasLiveBoss
+          ? 'rgba(38, 10, 32, 0.92)'
+          : 'rgba(15, 26, 46, 0.88)';
         ctx.fill();
-        ctx.strokeStyle = 'rgba(56, 189, 248, 0.45)';
-        ctx.lineWidth = 1.2;
+        ctx.strokeStyle = hasLiveBoss
+          ? 'rgba(251, 191, 36, 0.72)'
+          : 'rgba(56, 189, 248, 0.45)';
+        ctx.lineWidth = hasLiveBoss ? 1.6 : 1.2;
         ctx.stroke();
 
-        ctx.fillStyle = '#f8fafc';
-        ctx.font = '700 18px "Segoe UI", system-ui, sans-serif';
+        ctx.fillStyle = hasLiveBoss ? '#fef08a' : '#f8fafc';
+        ctx.font = hasLiveBoss
+          ? '800 16px Tajawal, "Segoe UI", system-ui, sans-serif'
+          : '700 18px "Segoe UI", system-ui, sans-serif';
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
         ctx.fillText(sim.stageBannerText, width / 2, by + 20);
 
-        ctx.fillStyle = '#94a3b8';
-        ctx.font = '600 12px "Segoe UI", system-ui, sans-serif';
-        ctx.fillText(sim.stageBannerSub, width / 2, by + 39);
+        ctx.fillStyle = hasLiveBoss ? '#fecaca' : '#94a3b8';
+        ctx.font = '600 12px Tajawal, "Segoe UI", system-ui, sans-serif';
+        ctx.fillText(sim.stageBannerSub, width / 2, by + 40);
         ctx.restore();
       }
 
@@ -7758,7 +10573,8 @@ export default function App() {
     bagModalOpen ||
     settingsModalOpen ||
     gamesModalOpen;
-  const totalBagCount = bag.hearts + bag.corn + bag.diamonds;
+  const totalBagCount =
+    bag.hearts + bag.corn + bag.diamonds + bag.stars + bag.skulls;
   const positiveCatalog = INDEX_CATALOG.filter((e) => e.category === 'positive');
   const negativeCatalog = INDEX_CATALOG.filter((e) => e.category === 'negative');
   const activeIndexEntries =
@@ -7798,6 +10614,36 @@ export default function App() {
   ).length;
   const goldNegativeDiscoveredCount = goldNegativeCatalog.filter((e) =>
     discoveredGoldItems.includes(e.kind)
+  ).length;
+
+  const spacePositiveCatalog = SPACE_INDEX_CATALOG.filter(
+    (e) => e.category === 'positive'
+  );
+  const spaceNegativeCatalog = SPACE_INDEX_CATALOG.filter(
+    (e) => e.category === 'negative'
+  );
+  const activeSpaceIndexEntries =
+    indexTab === 'positive' ? spacePositiveCatalog : spaceNegativeCatalog;
+  const spacePositiveDiscoveredCount = spacePositiveCatalog.filter((e) =>
+    discoveredSpaceItems.includes(e.kind)
+  ).length;
+  const spaceNegativeDiscoveredCount = spaceNegativeCatalog.filter((e) =>
+    discoveredSpaceItems.includes(e.kind)
+  ).length;
+
+  const monsterPositiveCatalog = MONSTER_INDEX_CATALOG.filter(
+    (e) => e.category === 'positive'
+  );
+  const monsterNegativeCatalog = MONSTER_INDEX_CATALOG.filter(
+    (e) => e.category === 'negative'
+  );
+  const activeMonsterIndexEntries =
+    indexTab === 'positive' ? monsterPositiveCatalog : monsterNegativeCatalog;
+  const monsterPositiveDiscoveredCount = monsterPositiveCatalog.filter((e) =>
+    discoveredMonsterItems.includes(e.kind)
+  ).length;
+  const monsterNegativeDiscoveredCount = monsterNegativeCatalog.filter((e) =>
+    discoveredMonsterItems.includes(e.kind)
   ).length;
 
   return (
@@ -8054,7 +10900,11 @@ export default function App() {
               </span>
               <span
                 className={`font-num text-[11px] sm:text-sm lg:text-base font-bold ${
-                  isGoldMode
+                  isMonsterMode
+                    ? 'text-rose-300'
+                    : isSpaceMode
+                    ? 'text-violet-300'
+                    : isGoldMode
                     ? 'text-yellow-300'
                     : isFruitMode
                     ? 'text-amber-300'
@@ -8120,7 +10970,10 @@ export default function App() {
             <div className="relative flex items-center whitespace-nowrap">
               <button
                 type="button"
-                onClick={() => setPinkCoinInfoOpen((prev) => !prev)}
+                onClick={() => {
+                  setSpaceCoinInfoOpen(false);
+                  setPinkCoinInfoOpen((prev) => !prev);
+                }}
                 aria-expanded={pinkCoinInfoOpen}
                 aria-label={`${t.pinkCoins}: ${pinkCoins} — ${t.pinkCoinBenefitDesc}`}
                 title={`${t.pinkCoinBenefitTitle}: ${t.pinkCoinBenefitDesc}`}
@@ -8134,7 +10987,7 @@ export default function App() {
                 <span className="font-num text-[11px] sm:text-sm lg:text-base font-bold text-pink-300">
                   {pinkCoins}
                 </span>
-                <span className="hidden md:inline text-[10px] font-semibold text-pink-200/90 border-s border-pink-400/30 ps-1">
+                <span className="hidden lg:inline text-[10px] font-semibold text-pink-200/90 border-s border-pink-400/30 ps-1">
                   {t.pinkCoinShortBenefit}
                 </span>
                 <span
@@ -8174,6 +11027,74 @@ export default function App() {
               )}
             </div>
 
+            {/* Space Coins (عملات الفضاء) + How to Earn Info */}
+            <div className="relative flex items-center whitespace-nowrap">
+              <button
+                type="button"
+                onClick={() => {
+                  setPinkCoinInfoOpen(false);
+                  setSpaceCoinInfoOpen((prev) => !prev);
+                }}
+                aria-expanded={spaceCoinInfoOpen}
+                aria-label={`${t.spaceCoins}: ${spaceCoins} — ${t.spaceCoinBenefitDesc}`}
+                title={`${t.spaceCoinBenefitTitle}: ${t.spaceCoinBenefitDesc}`}
+                className={`inline-flex items-center gap-0.5 sm:gap-1 px-1 sm:px-1.5 py-0.5 rounded-md border transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-400 ${
+                  spaceCoinInfoOpen
+                    ? 'border-cyan-400/75 bg-violet-500/25'
+                    : 'border-violet-400/35 bg-violet-500/12 hover:bg-violet-500/22'
+                }`}
+              >
+                <SpaceCoinIcon className="w-3.5 h-3.5 sm:w-4 sm:h-4 lg:w-4.5 lg:h-4.5 shrink-0" />
+                <span className="font-num text-[11px] sm:text-sm lg:text-base font-bold text-cyan-200">
+                  {spaceCoins}
+                </span>
+                <span className="hidden lg:inline text-[10px] font-semibold text-violet-200/95 border-s border-violet-400/30 ps-1">
+                  {t.spaceCoinShortBenefit}
+                </span>
+                <span
+                  aria-hidden="true"
+                  className="hidden sm:inline-flex items-center justify-center w-3.5 h-3.5 rounded-full bg-violet-400/30 text-[9px] font-bold text-cyan-100"
+                >
+                  ؟
+                </span>
+              </button>
+
+              {spaceCoinInfoOpen && (
+                <div
+                  role="dialog"
+                  aria-label={t.spaceCoinBenefitTitle}
+                  className="fixed top-20 inset-x-3 mx-auto sm:absolute sm:top-full sm:inset-x-auto sm:left-1/2 sm:-translate-x-1/2 sm:mt-2 z-40 w-auto max-w-[320px] sm:w-80 p-3.5 rounded-xl border border-violet-400/50 bg-[#120b29]/98 shadow-2xl whitespace-normal text-start space-y-2.5"
+                >
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-1.5">
+                      <SpaceCoinIcon className="w-4 h-4 shrink-0" />
+                      <span className="text-xs font-extrabold text-cyan-200">
+                        {t.spaceCoinBenefitTitle}
+                      </span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setSpaceCoinInfoOpen(false)}
+                      aria-label={t.close}
+                      className="text-slate-400 hover:text-white text-xs font-bold px-1 cursor-pointer"
+                    >
+                      ✕
+                    </button>
+                  </div>
+                  <p className="text-[11px] sm:text-xs text-violet-100/95 leading-relaxed">
+                    {t.spaceCoinBenefitDesc}
+                  </p>
+                  <button
+                    type="button"
+                    onClick={openSpaceShopModal}
+                    className="w-full h-8 rounded-lg bg-gradient-to-r from-violet-400 to-cyan-300 hover:brightness-110 text-slate-950 text-xs font-extrabold transition-all cursor-pointer"
+                  >
+                    {t.spaceShopBtn}
+                  </button>
+                </div>
+              )}
+            </div>
+
             <div className="hidden xl:block h-4 w-px bg-white/10 shrink-0" aria-hidden="true" />
 
             {/* Best Score (desktop HUD; also always shown in overlays) */}
@@ -8186,14 +11107,33 @@ export default function App() {
 
             <div className="hidden sm:block h-4 w-px bg-white/10 shrink-0" aria-hidden="true" />
 
-            {/* Lives (Hearts in Normal, Corn in Fruit, Diamonds in Gold) + live 5-min regen + buy button */}
+            {/* Lives (Hearts in Normal, Corn in Fruit, Diamonds in Gold, Stars in Space) + live 5-min regen + buy button */}
             <div
               className="flex items-center gap-0.5 sm:gap-1.5 whitespace-nowrap"
               aria-label={`${
-                isGoldMode ? t.diamondsLabel : isFruitMode ? t.cornLabel : t.lives
+                isMonsterMode
+                  ? t.monsterSkullsLabel
+                  : isSpaceMode
+                  ? t.starsLabel
+                  : isGoldMode
+                  ? t.diamondsLabel
+                  : isFruitMode
+                  ? t.cornLabel
+                  : t.lives
               }: ${activeLives}/${activeMaxLives}`}
             >
-              {isGoldMode ? (
+              {isMonsterMode ? (
+                <MonsterSkullIcon
+                  filled={activeLives > 0}
+                  className="w-3.5 h-3.5 sm:w-5 sm:h-5 shrink-0"
+                />
+              ) : isSpaceMode ? (
+                <SpaceStarIcon
+                  className={`w-3.5 h-3.5 sm:w-5 sm:h-5 shrink-0 ${
+                    activeLives > 0 ? '' : 'opacity-40 grayscale'
+                  }`}
+                />
+              ) : isGoldMode ? (
                 <DiamondIcon
                   className={`w-3.5 h-3.5 sm:w-5 sm:h-5 shrink-0 ${
                     activeLives > 0 ? '' : 'opacity-40 grayscale'
@@ -8220,7 +11160,11 @@ export default function App() {
               <span
                 className={`font-num text-[11px] sm:text-sm lg:text-base font-bold ${
                   activeLives > 0
-                    ? isGoldMode
+                    ? isMonsterMode
+                      ? 'text-rose-300'
+                      : isSpaceMode
+                      ? 'text-violet-300'
+                      : isGoldMode
                       ? 'text-sky-300'
                       : isFruitMode
                       ? 'text-amber-300'
@@ -8243,7 +11187,11 @@ export default function App() {
                   activeLifeCurrencyBalance < activeLifeBuyCost
                 }
                 aria-label={
-                  isGoldMode
+                  isMonsterMode
+                    ? t.buySkullAria
+                    : isSpaceMode
+                    ? t.buyStarAria
+                    : isGoldMode
                     ? t.buyDiamondAria
                     : isFruitMode
                     ? t.buyCornAria
@@ -8251,7 +11199,11 @@ export default function App() {
                 }
                 title={
                   activeLives >= activeMaxLives
-                    ? isGoldMode
+                    ? isMonsterMode
+                      ? t.skullsFullTip
+                      : isSpaceMode
+                      ? t.starsFullTip
+                      : isGoldMode
                       ? t.diamondsFullTip
                       : isFruitMode
                       ? t.cornFullTip
@@ -8259,11 +11211,19 @@ export default function App() {
                       ? `القلوب ممتلئة (${effectiveMaxLives}/${effectiveMaxLives})`
                       : `Hearts full (${effectiveMaxLives}/${effectiveMaxLives})`
                     : activeLifeCurrencyBalance < activeLifeBuyCost
-                    ? isGoldMode
+                    ? isMonsterMode
+                      ? t.needCoinsSkullTip
+                      : isSpaceMode
+                      ? t.needCoinsStarTip
+                      : isGoldMode
                       ? t.needCoinsDiamondTip
                       : isFruitMode
                       ? t.needCoinsCornTip
                       : t.needCoinsTip
+                    : isMonsterMode
+                    ? t.buySkullAria
+                    : isSpaceMode
+                    ? t.buyStarAria
                     : isGoldMode
                     ? t.buyDiamondAria
                     : isFruitMode
@@ -8315,7 +11275,11 @@ export default function App() {
         >
           <div
             className={`h-full transition-transform duration-150 origin-left rtl:origin-right ${
-              isGoldMode
+              isMonsterMode
+                ? 'bg-gradient-to-r from-amber-400 via-rose-500 to-red-600'
+                : isSpaceMode
+                ? 'bg-gradient-to-r from-violet-400 via-fuchsia-400 to-cyan-400'
+                : isGoldMode
                 ? 'bg-gradient-to-r from-amber-300 via-yellow-400 to-sky-400'
                 : isFruitMode
                 ? 'bg-gradient-to-r from-amber-400 via-lime-400 to-rose-400'
@@ -8536,15 +11500,57 @@ export default function App() {
             <div className="absolute inset-0 flex items-center justify-center p-4 bg-[#060c17]/76 backdrop-blur-[3px]">
               <div
                 className={`w-full max-w-md rounded-xl border bg-[#0f1a2e]/95 p-6 sm:p-8 text-center shadow-2xl ${
-                  isGoldMode
+                  isMonsterMode
+                    ? 'border-rose-500/50'
+                    : isSpaceMode
+                    ? 'border-violet-400/45'
+                    : isGoldMode
                     ? 'border-yellow-400/40'
                     : isFruitMode
                     ? 'border-amber-400/30'
                     : 'border-sky-400/25'
                 }`}
               >
+                {isSpaceMode && getSpaceBossConfig(stageNum) && (
+                  <div className="inline-flex items-center justify-center gap-1.5 px-3 py-1 rounded-md bg-gradient-to-r from-rose-500/25 via-amber-500/25 to-violet-500/25 border border-amber-400/50 text-xs sm:text-sm font-extrabold text-amber-200 mb-2.5">
+                    <span>
+                      {t.spaceBossDefeated(
+                        lang === 'ar'
+                          ? getSpaceBossConfig(stageNum)!.nameAr
+                          : getSpaceBossConfig(stageNum)!.nameEn
+                      )}
+                    </span>
+                  </div>
+                )}
+                {isMonsterMode && (
+                  <div
+                    className={`inline-flex items-center justify-center gap-1.5 px-3 py-1 rounded-md border text-xs sm:text-sm font-extrabold mb-2.5 ${
+                      isGrandMonsterStage(stageNum)
+                        ? 'bg-gradient-to-r from-red-600/35 via-amber-500/30 to-rose-600/35 border-yellow-400/70 text-yellow-200'
+                        : 'bg-rose-500/20 border-rose-400/50 text-rose-200'
+                    }`}
+                  >
+                    <span>
+                      {isGrandMonsterStage(stageNum)
+                        ? t.grandMonsterDefeated(
+                            lang === 'ar'
+                              ? getMonsterBossConfig(stageNum).nameAr
+                              : getMonsterBossConfig(stageNum).nameEn
+                          )
+                        : t.monsterBossDefeated(
+                            lang === 'ar'
+                              ? getMonsterBossConfig(stageNum).nameAr
+                              : getMonsterBossConfig(stageNum).nameEn
+                          )}
+                    </span>
+                  </div>
+                )}
                 <h2 className="text-2xl sm:text-3xl font-bold text-white mb-2 text-balance">
-                  {isGoldMode
+                  {isMonsterMode
+                    ? t.monsterStageCompleteTitle(stageNum)
+                    : isSpaceMode
+                    ? t.spaceStageCompleteTitle(stageNum)
+                    : isGoldMode
                     ? t.goldStageCompleteTitle(stageNum)
                     : isFruitMode
                     ? t.fruitStageCompleteTitle(stageNum)
@@ -8555,12 +11561,28 @@ export default function App() {
                     lastEarnedCoins > 0 ? 'text-amber-300' : 'text-slate-400'
                   }`}
                 >
-                  {isGoldMode
+                  {isMonsterMode
+                    ? t.monsterCoinsEarned(lastEarnedCoins, monsterSkulls)
+                    : isSpaceMode
+                    ? t.spaceCoinsEarned(lastEarnedCoins, stars)
+                    : isGoldMode
                     ? t.goldCoinsEarned(lastEarnedCoins, diamonds)
                     : isFruitMode
                     ? t.fruitCoinsEarned(lastEarnedCoins, corn)
                     : t.coinsEarned(lastEarnedCoins, lives)}
                 </p>
+                {isSpaceMode && lastEarnedSpaceCoins > 0 && (
+                  <p className="text-sm font-extrabold text-cyan-300 mb-1.5 inline-flex items-center justify-center gap-1.5">
+                    <SpaceCoinIcon className="w-4 h-4 shrink-0" />
+                    <span>{t.spaceCoinsRewardLine(lastEarnedSpaceCoins)}</span>
+                  </p>
+                )}
+                {isMonsterMode && lastEarnedPinkCoins > 0 && (
+                  <p className="text-sm font-extrabold text-pink-300 mb-1.5 inline-flex items-center justify-center gap-1.5">
+                    <PinkCoinIcon className="w-4 h-4 shrink-0" />
+                    <span>{t.monsterPinkRewardLine(lastEarnedPinkCoins)}</span>
+                  </p>
+                )}
                 <p className="text-xs sm:text-sm text-sky-300 font-medium mb-5">
                   {t.nextGoalText(nextStageConfig.pointsNeeded)}
                 </p>
@@ -8584,7 +11606,11 @@ export default function App() {
                   </div>
                   <div className="px-2">
                     <div className="text-xs text-slate-400 mb-1">
-                      {isGoldMode
+                      {isMonsterMode
+                        ? t.monsterSkullsLabel
+                        : isSpaceMode
+                        ? t.starsLabel
+                        : isGoldMode
                         ? t.diamondsLabel
                         : isFruitMode
                         ? t.cornLabel
@@ -8592,7 +11618,11 @@ export default function App() {
                     </div>
                     <div
                       className={`font-num text-2xl sm:text-3xl font-bold ${
-                        isGoldMode
+                        isMonsterMode
+                          ? 'text-rose-300'
+                          : isSpaceMode
+                          ? 'text-violet-300'
+                          : isGoldMode
                           ? 'text-sky-300'
                           : isFruitMode
                           ? 'text-amber-300'
@@ -8611,6 +11641,10 @@ export default function App() {
                   className={`w-full sm:w-auto min-w-[220px] px-8 py-3.5 rounded-lg font-bold text-base transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-300 focus-visible:ring-offset-2 focus-visible:ring-offset-[#0f1a2e] whitespace-nowrap ${
                     activeLives <= 0
                       ? 'bg-slate-700 text-slate-300 cursor-not-allowed'
+                      : isMonsterMode
+                      ? 'bg-gradient-to-r from-amber-400 via-rose-500 to-red-500 hover:brightness-110 active:scale-[0.98] text-white cursor-pointer'
+                      : isSpaceMode
+                      ? 'bg-gradient-to-r from-violet-400 via-fuchsia-400 to-cyan-400 hover:brightness-110 active:scale-[0.98] text-slate-950 cursor-pointer'
                       : isGoldMode
                       ? 'bg-gradient-to-r from-yellow-400 via-amber-400 to-sky-400 hover:brightness-110 active:scale-[0.98] text-slate-950 cursor-pointer'
                       : isFruitMode
@@ -8619,11 +11653,19 @@ export default function App() {
                   }`}
                 >
                   {activeLives <= 0
-                    ? isGoldMode
+                    ? isMonsterMode
+                      ? t.waitSkullBtn(formatCountdown(activeNextRegenMs))
+                      : isSpaceMode
+                      ? t.waitStarBtn(formatCountdown(activeNextRegenMs))
+                      : isGoldMode
                       ? t.waitDiamondBtn(formatCountdown(activeNextRegenMs))
                       : isFruitMode
                       ? t.waitCornBtn(formatCountdown(activeNextRegenMs))
                       : t.waitHeartBtn(formatCountdown(activeNextRegenMs))
+                    : isMonsterMode
+                    ? t.monsterNextStageBtn(stageNum + 1)
+                    : isSpaceMode
+                    ? t.spaceNextStageBtn(stageNum + 1)
                     : isGoldMode
                     ? t.goldNextStageBtn(stageNum + 1)
                     : isFruitMode
@@ -8639,12 +11681,44 @@ export default function App() {
               <div className="absolute inset-0 flex items-center justify-center p-4 bg-[#060c17]/78 backdrop-blur-[3px]">
                 <div
                   className={`w-full max-w-md rounded-xl border bg-[#0f1a2e]/95 p-6 sm:p-8 text-center shadow-2xl ${
-                    isGoldMode ? 'border-yellow-400/35' : 'border-white/12'
+                    isMonsterMode
+                      ? 'border-rose-500/45'
+                      : isSpaceMode
+                      ? 'border-violet-400/40'
+                      : isGoldMode
+                      ? 'border-yellow-400/35'
+                      : 'border-white/12'
                   }`}
                 >
+                  {status === 'VICTORY' && isSpaceMode && getSpaceBossConfig(stageNum) && (
+                    <div className="inline-flex items-center justify-center gap-1.5 px-3 py-1 rounded-md bg-gradient-to-r from-rose-500/30 via-amber-500/30 to-violet-500/30 border border-amber-400/60 text-xs sm:text-sm font-extrabold text-amber-200 mb-2.5">
+                      <span>
+                        {t.spaceBossDefeated(
+                          lang === 'ar'
+                            ? getSpaceBossConfig(stageNum)!.nameAr
+                            : getSpaceBossConfig(stageNum)!.nameEn
+                        )}
+                      </span>
+                    </div>
+                  )}
+                  {status === 'VICTORY' && isMonsterMode && (
+                    <div className="inline-flex items-center justify-center gap-1.5 px-3 py-1 rounded-md bg-gradient-to-r from-red-600/35 via-amber-500/30 to-rose-600/35 border border-yellow-400/70 text-xs sm:text-sm font-extrabold text-yellow-200 mb-2.5">
+                      <span>
+                        {t.grandMonsterDefeated(
+                          lang === 'ar'
+                            ? getMonsterBossConfig(stageNum).nameAr
+                            : getMonsterBossConfig(stageNum).nameEn
+                        )}
+                      </span>
+                    </div>
+                  )}
                   <h2 className="text-2xl sm:text-3xl font-bold text-white mb-2 text-balance">
                     {status === 'VICTORY'
-                      ? isGoldMode
+                      ? isMonsterMode
+                        ? t.monsterVictoryTitle
+                        : isSpaceMode
+                        ? t.spaceVictoryTitle
+                        : isGoldMode
                         ? t.goldVictoryTitle
                         : isFruitMode
                         ? t.fruitVictoryTitle
@@ -8659,14 +11733,34 @@ export default function App() {
                           lastEarnedCoins > 0 ? 'text-amber-300' : 'text-slate-400'
                         }`}
                       >
-                        {isGoldMode
+                        {isMonsterMode
+                          ? t.monsterCoinsEarned(lastEarnedCoins, monsterSkulls)
+                          : isSpaceMode
+                          ? t.spaceCoinsEarned(lastEarnedCoins, stars)
+                          : isGoldMode
                           ? t.goldCoinsEarned(lastEarnedCoins, diamonds)
                           : isFruitMode
                           ? t.fruitCoinsEarned(lastEarnedCoins, corn)
                           : t.coinsEarned(lastEarnedCoins, lives)}
                       </p>
+                      {isSpaceMode && lastEarnedSpaceCoins > 0 && (
+                        <p className="text-sm font-extrabold text-cyan-300 mb-1.5 inline-flex items-center justify-center gap-1.5">
+                          <SpaceCoinIcon className="w-4 h-4 shrink-0" />
+                          <span>{t.spaceCoinsRewardLine(lastEarnedSpaceCoins)}</span>
+                        </p>
+                      )}
+                      {isMonsterMode && lastEarnedPinkCoins > 0 && (
+                        <p className="text-sm font-extrabold text-pink-300 mb-1.5 inline-flex items-center justify-center gap-1.5">
+                          <PinkCoinIcon className="w-4 h-4 shrink-0" />
+                          <span>{t.monsterPinkRewardLine(lastEarnedPinkCoins)}</span>
+                        </p>
+                      )}
                       <p className="text-sm font-medium text-emerald-300 mb-3">
-                        {isGoldMode
+                        {isMonsterMode
+                          ? t.monsterVictorySubtitle
+                          : isSpaceMode
+                          ? t.spaceVictorySubtitle
+                          : isGoldMode
                           ? t.goldVictorySubtitle
                           : isFruitMode
                           ? t.fruitVictorySubtitle
@@ -8705,7 +11799,11 @@ export default function App() {
                       </div>
                       <div
                         className={`font-num text-2xl sm:text-3xl font-bold ${
-                          isGoldMode
+                          isMonsterMode
+                            ? 'text-rose-300'
+                            : isSpaceMode
+                            ? 'text-violet-300'
+                            : isGoldMode
                             ? 'text-yellow-300'
                             : isFruitMode
                             ? 'text-amber-300'
@@ -8726,7 +11824,11 @@ export default function App() {
 
                   {activeLives <= 0 && (
                     <p className="text-xs sm:text-sm font-semibold text-rose-300 mb-3">
-                      {isGoldMode
+                      {isMonsterMode
+                        ? t.noSkullsNotice(formatCountdown(activeNextRegenMs))
+                        : isSpaceMode
+                        ? t.noStarsNotice(formatCountdown(activeNextRegenMs))
+                        : isGoldMode
                         ? t.noDiamondsNotice(formatCountdown(activeNextRegenMs))
                         : isFruitMode
                         ? t.noCornNotice(formatCountdown(activeNextRegenMs))
@@ -8748,7 +11850,11 @@ export default function App() {
                             : 'bg-slate-800 text-slate-500 border border-white/10 cursor-not-allowed'
                         }`}
                       >
-                        {isGoldMode
+                        {isMonsterMode
+                          ? t.buySkullBtn
+                          : isSpaceMode
+                          ? t.buyStarBtn
+                          : isGoldMode
                           ? t.buyDiamondBtn
                           : isFruitMode
                           ? t.buyCornBtn
@@ -8766,6 +11872,10 @@ export default function App() {
                       className={`w-full sm:w-auto min-w-[200px] px-8 py-3.5 rounded-lg font-bold text-base transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-300 focus-visible:ring-offset-2 focus-visible:ring-offset-[#0f1a2e] whitespace-nowrap ${
                         activeLives <= 0
                           ? 'bg-slate-700 text-slate-300 cursor-not-allowed'
+                          : isMonsterMode
+                          ? 'bg-gradient-to-r from-amber-400 via-rose-500 to-red-500 hover:brightness-110 active:scale-[0.98] text-white cursor-pointer'
+                          : isSpaceMode
+                          ? 'bg-gradient-to-r from-violet-400 via-fuchsia-400 to-cyan-400 hover:brightness-110 active:scale-[0.98] text-slate-950 cursor-pointer'
                           : isGoldMode
                           ? 'bg-gradient-to-r from-yellow-400 via-amber-400 to-sky-400 hover:brightness-110 active:scale-[0.98] text-slate-950 cursor-pointer'
                           : isFruitMode
@@ -8774,7 +11884,11 @@ export default function App() {
                       }`}
                     >
                       {activeLives <= 0
-                        ? isGoldMode
+                        ? isMonsterMode
+                          ? t.waitSkullBtn(formatCountdown(activeNextRegenMs))
+                          : isSpaceMode
+                          ? t.waitStarBtn(formatCountdown(activeNextRegenMs))
+                          : isGoldMode
                           ? t.waitDiamondBtn(formatCountdown(activeNextRegenMs))
                           : isFruitMode
                           ? t.waitCornBtn(formatCountdown(activeNextRegenMs))
@@ -8822,11 +11936,11 @@ export default function App() {
                 </div>
 
                 <div className="px-5 pt-3.5 pb-5 overflow-y-auto">
-                  {/* World Tabs inside Stages Modal: Normal (50) | Fruit (15) | Gold (15) */}
+                  {/* World Tabs inside Stages Modal: Normal (75) | Fruit (30) | Gold (30) | Space (50) */}
                   <div
                     role="tablist"
                     aria-label={t.stagesModalTitle}
-                    className="grid grid-cols-3 gap-1.5 p-1 rounded-lg bg-slate-950/75 border border-white/10 mb-3.5"
+                    className="grid grid-cols-2 sm:grid-cols-3 gap-1.5 p-1 rounded-lg bg-slate-950/75 border border-white/10 mb-3.5"
                   >
                     <button
                       type="button"
@@ -8946,6 +12060,77 @@ export default function App() {
                         </span>
                       )}
                     </button>
+
+                    <button
+                      type="button"
+                      role="tab"
+                      aria-selected={stagesModalTab === 'space'}
+                      onClick={() => setStagesModalTab('space')}
+                      className={`h-10 px-2 rounded-md inline-flex items-center justify-center gap-1 text-[11px] sm:text-xs font-bold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-300 whitespace-nowrap cursor-pointer ${
+                        stagesModalTab === 'space'
+                          ? 'bg-gradient-to-r from-violet-400 via-fuchsia-400 to-cyan-400 text-slate-950'
+                          : 'text-violet-200 hover:text-white hover:bg-violet-500/20'
+                      }`}
+                    >
+                      <span>{t.spaceWorldLabel}</span>
+                      {!spaceUnlocked ? (
+                        <span
+                          className={`inline-flex items-center gap-0.5 text-[10px] font-num ${
+                            stagesModalTab === 'space'
+                              ? 'text-slate-950/90'
+                              : 'text-fuchsia-300'
+                          }`}
+                        >
+                          <svg
+                            viewBox="0 0 24 24"
+                            className="w-2.5 h-2.5"
+                            fill="none"
+                            stroke="currentColor"
+                            strokeWidth="2.4"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            aria-hidden="true"
+                          >
+                            <rect x="5" y="11" width="14" height="10" rx="2" />
+                            <path d="M8 11V7a4 4 0 0 1 8 0v4" />
+                          </svg>
+                          {SPACE_UNLOCK_COST}
+                        </span>
+                      ) : (
+                        <span
+                          className={`font-num text-[10px] sm:text-[11px] ${
+                            stagesModalTab === 'space'
+                              ? 'text-slate-950/85'
+                              : 'text-violet-300/90'
+                          }`}
+                        >
+                          ({TOTAL_SPACE_STAGES})
+                        </span>
+                      )}
+                    </button>
+
+                    <button
+                      type="button"
+                      role="tab"
+                      aria-selected={stagesModalTab === 'monster'}
+                      onClick={() => setStagesModalTab('monster')}
+                      className={`col-span-2 sm:col-span-2 h-10 px-2 rounded-md inline-flex items-center justify-center gap-1 text-[11px] sm:text-xs font-extrabold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-400 whitespace-nowrap cursor-pointer ${
+                        stagesModalTab === 'monster'
+                          ? 'bg-gradient-to-r from-amber-400 via-rose-500 to-red-600 text-white shadow'
+                          : 'text-rose-200 hover:text-white hover:bg-rose-500/20'
+                      }`}
+                    >
+                      <span>👹 {t.monsterWorldLabel}</span>
+                      <span
+                        className={`font-num text-[10px] sm:text-[11px] ${
+                          stagesModalTab === 'monster'
+                            ? 'text-amber-100'
+                            : 'text-rose-300/90'
+                        }`}
+                      >
+                        ({TOTAL_MONSTER_STAGES})
+                      </span>
+                    </button>
                   </div>
 
                   {stagesModalTab === 'normal' ? (
@@ -8978,6 +12163,8 @@ export default function App() {
                           const isCurrent =
                             !isFruitMode &&
                             !isGoldMode &&
+                            !isSpaceMode &&
+                            !isMonsterMode &&
                             cfg.stage === stageNum;
                           const isCompleted = completedStages.includes(cfg.stage);
                           const unlocked = isStageUnlocked(cfg.stage, completedStages);
@@ -9058,6 +12245,412 @@ export default function App() {
                         })}
                       </div>
                     </>
+                  ) : stagesModalTab === 'monster' ? (
+                    <>
+                      <p className="text-xs sm:text-sm text-rose-100/90 mb-3">
+                        {t.monsterStagesModalHint}
+                      </p>
+
+                      {/* Dedicated Monster Skulls Lives Bar */}
+                      <div className="flex flex-wrap items-center justify-between gap-2 mb-3 p-2.5 rounded-lg border border-rose-500/40 bg-gradient-to-r from-[#2c0a15]/90 via-[#1f0a1a]/90 to-[#2b120e]/90">
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <MonsterSkullIcon className="w-5 h-5 shrink-0" />
+                          <span className="text-xs sm:text-sm font-bold text-rose-200">
+                            {t.monsterSkullsLabel}:{' '}
+                            <span className="font-num text-amber-200">
+                              {monsterSkulls}/{MAX_MONSTER_SKULLS}
+                            </span>
+                          </span>
+                          {monsterSkulls < MAX_MONSTER_SKULLS && (
+                            <span className="font-num text-[11px] font-semibold text-sky-300 bg-sky-500/15 border border-sky-400/25 rounded px-1.5 py-0.5">
+                              {formatCountdown(nextSkullInMs)}
+                            </span>
+                          )}
+                        </div>
+                        {monsterSkulls < MAX_MONSTER_SKULLS && (
+                          <button
+                            type="button"
+                            disabled={coins < HEART_COST_COINS}
+                            onClick={() => buyLifeForMode('monster')}
+                            className={`px-2.5 py-1 rounded-md text-xs font-bold transition-colors whitespace-nowrap ${
+                              coins >= HEART_COST_COINS
+                                ? 'bg-amber-400 hover:bg-amber-300 text-slate-950 cursor-pointer'
+                                : 'bg-slate-800 text-slate-500 cursor-not-allowed'
+                            }`}
+                          >
+                            {t.buySkullBtn}
+                          </button>
+                        )}
+                      </div>
+
+                      {monsterSkulls <= 0 && (
+                        <p className="text-xs sm:text-sm font-semibold text-rose-300 mb-3">
+                          {t.noSkullsNotice(formatCountdown(nextSkullInMs))}
+                        </p>
+                      )}
+
+                      <div className="grid grid-cols-4 sm:grid-cols-5 gap-2.5 pt-1">
+                        {MONSTER_STAGES.map((cfg) => {
+                          const isCurrent = isMonsterMode && cfg.stage === stageNum;
+                          const isCompleted = completedMonsterStages.includes(
+                            cfg.stage
+                          );
+                          const unlocked = isStageUnlocked(
+                            cfg.stage,
+                            completedMonsterStages
+                          );
+                          const canEnter = unlocked && monsterSkulls > 0;
+                          const bossCfg = getMonsterBossConfig(cfg.stage);
+                          const isGrand = bossCfg.isGrandMonster;
+                          const bossName =
+                            lang === 'ar' ? bossCfg.nameAr : bossCfg.nameEn;
+
+                          return (
+                            <button
+                              key={cfg.stage}
+                              type="button"
+                              disabled={!canEnter}
+                              title={bossName}
+                              aria-label={
+                                unlocked
+                                  ? `${t.monsterStageBanner(cfg.stage)} (${bossName}) — HP ${cfg.pointsNeeded}`
+                                  : t.lockedStageAria(cfg.stage)
+                              }
+                              onClick={() => {
+                                if (canEnter) startAtStage(cfg.stage, 'monster');
+                              }}
+                              className={`relative flex flex-col items-center justify-center py-3 px-2 rounded-lg border transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-400 ${
+                                !unlocked
+                                  ? isGrand
+                                    ? 'border-yellow-400/50 bg-gradient-to-b from-red-950/70 to-amber-950/45 text-amber-200/70 opacity-85 cursor-not-allowed'
+                                    : 'border-white/5 bg-slate-950/70 text-slate-500 opacity-65 cursor-not-allowed'
+                                  : isCurrent
+                                  ? isGrand
+                                    ? 'border-yellow-300 bg-gradient-to-b from-red-600/50 via-amber-500/35 to-rose-950/80 text-yellow-100 ring-1 ring-yellow-300/60 cursor-pointer'
+                                    : 'border-rose-400 bg-gradient-to-b from-rose-500/35 to-amber-600/20 text-white cursor-pointer'
+                                  : isCompleted
+                                  ? isGrand
+                                    ? 'border-yellow-400/80 bg-gradient-to-b from-red-700/40 via-amber-600/25 to-rose-950/70 text-yellow-100 hover:brightness-110 cursor-pointer'
+                                    : 'border-rose-400/45 bg-gradient-to-b from-rose-500/20 to-amber-900/20 text-rose-50 hover:brightness-110 cursor-pointer'
+                                  : isGrand
+                                  ? 'border-yellow-400/85 bg-gradient-to-b from-red-950/90 via-[#3d0b16]/95 to-amber-950/85 text-yellow-100 hover:border-yellow-200 cursor-pointer'
+                                  : 'border-rose-400/30 bg-[#1f0b15]/90 text-rose-100 hover:bg-[#2e101f]/95 hover:border-rose-300/60 cursor-pointer'
+                              }`}
+                            >
+                              {isGrand && (
+                                <span className="absolute -top-2 start-1/2 -translate-x-1/2 rtl:translate-x-1/2 px-1.5 py-0.5 rounded text-[8.5px] font-black shadow whitespace-nowrap leading-none bg-gradient-to-r from-red-600 via-amber-400 to-yellow-300 text-slate-950 ring-1 ring-yellow-100/80">
+                                  {t.grandMonsterBadge}
+                                </span>
+                              )}
+                              {!unlocked ? (
+                                <span
+                                  className="absolute top-1.5 end-1.5 text-slate-500"
+                                  aria-hidden="true"
+                                >
+                                  <svg
+                                    viewBox="0 0 24 24"
+                                    className="w-3.5 h-3.5"
+                                    fill="none"
+                                    stroke="currentColor"
+                                    strokeWidth="2.2"
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                  >
+                                    <rect x="5" y="11" width="14" height="10" rx="2" />
+                                    <path d="M8 11V7a4 4 0 0 1 8 0v4" />
+                                  </svg>
+                                </span>
+                              ) : (
+                                isCompleted && (
+                                  <span
+                                    className="absolute top-1.5 end-1.5 text-amber-300"
+                                    aria-hidden="true"
+                                  >
+                                    <svg
+                                      viewBox="0 0 24 24"
+                                      className="w-3.5 h-3.5"
+                                      fill="none"
+                                      stroke="currentColor"
+                                      strokeWidth="3"
+                                      strokeLinecap="round"
+                                      strokeLinejoin="round"
+                                    >
+                                      <polyline points="20 6 9 17 4 12" />
+                                    </svg>
+                                  </span>
+                                )
+                              )}
+                              <span className="font-num text-base sm:text-lg font-bold">
+                                {cfg.stage}
+                              </span>
+                              <span
+                                className={`font-num text-[11px] whitespace-nowrap ${
+                                  isGrand
+                                    ? unlocked
+                                      ? 'text-yellow-300 font-bold'
+                                      : 'text-yellow-300/65 font-bold'
+                                    : unlocked
+                                    ? 'text-rose-200/85'
+                                    : 'text-slate-600'
+                                }`}
+                              >
+                                HP {cfg.pointsNeeded}
+                              </span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </>
+                  ) : stagesModalTab === 'space' ? (
+                    !spaceUnlocked ? (
+                      <div className="rounded-xl border border-violet-400/40 bg-gradient-to-b from-[#1e103d]/95 via-[#130d2e]/95 to-[#0b1329]/95 p-5 text-center">
+                        <div className="flex items-center justify-center gap-2 mb-3">
+                          <SpaceIndexIcon kind="space_saturn" />
+                          <SpaceIndexIcon kind="space_galaxy" />
+                          <SpaceStarIcon className="w-8 h-8" />
+                          <SpaceIndexIcon kind="space_blackhole" />
+                          <SpaceIndexIcon kind="space_supernova_core" />
+                        </div>
+                        <h3 className="text-lg sm:text-xl font-bold text-violet-100 mb-2">
+                          {t.spaceUnlockTitle}
+                        </h3>
+                        <p className="text-xs sm:text-sm text-slate-200 leading-relaxed mb-4">
+                          {t.spaceUnlockDesc}
+                        </p>
+
+                        <div className="flex flex-col sm:flex-row items-center justify-center gap-2.5">
+                          <button
+                            type="button"
+                            disabled={coins < SPACE_UNLOCK_COST}
+                            onClick={unlockSpaceWorldWithCoins}
+                            className={`w-full sm:w-auto min-w-[205px] px-5 py-3 rounded-lg font-bold text-sm transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-300 whitespace-nowrap ${
+                              coins >= SPACE_UNLOCK_COST
+                                ? 'bg-gradient-to-r from-amber-400 via-yellow-400 to-orange-400 hover:brightness-110 active:scale-[0.98] text-slate-950 cursor-pointer'
+                                : 'bg-slate-800 text-slate-400 border border-white/10 cursor-not-allowed'
+                            }`}
+                          >
+                            {t.spaceUnlockCoinsBtn}
+                          </button>
+
+                          <button
+                            type="button"
+                            disabled={pinkCoins < SPACE_UNLOCK_PINK_COST}
+                            onClick={unlockSpaceWorldWithPinkCoins}
+                            className={`w-full sm:w-auto min-w-[205px] px-5 py-3 rounded-lg font-bold text-sm inline-flex items-center justify-center gap-1.5 transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-pink-300 whitespace-nowrap ${
+                              pinkCoins >= SPACE_UNLOCK_PINK_COST
+                                ? 'bg-gradient-to-r from-pink-400 via-fuchsia-400 to-violet-400 hover:brightness-110 active:scale-[0.98] text-slate-950 cursor-pointer'
+                                : 'bg-slate-800 text-slate-400 border border-white/10 cursor-not-allowed'
+                            }`}
+                          >
+                            <PinkCoinIcon className="w-4 h-4 shrink-0" />
+                            <span>{t.spaceUnlockPinkBtn}</span>
+                          </button>
+                        </div>
+
+                        {coins < SPACE_UNLOCK_COST &&
+                          pinkCoins < SPACE_UNLOCK_PINK_COST && (
+                            <p className="text-xs text-violet-200/85 mt-3 font-medium">
+                              {t.spaceNeedBothHint(
+                                SPACE_UNLOCK_COST - coins,
+                                SPACE_UNLOCK_PINK_COST - pinkCoins
+                              )}
+                            </p>
+                          )}
+                      </div>
+                    ) : (
+                      <>
+                        <p className="text-xs sm:text-sm text-violet-100/90 mb-3">
+                          {t.spaceStagesModalHint}
+                        </p>
+
+                        {/* Dedicated Cosmic Stars Lives Bar + Space Shop Shortcut */}
+                        <div className="flex flex-wrap items-center justify-between gap-2 mb-3 p-2.5 rounded-lg border border-violet-400/35 bg-gradient-to-r from-[#1d1138]/90 via-[#131031]/90 to-[#0c1c34]/90">
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <SpaceStarIcon className="w-5 h-5 shrink-0" />
+                            <span className="text-xs sm:text-sm font-bold text-violet-200">
+                              {t.starsLabel}:{' '}
+                              <span className="font-num text-fuchsia-200">
+                                {stars}/{effectiveMaxStars}
+                              </span>
+                            </span>
+                            {stars < effectiveMaxStars && (
+                              <span className="font-num text-[11px] font-semibold text-sky-300 bg-sky-500/15 border border-sky-400/25 rounded px-1.5 py-0.5">
+                                {formatCountdown(nextStarInMs)}
+                              </span>
+                            )}
+                          </div>
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <button
+                              type="button"
+                              onClick={openSpaceShopModal}
+                              className="px-2.5 py-1 rounded-md text-xs font-extrabold bg-gradient-to-r from-violet-400 to-cyan-300 hover:brightness-110 text-slate-950 transition-all whitespace-nowrap inline-flex items-center gap-1 cursor-pointer"
+                            >
+                              <SpaceCoinIcon className="w-3.5 h-3.5 shrink-0" />
+                              <span>{t.spaceShopBtn}</span>
+                              <span className="font-num">({spaceCoins})</span>
+                            </button>
+                            {stars < effectiveMaxStars && (
+                              <button
+                                type="button"
+                                disabled={coins < HEART_COST_COINS}
+                                onClick={() => buyLifeForMode('space')}
+                                className={`px-2.5 py-1 rounded-md text-xs font-bold transition-colors whitespace-nowrap ${
+                                  coins >= HEART_COST_COINS
+                                    ? 'bg-amber-400 hover:bg-amber-300 text-slate-950 cursor-pointer'
+                                    : 'bg-slate-800 text-slate-500 cursor-not-allowed'
+                                }`}
+                              >
+                                {t.buyStarBtn}
+                              </button>
+                            )}
+                          </div>
+                        </div>
+
+                        {stars <= 0 && (
+                          <p className="text-xs sm:text-sm font-semibold text-rose-300 mb-3">
+                            {t.noStarsNotice(formatCountdown(nextStarInMs))}
+                          </p>
+                        )}
+
+                        <div className="grid grid-cols-4 sm:grid-cols-5 gap-2.5">
+                          {SPACE_STAGES.map((cfg) => {
+                            const isCurrent = isSpaceMode && cfg.stage === stageNum;
+                            const isCompleted = completedSpaceStages.includes(
+                              cfg.stage
+                            );
+                            const unlocked = isStageUnlocked(
+                              cfg.stage,
+                              completedSpaceStages
+                            );
+                            const canEnter = unlocked && stars > 0;
+                            const bossCfg = getSpaceBossConfig(cfg.stage);
+                            const isSupremeBoss = Boolean(bossCfg?.isSupreme);
+                            const bossLabel = bossCfg
+                              ? lang === 'ar'
+                                ? bossCfg.nameAr
+                                : bossCfg.nameEn
+                              : null;
+                            return (
+                              <button
+                                key={cfg.stage}
+                                type="button"
+                                disabled={!canEnter}
+                                title={bossLabel ?? undefined}
+                                aria-label={
+                                  unlocked
+                                    ? `${t.spaceStageBanner(cfg.stage)}${
+                                        bossLabel ? ` (${bossLabel})` : ''
+                                      } — ${cfg.pointsNeeded} ${t.ptsShort}`
+                                    : t.lockedStageAria(cfg.stage)
+                                }
+                                onClick={() => {
+                                  if (canEnter) startAtStage(cfg.stage, 'space');
+                                }}
+                                className={`relative flex flex-col items-center justify-center py-3 px-2 rounded-lg border transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-400 ${
+                                  !unlocked
+                                    ? isSupremeBoss
+                                      ? 'border-yellow-400/50 bg-gradient-to-b from-red-950/60 to-amber-950/40 text-amber-200/65 opacity-85 cursor-not-allowed'
+                                      : bossCfg
+                                      ? 'border-amber-400/25 bg-rose-950/35 text-slate-400 opacity-75 cursor-not-allowed'
+                                      : 'border-white/5 bg-slate-950/70 text-slate-500 opacity-65 cursor-not-allowed'
+                                    : isCurrent
+                                    ? isSupremeBoss
+                                      ? 'border-yellow-300 bg-gradient-to-b from-red-600/45 via-amber-500/30 to-rose-950/70 text-yellow-100 ring-1 ring-yellow-300/60 cursor-pointer'
+                                      : bossCfg
+                                      ? 'border-amber-300 bg-gradient-to-b from-rose-500/35 via-amber-500/25 to-violet-600/30 text-white cursor-pointer'
+                                      : 'border-violet-400 bg-gradient-to-b from-violet-500/30 to-cyan-500/20 text-white cursor-pointer'
+                                    : isCompleted
+                                    ? isSupremeBoss
+                                      ? 'border-yellow-400/80 bg-gradient-to-b from-red-700/35 via-amber-600/25 to-rose-950/65 text-yellow-100 hover:brightness-110 cursor-pointer'
+                                      : bossCfg
+                                      ? 'border-amber-400/60 bg-gradient-to-b from-rose-500/25 to-violet-600/25 text-amber-100 hover:brightness-110 cursor-pointer'
+                                      : 'border-fuchsia-400/40 bg-gradient-to-b from-violet-500/20 to-indigo-500/15 text-violet-50 hover:from-violet-500/30 hover:to-indigo-500/25 cursor-pointer'
+                                    : isSupremeBoss
+                                    ? 'border-yellow-400/85 bg-gradient-to-b from-red-950/90 via-[#3b0a14]/95 to-amber-950/85 text-yellow-100 hover:border-yellow-200 cursor-pointer'
+                                    : bossCfg
+                                    ? 'border-rose-400/60 bg-gradient-to-b from-rose-950/80 via-[#2a0f2e]/90 to-violet-950/80 text-amber-100 hover:border-amber-300 cursor-pointer'
+                                    : 'border-violet-400/25 bg-[#160f2b]/85 text-violet-100 hover:bg-[#221642]/90 hover:border-violet-300/50 cursor-pointer'
+                                }`}
+                              >
+                                {bossCfg && (
+                                  <span
+                                    className={`absolute -top-2 start-1/2 -translate-x-1/2 rtl:translate-x-1/2 px-1.5 py-0.5 rounded text-[9px] font-black shadow whitespace-nowrap leading-none ${
+                                      isSupremeBoss
+                                        ? 'bg-gradient-to-r from-red-600 via-amber-400 to-yellow-300 text-slate-950 ring-1 ring-yellow-100/80'
+                                        : 'bg-gradient-to-r from-rose-600 to-amber-500 text-white'
+                                    }`}
+                                  >
+                                    {isSupremeBoss
+                                      ? t.spaceSupremeBossBadge
+                                      : t.spaceBossBadge}
+                                  </span>
+                                )}
+                                {!unlocked ? (
+                                  <span
+                                    className="absolute top-1.5 end-1.5 text-slate-500"
+                                    aria-hidden="true"
+                                  >
+                                    <svg
+                                      viewBox="0 0 24 24"
+                                      className="w-3.5 h-3.5"
+                                      fill="none"
+                                      stroke="currentColor"
+                                      strokeWidth="2.2"
+                                      strokeLinecap="round"
+                                      strokeLinejoin="round"
+                                    >
+                                      <rect x="5" y="11" width="14" height="10" rx="2" />
+                                      <path d="M8 11V7a4 4 0 0 1 8 0v4" />
+                                    </svg>
+                                  </span>
+                                ) : (
+                                  isCompleted && (
+                                    <span
+                                      className="absolute top-1.5 end-1.5 text-cyan-300"
+                                      aria-hidden="true"
+                                    >
+                                      <svg
+                                        viewBox="0 0 24 24"
+                                        className="w-3.5 h-3.5"
+                                        fill="none"
+                                        stroke="currentColor"
+                                        strokeWidth="3"
+                                        strokeLinecap="round"
+                                        strokeLinejoin="round"
+                                      >
+                                        <polyline points="20 6 9 17 4 12" />
+                                      </svg>
+                                    </span>
+                                  )
+                                )}
+                                <span className="font-num text-base sm:text-lg font-bold">
+                                  {cfg.stage}
+                                </span>
+                                <span
+                                  className={`font-num text-[11px] whitespace-nowrap ${
+                                    isSupremeBoss
+                                      ? unlocked
+                                        ? 'text-yellow-300 font-bold'
+                                        : 'text-yellow-300/65 font-bold'
+                                      : bossCfg
+                                      ? unlocked
+                                        ? 'text-amber-200/90'
+                                        : 'text-amber-300/50'
+                                      : unlocked
+                                      ? 'text-violet-200/80'
+                                      : 'text-slate-600'
+                                  }`}
+                                >
+                                  {bossCfg
+                                    ? `HP ${cfg.pointsNeeded}`
+                                    : `${cfg.pointsNeeded} ${t.ptsShort}`}
+                                </span>
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </>
+                    )
                   ) : stagesModalTab === 'gold' ? (
                     !goldUnlocked ? (
                       <div className="rounded-xl border border-yellow-400/35 bg-gradient-to-b from-[#332208]/90 via-[#1b150a]/95 to-[#0c1624]/95 p-5 text-center">
@@ -9421,7 +13014,11 @@ export default function App() {
                 <div className="flex items-center justify-between gap-2.5 px-3.5 sm:px-5 py-3 sm:py-4 border-b border-white/10 shrink-0">
                   <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5 min-w-0">
                     <h2 className="text-base sm:text-xl font-bold text-white leading-tight">
-                      {indexModalWorld === 'gold'
+                      {indexModalWorld === 'monster'
+                        ? t.monsterIndexWorldBtn
+                        : indexModalWorld === 'space'
+                        ? t.spaceIndexWorldBtn
+                        : indexModalWorld === 'gold'
                         ? t.goldIndexWorldBtn
                         : indexModalWorld === 'fruit'
                         ? t.fruitIndexWorldBtn
@@ -9429,7 +13026,11 @@ export default function App() {
                     </h2>
                     <span
                       className={`text-xs sm:text-sm font-semibold font-num whitespace-nowrap ${
-                        indexModalWorld === 'gold'
+                        indexModalWorld === 'monster'
+                          ? 'text-rose-300'
+                          : indexModalWorld === 'space'
+                          ? 'text-violet-300'
+                          : indexModalWorld === 'gold'
                           ? 'text-yellow-300'
                           : indexModalWorld === 'fruit'
                           ? 'text-amber-300'
@@ -9437,7 +13038,17 @@ export default function App() {
                       }`}
                     >
                       ·{' '}
-                      {indexModalWorld === 'gold'
+                      {indexModalWorld === 'monster'
+                        ? t.indexDiscoveredCount(
+                            discoveredMonsterItems.length,
+                            MONSTER_INDEX_CATALOG.length
+                          )
+                        : indexModalWorld === 'space'
+                        ? t.indexDiscoveredCount(
+                            discoveredSpaceItems.length,
+                            SPACE_INDEX_CATALOG.length
+                          )
+                        : indexModalWorld === 'gold'
                         ? t.indexDiscoveredCount(
                             discoveredGoldItems.length,
                             GOLD_INDEX_CATALOG.length
@@ -9476,18 +13087,18 @@ export default function App() {
                 </div>
 
                 <div className="px-3.5 sm:px-5 pt-3 pb-4 sm:pb-5 overflow-y-auto overflow-x-hidden">
-                  {/* World Switcher: Normal vs Fruit vs Gold Index */}
+                  {/* World Switcher: Normal vs Fruit vs Gold vs Space vs Monster Index */}
                   <div
                     role="tablist"
                     aria-label={t.indexModalTitle}
-                    className="grid grid-cols-3 gap-1.5 p-1 rounded-lg bg-slate-950/75 border border-white/10 mb-3"
+                    className="grid grid-cols-2 sm:grid-cols-3 gap-1.5 p-1 rounded-lg bg-slate-950/75 border border-white/10 mb-3"
                   >
                     <button
                       type="button"
                       role="tab"
                       aria-selected={indexModalWorld === 'normal'}
                       onClick={() => setIndexModalWorld('normal')}
-                      className={`min-w-0 min-h-[44px] sm:h-9 px-1.5 py-1.5 sm:py-0 rounded-md flex flex-col sm:flex-row items-center justify-center gap-0.5 sm:gap-1 text-[11px] sm:text-xs font-bold leading-tight text-center transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400 cursor-pointer ${
+                      className={`min-w-0 min-h-[40px] sm:h-9 px-1.5 py-1 sm:py-0 rounded-md flex flex-col sm:flex-row items-center justify-center gap-0.5 sm:gap-1 text-[11px] font-bold leading-tight text-center transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400 cursor-pointer ${
                         indexModalWorld === 'normal'
                           ? 'bg-sky-500 text-slate-950'
                           : 'text-slate-300 hover:text-white hover:bg-slate-800/70'
@@ -9510,7 +13121,7 @@ export default function App() {
                       role="tab"
                       aria-selected={indexModalWorld === 'fruit'}
                       onClick={() => setIndexModalWorld('fruit')}
-                      className={`min-w-0 min-h-[44px] sm:h-9 px-1.5 py-1.5 sm:py-0 rounded-md flex flex-col sm:flex-row items-center justify-center gap-0.5 sm:gap-1 text-[11px] sm:text-xs font-bold leading-tight text-center transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400 cursor-pointer ${
+                      className={`min-w-0 min-h-[40px] sm:h-9 px-1.5 py-1 sm:py-0 rounded-md flex flex-col sm:flex-row items-center justify-center gap-0.5 sm:gap-1 text-[11px] font-bold leading-tight text-center transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400 cursor-pointer ${
                         indexModalWorld === 'fruit'
                           ? 'bg-amber-400 text-slate-950'
                           : 'text-amber-200 hover:text-white hover:bg-amber-500/15'
@@ -9533,7 +13144,7 @@ export default function App() {
                       role="tab"
                       aria-selected={indexModalWorld === 'gold'}
                       onClick={() => setIndexModalWorld('gold')}
-                      className={`min-w-0 min-h-[44px] sm:h-9 px-1.5 py-1.5 sm:py-0 rounded-md flex flex-col sm:flex-row items-center justify-center gap-0.5 sm:gap-1 text-[11px] sm:text-xs font-bold leading-tight text-center transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-yellow-300 cursor-pointer ${
+                      className={`min-w-0 min-h-[40px] sm:h-9 px-1.5 py-1 sm:py-0 rounded-md flex flex-col sm:flex-row items-center justify-center gap-0.5 sm:gap-1 text-[11px] font-bold leading-tight text-center transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-yellow-300 cursor-pointer ${
                         indexModalWorld === 'gold'
                           ? 'bg-gradient-to-r from-yellow-400 via-amber-400 to-sky-400 text-slate-950'
                           : 'text-yellow-200 hover:text-white hover:bg-yellow-500/15'
@@ -9550,10 +13161,62 @@ export default function App() {
                         {discoveredGoldItems.length}/{GOLD_INDEX_CATALOG.length}
                       </span>
                     </button>
+
+                    <button
+                      type="button"
+                      role="tab"
+                      aria-selected={indexModalWorld === 'space'}
+                      onClick={() => setIndexModalWorld('space')}
+                      className={`min-w-0 min-h-[40px] sm:h-9 px-1.5 py-1 sm:py-0 rounded-md flex flex-col sm:flex-row items-center justify-center gap-0.5 sm:gap-1 text-[11px] font-bold leading-tight text-center transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-300 cursor-pointer ${
+                        indexModalWorld === 'space'
+                          ? 'bg-gradient-to-r from-violet-400 via-fuchsia-400 to-cyan-400 text-slate-950'
+                          : 'text-violet-200 hover:text-white hover:bg-violet-500/20'
+                      }`}
+                    >
+                      <span className="max-w-full truncate">{t.spaceIndexWorldBtn}</span>
+                      <span
+                        className={`font-num text-[10px] shrink-0 ${
+                          indexModalWorld === 'space'
+                            ? 'text-slate-950/85'
+                            : 'text-violet-300/90'
+                        }`}
+                      >
+                        {discoveredSpaceItems.length}/{SPACE_INDEX_CATALOG.length}
+                      </span>
+                    </button>
+
+                    <button
+                      type="button"
+                      role="tab"
+                      aria-selected={indexModalWorld === 'monster'}
+                      onClick={() => setIndexModalWorld('monster')}
+                      className={`col-span-2 sm:col-span-2 min-w-0 min-h-[40px] sm:h-9 px-1.5 py-1 sm:py-0 rounded-md flex flex-row items-center justify-center gap-1 text-[11px] font-extrabold leading-tight text-center transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-400 cursor-pointer ${
+                        indexModalWorld === 'monster'
+                          ? 'bg-gradient-to-r from-amber-400 via-rose-500 to-red-600 text-white'
+                          : 'text-rose-200 hover:text-white hover:bg-rose-500/20'
+                      }`}
+                    >
+                      <span className="max-w-full truncate">
+                        👹 {t.monsterIndexWorldBtn}
+                      </span>
+                      <span
+                        className={`font-num text-[10px] shrink-0 ${
+                          indexModalWorld === 'monster'
+                            ? 'text-amber-100'
+                            : 'text-rose-300/90'
+                        }`}
+                      >
+                        {discoveredMonsterItems.length}/{MONSTER_INDEX_CATALOG.length}
+                      </span>
+                    </button>
                   </div>
 
                   <p className="text-xs sm:text-sm text-slate-300 mb-3 leading-relaxed">
-                    {indexModalWorld === 'gold'
+                    {indexModalWorld === 'monster'
+                      ? t.monsterIndexModalHint
+                      : indexModalWorld === 'space'
+                      ? t.spaceIndexModalHint
+                      : indexModalWorld === 'gold'
                       ? t.goldIndexModalHint
                       : indexModalWorld === 'fruit'
                       ? t.fruitIndexModalHint
@@ -9573,7 +13236,11 @@ export default function App() {
                       onClick={() => setIndexTab('positive')}
                       className={`min-w-0 h-10 px-2 sm:px-3 rounded-md inline-flex items-center justify-center gap-1.5 sm:gap-2 text-xs sm:text-sm font-bold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400 cursor-pointer ${
                         indexTab === 'positive'
-                          ? indexModalWorld === 'gold'
+                          ? indexModalWorld === 'monster'
+                            ? 'bg-gradient-to-r from-amber-400 to-rose-500 text-slate-950'
+                            : indexModalWorld === 'space'
+                            ? 'bg-gradient-to-r from-violet-400 to-cyan-400 text-slate-950'
+                            : indexModalWorld === 'gold'
                             ? 'bg-gradient-to-r from-yellow-400 to-sky-400 text-slate-950'
                             : indexModalWorld === 'fruit'
                             ? 'bg-emerald-500 text-slate-950'
@@ -9582,7 +13249,11 @@ export default function App() {
                       }`}
                     >
                       <span className="truncate">
-                        {indexModalWorld === 'gold'
+                        {indexModalWorld === 'monster'
+                          ? t.monsterIndexPlusTab
+                          : indexModalWorld === 'space'
+                          ? t.spaceIndexPlusTab
+                          : indexModalWorld === 'gold'
                           ? t.goldIndexPlusTab
                           : indexModalWorld === 'fruit'
                           ? t.fruitIndexPlusTab
@@ -9593,7 +13264,11 @@ export default function App() {
                           indexTab === 'positive' ? 'text-slate-900' : 'text-slate-400'
                         }`}
                       >
-                        {indexModalWorld === 'gold'
+                        {indexModalWorld === 'monster'
+                          ? `${monsterPositiveDiscoveredCount}/${monsterPositiveCatalog.length}`
+                          : indexModalWorld === 'space'
+                          ? `${spacePositiveDiscoveredCount}/${spacePositiveCatalog.length}`
+                          : indexModalWorld === 'gold'
                           ? `${goldPositiveDiscoveredCount}/${goldPositiveCatalog.length}`
                           : indexModalWorld === 'fruit'
                           ? `${fruitPositiveDiscoveredCount}/${fruitPositiveCatalog.length}`
@@ -9613,7 +13288,11 @@ export default function App() {
                       }`}
                     >
                       <span className="truncate">
-                        {indexModalWorld === 'gold'
+                        {indexModalWorld === 'monster'
+                          ? t.monsterIndexMinusTab
+                          : indexModalWorld === 'space'
+                          ? t.spaceIndexMinusTab
+                          : indexModalWorld === 'gold'
                           ? t.goldIndexMinusTab
                           : indexModalWorld === 'fruit'
                           ? t.fruitIndexMinusTab
@@ -9624,7 +13303,11 @@ export default function App() {
                           indexTab === 'negative' ? 'text-rose-100' : 'text-slate-400'
                         }`}
                       >
-                        {indexModalWorld === 'gold'
+                        {indexModalWorld === 'monster'
+                          ? `${monsterNegativeDiscoveredCount}/${monsterNegativeCatalog.length}`
+                          : indexModalWorld === 'space'
+                          ? `${spaceNegativeDiscoveredCount}/${spaceNegativeCatalog.length}`
+                          : indexModalWorld === 'gold'
                           ? `${goldNegativeDiscoveredCount}/${goldNegativeCatalog.length}`
                           : indexModalWorld === 'fruit'
                           ? `${fruitNegativeDiscoveredCount}/${fruitNegativeCatalog.length}`
@@ -9635,7 +13318,174 @@ export default function App() {
 
                   {/* Entries List */}
                   <div className="space-y-3" role="tabpanel">
-                    {indexModalWorld === 'gold'
+                    {indexModalWorld === 'monster'
+                      ? activeMonsterIndexEntries.map((entry) => {
+                          const discovered = discoveredMonsterItems.includes(
+                            entry.kind
+                          );
+                          const isPositive = entry.category === 'positive';
+                          return (
+                            <div
+                              key={entry.kind}
+                              className={`flex items-start gap-3 p-3 sm:p-3.5 rounded-lg border transition-colors ${
+                                discovered
+                                  ? isPositive
+                                    ? 'border-rose-400/35 bg-gradient-to-r from-[#280b18]/90 to-[#180d22]/90'
+                                    : 'border-red-500/30 bg-slate-900/85'
+                                  : 'border-white/8 bg-slate-950/75 opacity-85'
+                              }`}
+                            >
+                              <div
+                                className={`w-11 h-11 sm:w-12 sm:h-12 rounded-lg border flex items-center justify-center shrink-0 mt-0.5 ${
+                                  discovered
+                                    ? 'border-rose-400/35 bg-[#1b0812]'
+                                    : 'border-rose-400/18 bg-[#120710]'
+                                }`}
+                                aria-hidden="true"
+                              >
+                                <MonsterIndexIcon kind={entry.kind} />
+                              </div>
+
+                              <div className="min-w-0 flex-1">
+                                {discovered ? (
+                                  <>
+                                    <div className="flex flex-wrap items-baseline justify-between gap-x-2 gap-y-0.5">
+                                      <span className="text-sm sm:text-base font-bold text-white leading-snug break-words">
+                                        {lang === 'ar' ? entry.nameAr : entry.nameEn}
+                                      </span>
+                                      <span
+                                        className={`font-num text-xs sm:text-sm font-bold leading-snug break-words ${
+                                          isPositive
+                                            ? 'text-amber-300'
+                                            : 'text-rose-400'
+                                        }`}
+                                      >
+                                        {lang === 'ar' ? entry.valueAr : entry.valueEn}
+                                      </span>
+                                    </div>
+                                    <div className="font-num text-[11px] font-semibold text-rose-300/90 mt-1">
+                                      {lang === 'ar'
+                                        ? `تظهر من المرحلة ${entry.minStage}`
+                                        : `Appears from Stage ${entry.minStage}`}
+                                    </div>
+                                    <p className="text-xs text-slate-300 mt-1 leading-relaxed break-words">
+                                      {lang === 'ar'
+                                        ? entry.benefitAr
+                                        : entry.benefitEn}
+                                    </p>
+                                  </>
+                                ) : (
+                                  <>
+                                    <div className="flex flex-wrap items-baseline justify-between gap-x-2 gap-y-0.5">
+                                      <span className="text-sm sm:text-base font-bold text-slate-100 leading-snug break-words">
+                                        {lang === 'ar' ? entry.nameAr : entry.nameEn}
+                                      </span>
+                                      <span className="text-[11px] font-semibold text-slate-400 whitespace-nowrap">
+                                        {lang === 'ar' ? 'فائدته مقفلة' : 'Effect Locked'}
+                                      </span>
+                                    </div>
+                                    <div className="font-num text-[11px] font-semibold text-rose-300/85 mt-1">
+                                      {lang === 'ar'
+                                        ? `تظهر من المرحلة ${entry.minStage}`
+                                        : `Appears from Stage ${entry.minStage}`}
+                                    </div>
+                                    <p className="text-xs text-slate-400 mt-1 leading-relaxed break-words">
+                                      {lang === 'ar'
+                                        ? 'الفائدة مخفية — التقطه أو المسه أثناء اللعب لفتح فائدته.'
+                                        : 'Benefit hidden — catch or touch it during play to unlock its effect.'}
+                                    </p>
+                                  </>
+                                )}
+                              </div>
+                            </div>
+                          );
+                        })
+                      : indexModalWorld === 'space'
+                      ? activeSpaceIndexEntries.map((entry) => {
+                          const discovered = discoveredSpaceItems.includes(entry.kind);
+                          const isPositive = entry.category === 'positive';
+                          return (
+                            <div
+                              key={entry.kind}
+                              className={`flex items-start gap-3 p-3 sm:p-3.5 rounded-lg border transition-colors ${
+                                discovered
+                                  ? isPositive
+                                    ? 'border-violet-400/35 bg-gradient-to-r from-[#1b1038]/90 to-[#0e1932]/90'
+                                    : 'border-rose-400/25 bg-slate-900/85'
+                                  : 'border-white/8 bg-slate-950/75 opacity-85'
+                              }`}
+                            >
+                              <div
+                                className={`w-11 h-11 sm:w-12 sm:h-12 rounded-lg border flex items-center justify-center shrink-0 mt-0.5 ${
+                                  discovered
+                                    ? 'border-violet-400/30 bg-[#120926]'
+                                    : 'border-violet-400/18 bg-[#0e081d]'
+                                }`}
+                                aria-hidden="true"
+                              >
+                                <SpaceIndexIcon kind={entry.kind} />
+                              </div>
+
+                              <div className="min-w-0 flex-1">
+                                {discovered ? (
+                                  <>
+                                    <div className="flex flex-wrap items-baseline justify-between gap-x-2 gap-y-0.5">
+                                      <span className="text-sm sm:text-base font-bold text-white leading-snug break-words">
+                                        {lang === 'ar' ? entry.nameAr : entry.nameEn}
+                                      </span>
+                                      <span
+                                        className={`font-num text-xs sm:text-sm font-bold leading-snug break-words ${
+                                          entry.kind === 'space_omega_crystal' ||
+                                          entry.kind === 'space_crown_nova'
+                                            ? 'text-amber-300'
+                                            : entry.kind === 'space_galaxy'
+                                            ? 'text-fuchsia-300'
+                                            : isPositive
+                                            ? 'text-cyan-300'
+                                            : 'text-rose-400'
+                                        }`}
+                                      >
+                                        {lang === 'ar' ? entry.valueAr : entry.valueEn}
+                                      </span>
+                                    </div>
+                                    <div className="font-num text-[11px] font-semibold text-violet-300/90 mt-1">
+                                      {lang === 'ar'
+                                        ? `تظهر من المرحلة ${entry.minStage}`
+                                        : `Appears from Stage ${entry.minStage}`}
+                                    </div>
+                                    <p className="text-xs text-slate-300 mt-1 leading-relaxed break-words">
+                                      {lang === 'ar'
+                                        ? entry.benefitAr
+                                        : entry.benefitEn}
+                                    </p>
+                                  </>
+                                ) : (
+                                  <>
+                                    <div className="flex flex-wrap items-baseline justify-between gap-x-2 gap-y-0.5">
+                                      <span className="text-sm sm:text-base font-bold text-slate-100 leading-snug break-words">
+                                        {lang === 'ar' ? entry.nameAr : entry.nameEn}
+                                      </span>
+                                      <span className="text-[11px] font-semibold text-slate-400 whitespace-nowrap">
+                                        {lang === 'ar' ? 'فائدته مقفلة' : 'Effect Locked'}
+                                      </span>
+                                    </div>
+                                    <div className="font-num text-[11px] font-semibold text-violet-300/85 mt-1">
+                                      {lang === 'ar'
+                                        ? `تظهر من المرحلة ${entry.minStage}`
+                                        : `Appears from Stage ${entry.minStage}`}
+                                    </div>
+                                    <p className="text-xs text-slate-400 mt-1 leading-relaxed break-words">
+                                      {lang === 'ar'
+                                        ? 'الفائدة مخفية — التقطه أو المسه أثناء اللعب لفتح فائدته.'
+                                        : 'Benefit hidden — catch or touch it during play to unlock its effect.'}
+                                    </p>
+                                  </>
+                                )}
+                              </div>
+                            </div>
+                          );
+                        })
+                      : indexModalWorld === 'gold'
                       ? activeGoldIndexEntries.map((entry) => {
                           const discovered = discoveredGoldItems.includes(entry.kind);
                           const isPositive = entry.category === 'positive';
@@ -10370,12 +14220,15 @@ export default function App() {
               lang={lang}
               coins={coins}
               pinkCoins={pinkCoins}
+              spaceCoins={spaceCoins}
               lives={lives}
               maxLives={effectiveMaxLives}
               corn={corn}
               maxCorn={MAX_CORN}
               diamonds={diamonds}
               maxDiamonds={MAX_DIAMONDS}
+              stars={stars}
+              maxStars={effectiveMaxStars}
               shop={shop}
               activeTab={shopTab}
               pointsSubTab={shopPointsSubTab}
@@ -10387,6 +14240,11 @@ export default function App() {
               onSelectOrBuyMinusSkin={selectOrBuyMinusSkin}
               onBuySupply={buySupply}
               onBuyMaxHeartsUpgrade={buyMaxHeartsUpgrade}
+              onSelectOrBuySpaceSkin={selectOrBuySpaceSkin}
+              onBuySpaceSupply={buySpaceSupply}
+              onBuyMaxStarsUpgrade={buyMaxStarsUpgrade}
+              onBuySpaceMagnetUpgrade={buySpaceMagnetUpgrade}
+              onBuySpaceStartShieldUpgrade={buySpaceStartShieldUpgrade}
             />
           )}
 
@@ -10476,6 +14334,32 @@ export default function App() {
                         useBtnClass:
                           'bg-gradient-to-r from-yellow-400 to-sky-400 hover:brightness-110 text-slate-950 cursor-pointer',
                       },
+                      {
+                        mode: 'space' as GameMode,
+                        title: t.bagStarsTitle,
+                        sub: t.bagStarsSub,
+                        stored: bag.stars,
+                        active: stars,
+                        max: effectiveMaxStars,
+                        cost: HEART_COST_COINS,
+                        borderClass: 'border-violet-400/30 bg-violet-950/25',
+                        countClass: 'text-violet-300',
+                        useBtnClass:
+                          'bg-gradient-to-r from-violet-400 to-cyan-400 hover:brightness-110 text-slate-950 cursor-pointer',
+                      },
+                      {
+                        mode: 'monster' as GameMode,
+                        title: t.bagSkullsTitle,
+                        sub: t.bagSkullsSub,
+                        stored: bag.skulls,
+                        active: monsterSkulls,
+                        max: MAX_MONSTER_SKULLS,
+                        cost: HEART_COST_COINS,
+                        borderClass: 'border-rose-500/35 bg-rose-950/30',
+                        countClass: 'text-rose-300',
+                        useBtnClass:
+                          'bg-gradient-to-r from-amber-400 to-rose-500 hover:brightness-110 text-slate-950 cursor-pointer',
+                      },
                     ] as const
                   ).map((row) => {
                     const isPinkRow = row.mode === 'gold';
@@ -10504,6 +14388,10 @@ export default function App() {
                                 </svg>
                               ) : row.mode === 'fruit' ? (
                                 <CornIcon className="w-6 h-6" />
+                              ) : row.mode === 'space' ? (
+                                <SpaceStarIcon className="w-6 h-6" />
+                              ) : row.mode === 'monster' ? (
+                                <MonsterSkullIcon className="w-6 h-6" />
                               ) : (
                                 <DiamondIcon className="w-6 h-6" />
                               )}
@@ -10600,8 +14488,8 @@ export default function App() {
           {/* Settings Overlay ("الإعدادات") */}
           {settingsModalOpen && (
             <div className="absolute inset-0 z-20 flex items-center justify-center p-4 bg-[#060c17]/82 backdrop-blur-[4px]">
-              <div className="w-full max-w-md rounded-xl border border-white/14 bg-[#0f1a2e]/98 shadow-2xl overflow-hidden">
-                <div className="flex items-center justify-between gap-3 px-5 py-4 border-b border-white/10">
+              <div className="w-full max-w-lg max-h-[86vh] flex flex-col rounded-xl border border-white/14 bg-[#0f1a2e]/98 shadow-2xl overflow-hidden">
+                <div className="flex items-center justify-between gap-3 px-5 py-4 border-b border-white/10 shrink-0">
                   <h2 className="text-lg sm:text-xl font-bold text-white">
                     {t.settingsTitle}
                   </h2>
@@ -10627,87 +14515,154 @@ export default function App() {
                   </button>
                 </div>
 
-                <div className="divide-y divide-white/10 px-5">
-                  {/* Music Toggle */}
-                  <div className="flex items-center justify-between gap-4 py-4">
-                    <div className="min-w-0">
-                      <div className="text-sm sm:text-base font-semibold text-white">
-                        {t.musicLabel}
-                      </div>
-                      <div className="text-xs text-slate-400 mt-0.5">
-                        {t.musicDesc}
-                      </div>
-                    </div>
+                {/* Settings Tabs: General / Stats */}
+                <div className="px-5 pt-3 pb-2 border-b border-white/10 shrink-0">
+                  <div className="grid grid-cols-2 gap-1.5 p-1 rounded-lg bg-slate-950/75 border border-white/10">
                     <button
                       type="button"
-                      role="switch"
-                      aria-checked={musicEnabled}
-                      onClick={toggleMusic}
-                      className={`h-10 min-w-[84px] px-3.5 rounded-lg border text-xs sm:text-sm font-bold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400 whitespace-nowrap shrink-0 cursor-pointer ${
-                        musicEnabled
-                          ? 'border-sky-400/50 bg-sky-500 text-slate-950 hover:bg-sky-400'
-                          : 'border-white/15 bg-slate-900 text-slate-300 hover:bg-slate-800'
+                      onClick={() => setSettingsTab('general')}
+                      className={`h-9 rounded-md text-xs sm:text-sm font-bold transition-colors cursor-pointer ${
+                        settingsTab === 'general'
+                          ? 'bg-sky-500 text-slate-950'
+                          : 'text-slate-300 hover:text-white'
                       }`}
                     >
-                      {musicEnabled ? t.onLabel : t.offLabel}
+                      {lang === 'ar' ? 'الإعدادات العامة' : 'General'}
                     </button>
-                  </div>
-
-                  {/* Sound Effects Toggle */}
-                  <div className="flex items-center justify-between gap-4 py-4">
-                    <div className="min-w-0">
-                      <div className="text-sm sm:text-base font-semibold text-white">
-                        {t.sfxLabel}
-                      </div>
-                      <div className="text-xs text-slate-400 mt-0.5">
-                        {t.sfxDesc}
-                      </div>
-                    </div>
                     <button
                       type="button"
-                      role="switch"
-                      aria-checked={sfxEnabled}
-                      onClick={toggleSfx}
-                      className={`h-10 min-w-[84px] px-3.5 rounded-lg border text-xs sm:text-sm font-bold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400 whitespace-nowrap shrink-0 cursor-pointer ${
-                        sfxEnabled
-                          ? 'border-sky-400/50 bg-sky-500 text-slate-950 hover:bg-sky-400'
-                          : 'border-white/15 bg-slate-900 text-slate-300 hover:bg-slate-800'
+                      onClick={() => setSettingsTab('stats')}
+                      className={`h-9 rounded-md text-xs sm:text-sm font-bold transition-colors cursor-pointer ${
+                        settingsTab === 'stats'
+                          ? 'bg-amber-400 text-slate-950'
+                          : 'text-slate-300 hover:text-white'
                       }`}
                     >
-                      {sfxEnabled ? t.onLabel : t.offLabel}
+                      {lang === 'ar' ? 'الإحصائيات' : 'Stats'}
                     </button>
                   </div>
+                </div>
 
-                  {/* Language Segmented Selector */}
-                  <div className="flex items-center justify-between gap-4 py-4">
-                    <div className="text-sm sm:text-base font-semibold text-white">
-                      {t.languageLabel}
+                <div className="flex-1 min-h-0 overflow-y-auto px-5">
+                  {settingsTab === 'general' ? (
+                    <div className="divide-y divide-white/10">
+                      {/* Music Toggle */}
+                      <div className="flex items-center justify-between gap-4 py-4">
+                        <div className="min-w-0">
+                          <div className="text-sm sm:text-base font-semibold text-white">
+                            {t.musicLabel}
+                          </div>
+                          <div className="text-xs text-slate-400 mt-0.5">
+                            {t.musicDesc}
+                          </div>
+                        </div>
+                        <button
+                          type="button"
+                          role="switch"
+                          aria-checked={musicEnabled}
+                          onClick={toggleMusic}
+                          className={`h-10 min-w-[84px] px-3.5 rounded-lg border text-xs sm:text-sm font-bold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400 whitespace-nowrap shrink-0 cursor-pointer ${
+                            musicEnabled
+                              ? 'border-sky-400/50 bg-sky-500 text-slate-950 hover:bg-sky-400'
+                              : 'border-white/15 bg-slate-900 text-slate-300 hover:bg-slate-800'
+                          }`}
+                        >
+                          {musicEnabled ? t.onLabel : t.offLabel}
+                        </button>
+                      </div>
+
+                      {/* Sound Effects Toggle */}
+                      <div className="flex items-center justify-between gap-4 py-4">
+                        <div className="min-w-0">
+                          <div className="text-sm sm:text-base font-semibold text-white">
+                            {t.sfxLabel}
+                          </div>
+                          <div className="text-xs text-slate-400 mt-0.5">
+                            {t.sfxDesc}
+                          </div>
+                        </div>
+                        <button
+                          type="button"
+                          role="switch"
+                          aria-checked={sfxEnabled}
+                          onClick={toggleSfx}
+                          className={`h-10 min-w-[84px] px-3.5 rounded-lg border text-xs sm:text-sm font-bold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400 whitespace-nowrap shrink-0 cursor-pointer ${
+                            sfxEnabled
+                              ? 'border-sky-400/50 bg-sky-500 text-slate-950 hover:bg-sky-400'
+                              : 'border-white/15 bg-slate-900 text-slate-300 hover:bg-slate-800'
+                          }`}
+                        >
+                          {sfxEnabled ? t.onLabel : t.offLabel}
+                        </button>
+                      </div>
+
+                      {/* Language Segmented Selector */}
+                      <div className="flex items-center justify-between gap-4 py-4">
+                        <div className="text-sm sm:text-base font-semibold text-white">
+                          {t.languageLabel}
+                        </div>
+                        <div className="flex items-center gap-1 p-1 rounded-lg bg-slate-900 border border-white/10 shrink-0">
+                          <button
+                            type="button"
+                            onClick={() => setLang('ar')}
+                            className={`h-8 px-3 rounded-md text-xs sm:text-sm font-semibold transition-colors whitespace-nowrap cursor-pointer ${
+                              lang === 'ar'
+                                ? 'bg-sky-500 text-slate-950'
+                                : 'text-slate-300 hover:text-white'
+                            }`}
+                          >
+                            العربية
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setLang('en')}
+                            className={`h-8 px-3 rounded-md text-xs sm:text-sm font-semibold transition-colors whitespace-nowrap cursor-pointer ${
+                              lang === 'en'
+                                ? 'bg-sky-500 text-slate-950'
+                                : 'text-slate-300 hover:text-white'
+                            }`}
+                          >
+                            English
+                          </button>
+                        </div>
+                      </div>
                     </div>
-                    <div className="flex items-center gap-1 p-1 rounded-lg bg-slate-900 border border-white/10 shrink-0">
-                      <button
-                        type="button"
-                        onClick={() => setLang('ar')}
-                        className={`h-8 px-3 rounded-md text-xs sm:text-sm font-semibold transition-colors whitespace-nowrap cursor-pointer ${
-                          lang === 'ar'
-                            ? 'bg-sky-500 text-slate-950'
-                            : 'text-slate-300 hover:text-white'
-                        }`}
-                      >
-                        العربية
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setLang('en')}
-                        className={`h-8 px-3 rounded-md text-xs sm:text-sm font-semibold transition-colors whitespace-nowrap cursor-pointer ${
-                          lang === 'en'
-                            ? 'bg-sky-500 text-slate-950'
-                            : 'text-slate-300 hover:text-white'
-                        }`}
-                      >
-                        English
-                      </button>
-                    </div>
-                  </div>
+                  ) : (
+                    <PlayerStatsPanel
+                      lang={lang}
+                      lifetimeStats={lifetimeStats}
+                      sessionSeconds={sessionSeconds}
+                      coins={coins}
+                      pinkCoins={pinkCoins}
+                      spaceCoins={spaceCoins}
+                      bestScore={bestScore}
+                      completedNormalCount={completedStages.length}
+                      totalNormalStages={TOTAL_STAGES}
+                      completedFruitCount={completedFruitStages.length}
+                      totalFruitStages={TOTAL_FRUIT_STAGES}
+                      completedGoldCount={completedGoldStages.length}
+                      totalGoldStages={TOTAL_GOLD_STAGES}
+                      completedSpaceCount={completedSpaceStages.length}
+                      totalSpaceStages={TOTAL_SPACE_STAGES}
+                      completedMonsterCount={completedMonsterStages.length}
+                      totalMonsterStages={TOTAL_MONSTER_STAGES}
+                      totalDiscoveredCount={
+                        discoveredItems.length +
+                        discoveredFruitItems.length +
+                        discoveredGoldItems.length +
+                        discoveredSpaceItems.length +
+                        discoveredMonsterItems.length
+                      }
+                      totalBagCount={totalBagCount}
+                      ownedUpgradesCount={
+                        shop.ownedSkins.length +
+                        shop.ownedPlusSkins.length +
+                        shop.ownedMinusSkins.length +
+                        shop.ownedSpaceSkins.length +
+                        shop.maxHeartsUpgrade
+                      }
+                    />
+                  )}
                 </div>
               </div>
             </div>
@@ -10787,6 +14742,7 @@ export default function App() {
           bestScore={bestScore}
           coins={coins}
           pinkCoins={pinkCoins}
+          spaceCoins={spaceCoins}
           lives={lives}
           maxLives={effectiveMaxLives}
           completedNormalCount={completedStages.length}
@@ -10795,15 +14751,26 @@ export default function App() {
           totalFruitStages={TOTAL_FRUIT_STAGES}
           completedGoldCount={completedGoldStages.length}
           totalGoldStages={TOTAL_GOLD_STAGES}
+          completedSpaceCount={completedSpaceStages.length}
+          totalSpaceStages={TOTAL_SPACE_STAGES}
+          completedMonsterCount={completedMonsterStages.length}
+          totalMonsterStages={TOTAL_MONSTER_STAGES}
           totalBagCount={totalBagCount}
           onStartMainGame={handleLandingStartMain}
           onOpenGamesHub={handleLandingOpenGamesHub}
           onOpenDateCatcher={handleLandingOpenDateCatcher}
           onOpenDesertRally={handleLandingOpenDesertRally}
           onOpenShawarma={handleLandingOpenShawarma}
+          onOpenPlantMerge={handleLandingOpenPlantMerge}
+          onOpenMonsterArena={handleLandingOpenMonsterArena}
+          onOpenDevilTrap={handleLandingOpenDevilTrap}
           onOpenShop={() => {
             setShowLanding(false);
             openShopModal();
+          }}
+          onOpenSpaceShop={() => {
+            setShowLanding(false);
+            openSpaceShopModal();
           }}
           onOpenIndex={() => {
             setShowLanding(false);
@@ -10812,6 +14779,11 @@ export default function App() {
           onOpenBag={() => {
             setShowLanding(false);
             openBagModal();
+          }}
+          onOpenSettings={() => {
+            setShowLanding(false);
+            setSettingsTab('stats');
+            openSettingsModal();
           }}
           onReplayIntro={() => setShowIntro(true)}
           onToggleLang={() => setLang((prev) => (prev === 'ar' ? 'en' : 'ar'))}

@@ -7,6 +7,7 @@ export interface LandingBoardProps {
   bestScore: number;
   coins: number;
   pinkCoins: number;
+  spaceCoins: number;
   lives: number;
   maxLives: number;
   completedNormalCount: number;
@@ -15,15 +16,24 @@ export interface LandingBoardProps {
   totalFruitStages: number;
   completedGoldCount: number;
   totalGoldStages: number;
+  completedSpaceCount: number;
+  totalSpaceStages: number;
+  completedMonsterCount: number;
+  totalMonsterStages: number;
   totalBagCount: number;
   onStartMainGame: (mode?: GameMode) => void;
   onOpenGamesHub: () => void;
   onOpenDateCatcher: () => void;
   onOpenDesertRally: () => void;
   onOpenShawarma: () => void;
+  onOpenPlantMerge: () => void;
+  onOpenMonsterArena: () => void;
+  onOpenDevilTrap: () => void;
   onOpenShop: () => void;
+  onOpenSpaceShop: () => void;
   onOpenIndex: () => void;
   onOpenBag: () => void;
+  onOpenSettings?: () => void;
   onReplayIntro: () => void;
   onToggleLang: () => void;
 }
@@ -36,24 +46,22 @@ const LANDING_COPY = {
     navShop: 'المتجر',
     navIndex: 'الاندكس',
     topCta: 'ابدأ اللعب',
-    heroKicker: '3 عوالم · 135 مرحلة · 10 ألعاب مصغرة (3 ألعاب 3D)',
+    heroKicker: '5 عوالم · 235 مرحلة · 13 لعبة مصغرة',
     heroTitle: 'التقط النقاط النادرة، طوّر أدواتك، وتحدَّ صالة الألعاب',
     heroSubtitle:
-      'انطلق في مغامرة صياد النقاط، أو جرّب ألعابنا ثلاثية الأبعاد الجديدة «ملك الشاورما 3D» و«سباق الصحراء 3D» و«صيد التمر 3D».',
-    primaryCta: 'ابدأ صياد النقاط',
-    shawarmaCta: 'ملك الشاورما 3D',
-    desertRallyCta: 'سباق الصحراء 3D',
-    dateCatcherCta: 'صيد التمر 3D',
-    secondaryHubCta: 'صالة الألعاب (10)',
+      'انطلق عبر 5 عوالم مليئة بالمراحل والتحديات، طوّر أدواتك من المتجر، أو افتح صالة الألعاب المصغرة لاكتشاف 13 لعبة متنوعة!',
+    primaryCta: 'ابدأ اللعب',
+    secondaryHubCta: 'صالة الألعاب (13)',
     statBestScore: 'أعلى نتيجة',
     statCurrency: 'رصيد العملات',
-    statCurrencySub: (pink: number) => `${pink} عملة وردية`,
+    statCurrencySub: (pink: number, space: number) =>
+      `${pink} وردي · ${space} فضاء`,
     statStages: 'المراحل المكتملة',
     statStagesSub: (total: number) => `من أصل ${total} مرحلة`,
     statHearts: 'القلوب المتاحة',
     statHeartsSub: 'تتجدد تلقائياً كل 5 دقائق',
     sectionWorldsNum: '01.',
-    sectionWorldsTitle: 'العوالم الثلاثة',
+    sectionWorldsTitle: 'العوالم الخمسة',
     sectionWorldsSub: 'اختر عالمك وابدأ التحدي مباشرة مع حفظ كامل لتقدمك.',
     worldNormalTitle: 'العالم العادي',
     worldNormalDesc: '75 مرحلة متصاعدة مع الجوهرة الملكية +10 نقاط والعملات الوردية.',
@@ -61,21 +69,28 @@ const LANDING_COPY = {
     worldFruitDesc: '30 مرحلة من الفواكه المنعشة والذرة الذهبية وتأثيرات السرعة.',
     worldGoldTitle: 'العالم الذهبي',
     worldGoldDesc: '30 مرحلة من الكنوز والألماس والمكافآت المضاعفة.',
+    worldSpaceTitle: 'عالم الفضاء',
+    worldSpaceDesc:
+      '50 مرحلة كونية بعملات الفضاء ومتجر الفضاء — يُفتح بـ 40 فلوس أو 400 عملة وردية!',
+    worldMonsterTitle: '👹 مراحل الوحش',
+    worldMonsterDesc:
+      '50 مرحلة قتال ضد وحوش متنوعة + 🔥 «الوحش الأكبر» كل 10 مراحل (أضعف بـ 150% من الوحش الأكبر بالفضاء) ومفتوحة مجاناً!',
     enterWorldBtn: 'دخول العالم',
     sectionArcadeNum: '02.',
     sectionArcadeTitle: 'صالة الألعاب المصغرة',
-    sectionArcadeMeta: '10 ألعاب جاهزة — أحدثها: ملك الشاورما 3D',
+    sectionArcadeMeta: '13 لعبة متنوعة جاهزة للعب',
     sectionArcadeDesc:
-      'لغز الأسهم، 2048، الثعبان، أمسك التفاح، فسيفساء الأسهم، دمج الفواكه، تكسير النيون، صيد التمر 3D، سباق الصحراء 3D، وملك الشاورما 3D.',
+      'تشكيلة واسعة من ألعاب 2D و 3D للذكاء والسرعة والمنصات والقتال — افتح صالة الألعاب واختر اللعبة التي تناسبك.',
     openArcadeBtn: 'فتح صالة الألعاب',
     sectionGearNum: '03.',
     sectionGearTitle: 'المتجر والحقيبة والاندكس',
     sectionGearSub: 'انتقل بضغطة واحدة إلى أي قسم في المنصة.',
-    cardShopTitle: 'المتجر والتطويرات',
-    cardShopMeta: 'مظاهر · دروع · حتى 15 قلب',
+    cardShopTitle: 'المتجر ومتجر الفضاء',
+    cardShopMeta: 'مظاهر · مركبات فضاء · مغناطيس ودروع',
     cardShopDesc:
-      'افتح مظاهر جديدة للمركبة والنقاط، واشترِ تطويرات زيادة القلوب بالعملات الوردية.',
+      'افتح مظاهر جديدة للمركبة والنقاط، وتسوّق بعملات الفضاء في «متجر الفضاء» لشراء مركبات ومغناطيس ونجوم!',
     cardShopBtn: 'دخول المتجر',
+    cardSpaceShopBtn: 'متجر الفضاء',
     cardBagTitle: 'الحقيبة والاندكس',
     cardBagMeta: (bag: number) => `${bag} عناصر في الحقيبة`,
     cardBagDesc:
@@ -83,6 +98,7 @@ const LANDING_COPY = {
     openBagBtn: 'الحقيبة',
     openIndexBtn: 'الاندكس',
     footerNote: 'جميع التقدمات والمراحل والأرقام القياسية محفوظة تلقائياً على جهازك.',
+    openStatsLabel: 'الإعدادات والإحصائيات',
     replayIntro: 'عرض الشعار والموسيقى',
     langSwitch: 'English',
   },
@@ -93,24 +109,22 @@ const LANDING_COPY = {
     navShop: 'Shop',
     navIndex: 'Index',
     topCta: 'Start Playing',
-    heroKicker: '3 Worlds · 135 Stages · 10 Mini-Games (Three 3D Games)',
+    heroKicker: '5 Worlds · 235 Stages · 13 Mini-Games',
     heroTitle: 'Catch Rare Gems, Upgrade Your Gear, and Master the Arcade',
     heroSubtitle:
-      'Jump into Point Catcher across 3 worlds, or launch our 3D games Shawarma King 3D, Desert Rally 3D, and Date Catcher 3D right away.',
-    primaryCta: 'Play Point Catcher',
-    shawarmaCta: 'Shawarma King 3D',
-    desertRallyCta: 'Desert Rally 3D',
-    dateCatcherCta: 'Date Catcher 3D',
-    secondaryHubCta: 'Games Hub (10)',
+      'Explore 5 worlds packed with stages and upgrades, or open the Mini-Games Hub to play 13 diverse 2D and 3D games!',
+    primaryCta: 'Start Playing',
+    secondaryHubCta: 'Games Hub (13)',
     statBestScore: 'Best Score',
     statCurrency: 'Coin Balance',
-    statCurrencySub: (pink: number) => `${pink} Pink Coins`,
+    statCurrencySub: (pink: number, space: number) =>
+      `${pink} Pink · ${space} Space`,
     statStages: 'Stages Cleared',
     statStagesSub: (total: number) => `out of ${total} stages`,
     statHearts: 'Hearts Ready',
     statHeartsSub: 'Regenerates every 5 minutes',
     sectionWorldsNum: '01.',
-    sectionWorldsTitle: 'Three Worlds',
+    sectionWorldsTitle: 'Five Worlds',
     sectionWorldsSub: 'Pick any world and dive straight into your saved stage.',
     worldNormalTitle: 'Normal World',
     worldNormalDesc: '75 escalating stages featuring +10 Royal Prisms and Pink Coins.',
@@ -118,21 +132,28 @@ const LANDING_COPY = {
     worldFruitDesc: '30 vibrant fruit stages with Golden Corn lives and speed boosts.',
     worldGoldTitle: 'Gold World',
     worldGoldDesc: '30 treasure stages packed with Diamonds and high coin payouts.',
+    worldSpaceTitle: 'Space World',
+    worldSpaceDesc:
+      '50 cosmic stages with Space Coins & Space Shop — unlock for 40 Coins or 400 Pink Coins!',
+    worldMonsterTitle: '👹 Monster Stages',
+    worldMonsterDesc:
+      '50 living Monster boss battles + a 🔥 Grand Monster every 10 stages (150% weaker than Space Supreme Beast) — free to play!',
     enterWorldBtn: 'Enter World',
     sectionArcadeNum: '02.',
     sectionArcadeTitle: 'Mini-Games Hub',
-    sectionArcadeMeta: '10 playable games — Newest: Shawarma King 3D',
+    sectionArcadeMeta: '13 diverse games ready to play',
     sectionArcadeDesc:
-      'Arrow Escape, 2048, Snake, Apple Catch, Arrow Mosaic, Fruit Merge, Brick Breaker, Date Catcher 3D, Desert Rally 3D, and Shawarma King 3D.',
+      'A full collection of 2D & 3D arcade, puzzle, platformer, racing, and action games — open the Games Hub to pick any game.',
     openArcadeBtn: 'Open Games Hub',
     sectionGearNum: '03.',
     sectionGearTitle: 'Shop, Bag & Index',
     sectionGearSub: 'Jump directly to your upgrades and item encyclopedia.',
-    cardShopTitle: 'Shop & Upgrades',
-    cardShopMeta: 'Skins · Shields · Up to 15 Hearts',
+    cardShopTitle: 'Shop & Space Shop',
+    cardShopMeta: 'Skins · Starships · Magnet & Shields',
     cardShopDesc:
-      'Unlock catcher skins, custom point designs, and max-heart upgrades with your Pink Coins.',
+      'Unlock catcher skins, max hearts, and spend Space Coins in the Space Shop for starships, magnets & cosmic upgrades.',
     cardShopBtn: 'Open Shop',
+    cardSpaceShopBtn: 'Space Shop',
     cardBagTitle: 'Bag & Index',
     cardBagMeta: (bag: number) => `${bag} items stored`,
     cardBagDesc:
@@ -140,6 +161,7 @@ const LANDING_COPY = {
     openBagBtn: 'Bag',
     openIndexBtn: 'Index',
     footerNote: 'All stage progress and high scores are saved locally on your device.',
+    openStatsLabel: 'Settings & Stats',
     replayIntro: 'Replay Intro Logo',
     langSwitch: 'العربية',
   },
@@ -150,6 +172,7 @@ export const LandingBoard: React.FC<LandingBoardProps> = ({
   bestScore,
   coins,
   pinkCoins,
+  spaceCoins,
   lives,
   maxLives,
   completedNormalCount,
@@ -158,15 +181,18 @@ export const LandingBoard: React.FC<LandingBoardProps> = ({
   totalFruitStages,
   completedGoldCount,
   totalGoldStages,
+  completedSpaceCount,
+  totalSpaceStages,
+  completedMonsterCount,
+  totalMonsterStages,
   totalBagCount,
   onStartMainGame,
   onOpenGamesHub,
-  onOpenDateCatcher,
-  onOpenDesertRally,
-  onOpenShawarma,
   onOpenShop,
+  onOpenSpaceShop,
   onOpenIndex,
   onOpenBag,
+  onOpenSettings,
   onReplayIntro,
   onToggleLang,
 }) => {
@@ -174,9 +200,17 @@ export const LandingBoard: React.FC<LandingBoardProps> = ({
   const [heroImgFailed, setHeroImgFailed] = useState(false);
 
   const totalCleared =
-    completedNormalCount + completedFruitCount + completedGoldCount;
+    completedNormalCount +
+    completedFruitCount +
+    completedGoldCount +
+    completedSpaceCount +
+    completedMonsterCount;
   const totalAllStages =
-    totalNormalStages + totalFruitStages + totalGoldStages;
+    totalNormalStages +
+    totalFruitStages +
+    totalGoldStages +
+    totalSpaceStages +
+    totalMonsterStages;
 
   return (
     <div
@@ -258,22 +292,15 @@ export const LandingBoard: React.FC<LandingBoardProps> = ({
               <div className="flex flex-wrap items-center gap-2.5 sm:gap-3 pt-1">
                 <button
                   type="button"
-                  onClick={onOpenShawarma}
-                  className="h-11 sm:h-12 px-5 rounded-xl bg-gradient-to-b from-amber-300 to-orange-500 hover:from-amber-200 hover:to-orange-400 active:scale-[0.99] text-[#261105] font-extrabold text-sm sm:text-base transition-all whitespace-nowrap cursor-pointer shadow-lg"
-                >
-                  {t.shawarmaCta}
-                </button>
-                <button
-                  type="button"
                   onClick={() => onStartMainGame()}
-                  className="h-11 sm:h-12 px-5 rounded-xl bg-sky-400 hover:bg-sky-300 active:scale-[0.99] text-slate-950 font-bold text-sm sm:text-base transition-all whitespace-nowrap cursor-pointer"
+                  className="h-11 sm:h-12 px-6 rounded-xl bg-sky-400 hover:bg-sky-300 active:scale-[0.99] text-slate-950 font-extrabold text-sm sm:text-base transition-all whitespace-nowrap cursor-pointer shadow-lg"
                 >
                   {t.primaryCta}
                 </button>
                 <button
                   type="button"
                   onClick={onOpenGamesHub}
-                  className="h-11 sm:h-12 px-4 rounded-xl border border-emerald-400/35 bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-100 font-bold text-sm sm:text-base transition-colors whitespace-nowrap cursor-pointer"
+                  className="h-11 sm:h-12 px-5 rounded-xl border border-emerald-400/40 bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-100 font-bold text-sm sm:text-base transition-colors whitespace-nowrap cursor-pointer"
                 >
                   {t.secondaryHubCta}
                 </button>
@@ -316,7 +343,7 @@ export const LandingBoard: React.FC<LandingBoardProps> = ({
                 {coins.toLocaleString()}
               </span>
               <span className="font-num text-xs text-pink-300/90">
-                {t.statCurrencySub(pinkCoins)}
+                {t.statCurrencySub(pinkCoins, spaceCoins)}
               </span>
             </div>
 
@@ -358,7 +385,7 @@ export const LandingBoard: React.FC<LandingBoardProps> = ({
                 </p>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <button
                   type="button"
                   onClick={() => onStartMainGame('normal')}
@@ -421,6 +448,48 @@ export const LandingBoard: React.FC<LandingBoardProps> = ({
                     {t.enterWorldBtn}
                   </span>
                 </button>
+
+                <button
+                  type="button"
+                  onClick={() => onStartMainGame('space')}
+                  className="text-start rounded-xl border border-violet-400/35 bg-[#120b29] hover:border-violet-300/75 hover:bg-[#1d1242] p-4 flex flex-col justify-between gap-3 transition-colors cursor-pointer"
+                >
+                  <div>
+                    <div className="text-sm font-bold text-white">
+                      {t.worldSpaceTitle}
+                    </div>
+                    <div className="font-num text-xs text-violet-300 mt-0.5">
+                      {completedSpaceCount}/{totalSpaceStages}
+                    </div>
+                    <p className="text-xs text-slate-300 leading-relaxed mt-2">
+                      {t.worldSpaceDesc}
+                    </p>
+                  </div>
+                  <span className="text-xs font-bold text-violet-300">
+                    {t.enterWorldBtn}
+                  </span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => onStartMainGame('monster')}
+                  className="sm:col-span-2 text-start rounded-xl border border-rose-500/45 bg-gradient-to-br from-[#230914] via-[#1c0816] to-[#2c120d] hover:border-amber-400/75 hover:from-[#2f0c1b] hover:to-[#3b170e] p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 transition-all cursor-pointer"
+                >
+                  <div>
+                    <div className="text-sm sm:text-base font-extrabold text-amber-100">
+                      {t.worldMonsterTitle}
+                    </div>
+                    <div className="font-num text-xs text-rose-300 mt-0.5">
+                      {completedMonsterCount}/{totalMonsterStages}
+                    </div>
+                    <p className="text-xs text-rose-100/80 leading-relaxed mt-1.5">
+                      {t.worldMonsterDesc}
+                    </p>
+                  </div>
+                  <span className="text-xs font-extrabold text-amber-300 shrink-0">
+                    {t.enterWorldBtn}
+                  </span>
+                </button>
               </div>
             </div>
 
@@ -442,33 +511,10 @@ export const LandingBoard: React.FC<LandingBoardProps> = ({
               </div>
 
               <div className="flex flex-col gap-2">
-                <div className="grid grid-cols-3 gap-1.5">
-                  <button
-                    type="button"
-                    onClick={onOpenDateCatcher}
-                    className="w-full h-10 rounded-xl bg-amber-400 hover:bg-amber-300 active:scale-[0.99] text-[#2a1104] font-extrabold text-[11px] sm:text-xs transition-all cursor-pointer truncate px-1.5"
-                  >
-                    {t.dateCatcherCta}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={onOpenDesertRally}
-                    className="w-full h-10 rounded-xl bg-orange-400 hover:bg-orange-300 active:scale-[0.99] text-slate-950 font-extrabold text-[11px] sm:text-xs transition-all cursor-pointer truncate px-1.5"
-                  >
-                    {t.desertRallyCta}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={onOpenShawarma}
-                    className="w-full h-10 rounded-xl bg-rose-400 hover:bg-rose-300 active:scale-[0.99] text-slate-950 font-extrabold text-[11px] sm:text-xs transition-all cursor-pointer truncate px-1.5"
-                  >
-                    {t.shawarmaCta}
-                  </button>
-                </div>
                 <button
                   type="button"
                   onClick={onOpenGamesHub}
-                  className="w-full h-11 rounded-xl bg-emerald-400 hover:bg-emerald-300 active:scale-[0.99] text-slate-950 font-bold text-sm transition-all cursor-pointer"
+                  className="w-full h-12 rounded-xl bg-emerald-400 hover:bg-emerald-300 active:scale-[0.99] text-slate-950 font-extrabold text-sm sm:text-base transition-all cursor-pointer shadow-lg"
                 >
                   {t.openArcadeBtn}
                 </button>
@@ -503,13 +549,22 @@ export const LandingBoard: React.FC<LandingBoardProps> = ({
                     {t.cardShopDesc}
                   </p>
                 </div>
-                <button
-                  type="button"
-                  onClick={onOpenShop}
-                  className="h-10 px-4 rounded-lg border border-amber-400/35 bg-amber-500/15 hover:bg-amber-500/25 text-amber-100 text-xs sm:text-sm font-bold transition-colors whitespace-nowrap cursor-pointer"
-                >
-                  {t.cardShopBtn}
-                </button>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={onOpenShop}
+                    className="h-10 px-3 rounded-lg border border-amber-400/35 bg-amber-500/15 hover:bg-amber-500/25 text-amber-100 text-xs sm:text-sm font-bold transition-colors whitespace-nowrap cursor-pointer"
+                  >
+                    {t.cardShopBtn}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={onOpenSpaceShop}
+                    className="h-10 px-3 rounded-lg border border-violet-400/45 bg-gradient-to-r from-violet-500/25 to-cyan-500/20 hover:from-violet-500/35 hover:to-cyan-500/30 text-cyan-100 text-xs sm:text-sm font-bold transition-colors whitespace-nowrap cursor-pointer"
+                  >
+                    {t.cardSpaceShopBtn}
+                  </button>
+                </div>
               </div>
 
               <div className="rounded-2xl border border-white/10 bg-[#0c1628] p-5 flex flex-col justify-between gap-4">
@@ -550,7 +605,21 @@ export const LandingBoard: React.FC<LandingBoardProps> = ({
       <footer className="w-full border-t border-white/10 bg-[#060c17] mt-auto">
         <div className="mx-auto max-w-[1160px] px-4 sm:px-6 py-5 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-slate-400">
           <span>{t.footerNote}</span>
-          <div className="flex items-center gap-4">
+          <div className="flex flex-wrap items-center justify-center gap-4">
+            {onOpenSettings && (
+              <>
+                <button
+                  type="button"
+                  onClick={onOpenSettings}
+                  className="text-amber-300 hover:text-amber-200 font-semibold transition-colors whitespace-nowrap cursor-pointer"
+                >
+                  {t.openStatsLabel}
+                </button>
+                <span aria-hidden="true" className="text-slate-600">
+                  ·
+                </span>
+              </>
+            )}
             <button
               type="button"
               onClick={onReplayIntro}
