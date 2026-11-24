@@ -3,6 +3,7 @@ import type { User } from 'firebase/auth';
 import { isAnalyticsConfigured, STATS_ADMIN_EMAILS } from '../analytics/config';
 import { periodStart, summarize, type Period, type SessionRecord } from './aggregate';
 import { fetchSessions, signInWithGoogle, signOutUser, watchUser } from './firebaseClient';
+import { setStatsAdminFlag } from './adminAccess';
 import { makeDemoSessions } from './demoData';
 
 type DemoMode = 'data' | 'denied' | 'signin' | null;
@@ -27,23 +28,49 @@ function isAdmin(user: User | null): boolean {
   return STATS_ADMIN_EMAILS.includes(user.email.toLowerCase());
 }
 
-const Shell: React.FC<{ children: React.ReactNode }> = ({ children }) => (
+type Variant = 'page' | 'overlay';
+
+const Shell: React.FC<{ variant: Variant; children: React.ReactNode }> = ({ variant, children }) => (
   <div
     dir="rtl"
     lang="ar"
-    className="min-h-[100dvh] w-full bg-[#0b1020] text-slate-100"
+    role={variant === 'overlay' ? 'dialog' : undefined}
+    aria-modal={variant === 'overlay' ? true : undefined}
+    aria-label={variant === 'overlay' ? 'لوحة الإحصائيات' : undefined}
+    className={
+      variant === 'overlay'
+        ? 'fixed inset-0 z-[100] h-[100dvh] w-full overflow-y-auto overscroll-contain bg-[#0b1020] text-slate-100'
+        : 'min-h-[100dvh] w-full bg-[#0b1020] text-slate-100'
+    }
     style={{ fontFamily: "'Cairo', 'Tajawal', system-ui, sans-serif" }}
   >
     {children}
   </div>
 );
 
-const CenterCard: React.FC<{ title: string; body?: string; children?: React.ReactNode }> = ({
-  title,
-  body,
-  children,
-}) => (
-  <Shell>
+const BackButton: React.FC<{ onClose: () => void; className?: string }> = ({ onClose, className = '' }) => (
+  <button
+    type="button"
+    onClick={onClose}
+    className={`inline-flex min-h-10 items-center gap-1 rounded-xl border border-white/15 bg-white/5 px-3 text-xs font-bold text-slate-100 sm:text-sm ${className}`}
+  >
+    <span aria-hidden>→</span> رجوع للعبة
+  </button>
+);
+
+const CenterCard: React.FC<{
+  variant: Variant;
+  onClose?: () => void;
+  title: string;
+  body?: string;
+  children?: React.ReactNode;
+}> = ({ variant, onClose, title, body, children }) => (
+  <Shell variant={variant}>
+    {onClose && (
+      <div className="absolute right-3 top-3">
+        <BackButton onClose={onClose} />
+      </div>
+    )}
     <div className="flex min-h-[100dvh] items-center justify-center p-4">
       <div className="w-full max-w-md rounded-3xl border border-white/10 bg-white/5 p-6 text-center shadow-2xl">
         <div className="mb-3 text-4xl" aria-hidden>📊</div>
@@ -55,7 +82,9 @@ const CenterCard: React.FC<{ title: string; body?: string; children?: React.Reac
   </Shell>
 );
 
-const StatsPage: React.FC = () => {
+type StatsPageProps = { variant?: Variant; onClose?: () => void };
+
+const StatsPage: React.FC<StatsPageProps> = ({ variant = 'page', onClose }) => {
   const [user, setUser] = useState<User | null>(null);
   const [authReady, setAuthReady] = useState(demoMode !== null);
   const [period, setPeriod] = useState<Period>('7d');
@@ -63,8 +92,10 @@ const StatsPage: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [signingIn, setSigningIn] = useState(false);
+  const [denied, setDenied] = useState(demoMode === 'denied');
 
   useEffect(() => {
+    if (variant !== 'page') return;
     document.title = 'لوحة الإحصائيات | صياد النقاط';
     const meta = document.createElement('meta');
     meta.name = 'robots';
@@ -82,6 +113,25 @@ const StatsPage: React.FC = () => {
   }, []);
 
   const admin = demoMode === 'data' || isAdmin(user);
+
+  // Remember admins on this device (shows the 📊 button); kick everyone else out.
+  useEffect(() => {
+    if (demoMode || !authReady) return;
+    if (user && isAdmin(user)) {
+      setStatsAdminFlag(true);
+      setDenied(false);
+    } else if (user) {
+      setStatsAdminFlag(false);
+      setDenied(true);
+      void signOutUser();
+    }
+  }, [user, authReady]);
+
+  const handleSignOut = () => {
+    setStatsAdminFlag(false);
+    void signOutUser();
+    onClose?.();
+  };
 
   useEffect(() => {
     if (!admin) return;
@@ -104,13 +154,16 @@ const StatsPage: React.FC = () => {
   const summary = useMemo(() => summarize(records ?? [], period), [records, period]);
 
   if (!demoMode && !isAnalyticsConfigured) {
-    return <CenterCard title="اللوحة غير مهيّأة" body="إعدادات Firebase غير موجودة في هذا النشر." />;
+    return (
+      <CenterCard variant={variant} onClose={onClose} title="اللوحة غير مهيّأة" body="إعدادات Firebase غير موجودة في هذا النشر." />
+    );
   }
-  if (!authReady) return <CenterCard title="جارٍ التحميل…" />;
+  if (!authReady) return <CenterCard variant={variant} onClose={onClose} title="جارٍ التحميل…" />;
 
   const handleSignIn = async () => {
     setSigningIn(true);
     setError(null);
+    setDenied(false);
     try {
       await signInWithGoogle();
     } catch (e) {
@@ -126,9 +179,24 @@ const StatsPage: React.FC = () => {
     }
   };
 
+  if (denied) {
+    return (
+      <CenterCard variant={variant} onClose={onClose} title="غير مسموح" body="هذا الحساب لا يملك صلاحية عرض الإحصائيات، وتم تسجيل خروجه.">
+        <button
+          type="button"
+          onClick={handleSignIn}
+          disabled={signingIn}
+          className="min-h-12 rounded-2xl border border-white/20 px-5 py-2 text-sm font-bold"
+        >
+          الدخول بحساب آخر
+        </button>
+      </CenterCard>
+    );
+  }
+
   if (demoMode === 'signin' || (!demoMode && !user)) {
     return (
-      <CenterCard title="لوحة الإحصائيات" body="هذه الصفحة خاصة. سجّل الدخول بحساب Google المسموح له.">
+      <CenterCard variant={variant} onClose={onClose} title="لوحة الإحصائيات" body="هذه الصفحة خاصة. سجّل الدخول بحساب Google المسموح له.">
         <button
           type="button"
           onClick={handleSignIn}
@@ -143,29 +211,22 @@ const StatsPage: React.FC = () => {
   }
 
   if (!admin) {
-    return (
-      <CenterCard title="غير مسموح" body="هذا الحساب لا يملك صلاحية عرض الإحصائيات.">
-        <button
-          type="button"
-          onClick={() => void signOutUser()}
-          className="min-h-12 rounded-2xl border border-white/20 px-5 py-2 text-sm font-bold"
-        >
-          تسجيل الخروج
-        </button>
-      </CenterCard>
-    );
+    return <CenterCard variant={variant} onClose={onClose} title="جارٍ التحقق…" />;
   }
 
   const maxSeconds = summary.rows[0]?.totalSeconds || 1;
   const email = demoMode ? 'بيانات تجريبية' : user?.email ?? '';
 
   return (
-    <Shell>
+    <Shell variant={variant}>
       <div className="mx-auto w-full max-w-6xl px-3 pb-6 pt-3 sm:px-5">
         <header className="sticky top-0 z-10 -mx-3 mb-3 flex flex-wrap items-center justify-between gap-2 bg-[#0b1020]/95 px-3 py-2 backdrop-blur sm:-mx-5 sm:px-5">
-          <div className="min-w-0">
+          <div className="flex min-w-0 items-center gap-2">
+            {onClose && <BackButton onClose={onClose} className="shrink-0" />}
+            <div className="min-w-0">
             <h1 className="text-xl font-extrabold sm:text-2xl">📊 إحصائيات صياد النقاط</h1>
             <p className="truncate text-xs text-slate-400" dir="auto">{email}</p>
+            </div>
           </div>
           <div className="flex items-center gap-2">
             <div role="tablist" aria-label="الفترة" className="flex rounded-2xl bg-white/5 p-1">
@@ -187,7 +248,7 @@ const StatsPage: React.FC = () => {
             {!demoMode && (
               <button
                 type="button"
-                onClick={() => void signOutUser()}
+                onClick={handleSignOut}
                 className="min-h-10 rounded-xl border border-white/15 px-3 text-xs font-bold text-slate-300"
               >
                 خروج

@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { AdminLongPressTitle, StatsAdminButton } from './stats/InGameStats';
 import { GameMode } from './fruitWorld';
 import heroArcadeImg from './assets/images/landing_hero_arcade_1795342078886.jpg';
 
@@ -221,9 +222,9 @@ export const LandingBoard: React.FC<LandingBoardProps> = ({
       <header className="sticky top-0 z-20 w-full border-b border-white/10 bg-[#070e1a]/92 backdrop-blur-md">
         <div className="mx-auto max-w-[1160px] h-15 px-4 sm:px-6 flex items-center justify-between gap-4 lg:gap-8">
           {/* Zone 1: Single-line Brand Wordmark */}
-          <span className="text-base sm:text-lg font-bold tracking-tight text-white whitespace-nowrap shrink-0">
+          <AdminLongPressTitle className="text-base sm:text-lg font-bold tracking-tight text-white whitespace-nowrap shrink-0">
             {t.brand}
-          </span>
+          </AdminLongPressTitle>
 
           {/* Zone 2: Clean Single-line Nav Links */}
           <nav className="hidden md:flex items-center gap-6 text-sm font-medium text-slate-300">
@@ -257,7 +258,8 @@ export const LandingBoard: React.FC<LandingBoardProps> = ({
           </nav>
 
           {/* Zone 3: Single Primary Action */}
-          <div className="flex items-center shrink-0">
+          <div className="flex items-center gap-2 shrink-0">
+            <StatsAdminButton />
             <button
               type="button"
               onClick={() => onStartMainGame()}

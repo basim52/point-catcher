@@ -143,6 +143,7 @@ import {
 import { GamesModal, type MiniGameId } from './miniGames';
 import { LandingBoard } from './LandingBoard';
 import { useGamePlayTracking } from './analytics/tracker';
+import { StatsOverlayHost } from './stats/InGameStats';
 import { worldGameId } from './analytics/games';
 import { IntroSplash } from './IntroSplash';
 import {
@@ -14741,6 +14742,9 @@ export default function App() {
           </div>
         </div>
       </main>
+
+      {/* Private admin stats overlay (opened from the Landing Board) */}
+      <StatsOverlayHost />
 
       {/* Landing Board ("لوحة الهبوط") */}
       {showLanding && (
