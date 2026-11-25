@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import type { User } from 'firebase/auth';
 import { isAnalyticsConfigured, STATS_ADMIN_EMAILS } from '../analytics/config';
 import { applyAllTimeVisitFloor, periodStart, summarize, type Period, type SessionRecord } from './aggregate';
@@ -42,6 +42,62 @@ function signInErrorText(code: string): string {
 function isAdmin(user: User | null): boolean {
   if (!user || !user.emailVerified || !user.email) return false;
   return STATS_ADMIN_EMAILS.includes(user.email.toLowerCase());
+}
+
+
+const STATS_CACHE_KEY = 'pc_stats_last_summary_v1';
+
+type CachedBoard = {
+  period: Period;
+  records: Array<{
+    gameId: string;
+    gameName: string;
+    startedAt: string;
+    durationSeconds: number;
+    visit: boolean;
+  }>;
+  floors: Record<string, number>;
+};
+
+function readCachedBoard(): { period: Period; records: SessionRecord[]; floors: Record<string, number> } | null {
+  try {
+    const raw = sessionStorage.getItem(STATS_CACHE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as CachedBoard;
+    if (!parsed || !Array.isArray(parsed.records)) return null;
+    return {
+      period: parsed.period,
+      floors: parsed.floors && typeof parsed.floors === 'object' ? parsed.floors : {},
+      records: parsed.records.map((r) => ({
+        gameId: String(r.gameId ?? ''),
+        gameName: String(r.gameName ?? ''),
+        startedAt: new Date(r.startedAt),
+        durationSeconds: Number(r.durationSeconds ?? 0),
+        visit: r.visit !== false,
+      })),
+    };
+  } catch {
+    return null;
+  }
+}
+
+function writeCachedBoard(period: Period, records: SessionRecord[], floors: Record<string, number>): void {
+  try {
+    const payload: CachedBoard = {
+      period,
+      floors,
+      records: records.map((r) => ({
+        gameId: r.gameId,
+        gameName: r.gameName,
+        startedAt: r.startedAt.toISOString(),
+        durationSeconds: r.durationSeconds,
+        visit: r.visit,
+      })),
+    };
+    sessionStorage.setItem(STATS_CACHE_KEY, JSON.stringify(payload));
+  } catch {
+    // ignore quota / private mode
+  }
 }
 
 type Variant = 'page' | 'overlay';
@@ -104,9 +160,12 @@ const StatsPage: React.FC<StatsPageProps> = ({ variant = 'page', onClose }) => {
   const [user, setUser] = useState<User | null>(null);
   const [authReady, setAuthReady] = useState(demoMode !== null);
   const [period, setPeriod] = useState<Period>('7d');
+  const [appliedPeriod, setAppliedPeriod] = useState<Period>('7d');
   const [records, setRecords] = useState<SessionRecord[] | null>(null);
   const [visitFloors, setVisitFloors] = useState<Record<string, number>>({});
   const [loading, setLoading] = useState(false);
+  const lastAdminRef = useRef<User | null>(null);
+  const [holdAdmin, setHoldAdmin] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [signingIn, setSigningIn] = useState(false);
   const [denied, setDenied] = useState(demoMode === 'denied');
@@ -131,26 +190,55 @@ const StatsPage: React.FC<StatsPageProps> = ({ variant = 'page', onClose }) => {
 
   useEffect(() => {
     if (demoMode || !isAnalyticsConfigured) return;
-    return watchUser((u) => {
+    let readyTimer: number | undefined;
+    const stop = watchUser((u) => {
       setUser(u);
-      setAuthReady(true);
+      if (u) {
+        if (readyTimer !== undefined) window.clearTimeout(readyTimer);
+        setAuthReady(true);
+        return;
+      }
+      // Don't flash the sign-in screen if the persisted admin is about to arrive.
+      if (readyTimer !== undefined) window.clearTimeout(readyTimer);
+      readyTimer = window.setTimeout(() => setAuthReady(true), 800);
     });
+    return () => {
+      stop();
+      if (readyTimer !== undefined) window.clearTimeout(readyTimer);
+    };
   }, []);
 
-  const admin = demoMode === 'data' || isAdmin(user);
-
-  // Remember admins on this device (shows the 📊 button); kick everyone else out.
+  // Keep the last admin user through brief auth nulls (token refresh) so the board stays up.
   useEffect(() => {
     if (demoMode || !authReady) return;
     if (user && isAdmin(user)) {
+      lastAdminRef.current = user;
+      setHoldAdmin(true);
       setStatsAdminFlag(true);
       setDenied(false);
-    } else if (user) {
+      return;
+    }
+    if (user && !isAdmin(user)) {
+      lastAdminRef.current = null;
+      setHoldAdmin(false);
       setStatsAdminFlag(false);
       setDenied(true);
       void signOutUser();
+      return;
     }
+    if (!lastAdminRef.current) {
+      setHoldAdmin(false);
+      return;
+    }
+    const t = window.setTimeout(() => {
+      lastAdminRef.current = null;
+      setHoldAdmin(false);
+    }, 1500);
+    return () => window.clearTimeout(t);
   }, [user, authReady]);
+
+  const displayUser = (user && isAdmin(user) ? user : null) ?? (holdAdmin ? lastAdminRef.current : null);
+  const admin = demoMode === 'data' || isAdmin(displayUser);
 
   const handleSignOut = () => {
     setStatsAdminFlag(false);
@@ -171,13 +259,21 @@ const StatsPage: React.FC<StatsPageProps> = ({ variant = 'page', onClose }) => {
       .then((r) => {
         if (cancelled) return;
         setRecords(r);
+        setAppliedPeriod(period);
         if (period === 'all') {
           void syncPublicVisitCounts(r);
           void fetchGameStats()
-            .then((floors) => !cancelled && setVisitFloors(floors))
-            .catch(() => undefined);
+            .then((floors) => {
+              if (cancelled) return;
+              setVisitFloors(floors);
+              writeCachedBoard(period, r, floors);
+            })
+            .catch(() => {
+              if (!cancelled) writeCachedBoard(period, r, {});
+            });
         } else {
           setVisitFloors({});
+          writeCachedBoard(period, r, {});
         }
       })
       .catch(() => !cancelled && setError('تعذّر تحميل البيانات. تأكد من نشر قواعد Firestore ثم أعد المحاولة.'))
@@ -187,19 +283,32 @@ const StatsPage: React.FC<StatsPageProps> = ({ variant = 'page', onClose }) => {
     };
   }, [admin, period]);
 
+  // Restore last board instantly on remount so numbers never flash empty.
+  useEffect(() => {
+    if (records) return;
+    const cached = readCachedBoard();
+    if (!cached || cached.records.length === 0) return;
+    setRecords(cached.records);
+    setPeriod(cached.period);
+    setAppliedPeriod(cached.period);
+    setVisitFloors(cached.floors);
+  }, [records]);
+
   const summary = useMemo(() => {
-    const base = summarize(records ?? [], period);
-    return period === 'all'
+    const base = summarize(records ?? [], appliedPeriod);
+    return appliedPeriod === 'all'
       ? applyAllTimeVisitFloor(base, visitFloors, TRACKED_GAMES)
       : base;
-  }, [records, period, visitFloors]);
+  }, [records, appliedPeriod, visitFloors]);
 
   if (!demoMode && !isAnalyticsConfigured) {
     return (
       <CenterCard variant={variant} onClose={onClose} title="اللوحة غير مهيّأة" body="إعدادات Firebase غير موجودة في هذا النشر." />
     );
   }
-  if (!authReady) return <CenterCard variant={variant} onClose={onClose} title="جارٍ التحميل…" />;
+  if (!authReady && !admin && !records) {
+    return <CenterCard variant={variant} onClose={onClose} title="جارٍ التحميل…" />;
+  }
 
   const handleSignIn = async () => {
     setSigningIn(true);
@@ -231,7 +340,7 @@ const StatsPage: React.FC<StatsPageProps> = ({ variant = 'page', onClose }) => {
     );
   }
 
-  if (demoMode === 'signin' || (!demoMode && !user)) {
+  if (demoMode === 'signin' || (!demoMode && !admin && !displayUser && authReady && !holdAdmin)) {
     return (
       <CenterCard variant={variant} onClose={onClose} title="لوحة الإحصائيات" body="هذه الصفحة خاصة. سجّل الدخول بحساب Google المسموح له.">
         <button
@@ -252,7 +361,7 @@ const StatsPage: React.FC<StatsPageProps> = ({ variant = 'page', onClose }) => {
   }
 
   const maxSeconds = summary.rows[0]?.totalSeconds || 1;
-  const email = demoMode ? 'بيانات تجريبية' : user?.email ?? '';
+  const email = demoMode ? 'بيانات تجريبية' : displayUser?.email ?? user?.email ?? '';
 
   return (
     <Shell variant={variant}>

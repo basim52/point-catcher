@@ -21,6 +21,9 @@ type Listener = () => void;
 
 const listeners = new Set<Listener>();
 let countsCache: Record<string, number> = readLocalVisits();
+// True once we have a local cache or a finished server fetch, so the UI
+// never flashes "0 زيارة" while the first request is still in flight.
+let countsReady = Object.keys(countsCache).length > 0;
 let lastFetchAt = 0;
 let inFlightFetch: Promise<void> | null = null;
 
@@ -67,7 +70,16 @@ function getSnapshot(): VisitCountsMap {
   return countsCache;
 }
 
-const EMPTY_SNAPSHOT: VisitCountsMap = {};
+function getReadySnapshot(): boolean {
+  return countsReady;
+}
+
+function markReady(): void {
+  if (!countsReady) {
+    countsReady = true;
+    notify();
+  }
+}
 
 function sendRemoteIncrement(gameId: TrackedGameId): void {
   if (!isAnalyticsConfigured) return;
@@ -145,7 +157,11 @@ export function refreshGameVisits(force = false): Promise<void> {
 
   inFlightFetch = fetch(url, { credentials: 'omit' })
     .then(async (res) => {
-      if (!res.ok) return;
+      if (!res.ok) {
+        // Keep last known counts visible; just mark ready so we don't spin.
+        markReady();
+        return;
+      }
       const json = (await res.json()) as {
         documents?: Array<{
           name?: string;
@@ -154,7 +170,10 @@ export function refreshGameVisits(force = false): Promise<void> {
       };
       lastFetchAt = Date.now();
       const docs = json.documents ?? [];
-      if (docs.length === 0) return;
+      if (docs.length === 0) {
+        markReady();
+        return;
+      }
 
       let changed = false;
       const merged: Record<string, number> = { ...countsCache };
@@ -180,8 +199,9 @@ export function refreshGameVisits(force = false): Promise<void> {
       if (changed) {
         countsCache = merged;
         saveLocalVisits(countsCache);
-        notify();
       }
+      countsReady = true;
+      notify();
     })
     .catch(() => undefined)
     .finally(() => {
@@ -192,12 +212,13 @@ export function refreshGameVisits(force = false): Promise<void> {
 }
 
 /** Subscribe to per-game visit counts and refresh from Firestore on mount. */
-export function useGameVisitCounts(): VisitCountsMap {
-  const counts = useSyncExternalStore(subscribe, getSnapshot, () => EMPTY_SNAPSHOT);
+export function useGameVisitCounts(): { counts: VisitCountsMap; ready: boolean } {
+  const counts = useSyncExternalStore(subscribe, getSnapshot, getSnapshot);
+  const ready = useSyncExternalStore(subscribe, getReadySnapshot, getReadySnapshot);
   useEffect(() => {
     void refreshGameVisits();
   }, []);
-  return counts;
+  return { counts, ready };
 }
 
 /** Format a game's visit count cleanly for Arabic or English UI badges. */
