@@ -1,13 +1,16 @@
-import React, { useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { getPetDamageMultiplier, getPetMaxHp } from './gameLogic';
 import {
   ALL_FRUIT_IDS,
+  ALL_MEAT_IDS,
   ALL_PET_IDS,
   ALL_WEAPON_IDS,
   FRUIT_SPECS,
   FruitId,
   MAX_PET_LEVEL,
   MAX_PET_SQUAD,
+  MEAT_SPECS,
+  MeatId,
   MonsterArenaHudSnapshot,
   PET_SPECS,
   PetId,
@@ -15,7 +18,7 @@ import {
   WeaponId,
 } from './types';
 
-export type ArenaShopTab = 'fruits' | 'weapons' | 'pets';
+export type ArenaShopTab = 'fruits' | 'meats' | 'weapons' | 'pets';
 
 interface MonsterArenaUIProps {
   lang: 'ar' | 'en';
@@ -30,6 +33,7 @@ interface MonsterArenaUIProps {
   onResume: () => void;
   onToggleSound: () => void;
   onBuyFruit: (fruitId: FruitId) => void;
+  onBuyMeat: (meatId: MeatId) => void;
   onBuyOrEquipWeapon: (weaponId: WeaponId) => void;
   onBuyPet: (petId: PetId) => void;
   onMergePetPair: (petId: PetId, level: number) => void;
@@ -44,20 +48,39 @@ interface MonsterArenaUIProps {
 
 const FRUIT_ICONS: Record<FruitId, string> = {
   apple: '🍎',
+  strawberry: '🍓',
   banana: '🍌',
+  grapes: '🍇',
   watermelon: '🍉',
+  pineapple: '🍍',
   mango: '🥭',
+  kiwi: '🥝',
   dragonfruit: '🐉',
   golden_date: '🌴',
+  coconut: '🥥',
+};
+
+const MEAT_ICONS: Record<MeatId, string> = {
+  chicken_leg: '🍗',
+  lamb_chop: '🍖',
+  beef_steak: '🥩',
+  grilled_ribs: '🥓',
+  wagyu_feast: '🍱',
+  dragon_meat: '🔥',
 };
 
 const PET_ICONS: Record<PetId, string> = {
   wolf: '🐺',
   falcon: '🦅',
+  tiger: '🐯',
   bear: '🐻',
+  rhino: '🦏',
   panther: '🐆',
+  gorilla: '🦍',
   lion: '🦁',
+  shark: '🦈',
   baby_dragon: '🐲',
+  trex: '🦖',
 };
 
 const WEAPON_ICONS: Record<WeaponId, string> = {
@@ -65,10 +88,15 @@ const WEAPON_ICONS: Record<WeaponId, string> = {
   twin_blasters: '⚡',
   scatter_shotgun: '🔥',
   frost_rifle: '❄️',
+  laser_sniper: '🎯',
   thunder_cannon: '🌩️',
+  sawblade_launcher: '⚙️',
   venom_gatling: '☣️',
+  magma_mortar: '🌋',
   dragon_flamethrower: '☄️',
+  cryo_minigun: '🧊',
   cosmic_annihilator: '🌌',
+  solar_nova_blade: '☀️',
 };
 
 function formatCountdown(totalSec: number): string {
@@ -91,6 +119,7 @@ export const MonsterArenaUI: React.FC<MonsterArenaUIProps> = ({
   onResume,
   onToggleSound,
   onBuyFruit,
+  onBuyMeat,
   onBuyOrEquipWeapon,
   onBuyPet,
   onMergePetPair,
@@ -106,6 +135,12 @@ export const MonsterArenaUI: React.FC<MonsterArenaUIProps> = ({
   const [dockCollapsed, setDockCollapsed] = useState(false);
   const [pickedSlot, setPickedSlot] = useState<number | null>(null);
   const [dragFromSlot, setDragFromSlot] = useState<number | null>(null);
+
+  // Reset board pick/drag selection when switching tabs or closing shop
+  useEffect(() => {
+    setPickedSlot(null);
+    setDragFromSlot(null);
+  }, [shopTab]);
 
   // Virtual joystick state (bottom-left)
   const joyBaseRef = useRef<HTMLDivElement | null>(null);
@@ -133,7 +168,11 @@ export const MonsterArenaUI: React.FC<MonsterArenaUIProps> = ({
   const handleJoyDown = (e: React.PointerEvent<HTMLDivElement>) => {
     e.stopPropagation();
     activePointerRef.current = e.pointerId;
-    e.currentTarget.setPointerCapture(e.pointerId);
+    try {
+      e.currentTarget.setPointerCapture(e.pointerId);
+    } catch {
+      // Ignore pointer capture errors on synthetic/unsupported events
+    }
     updateJoystickFromEvent(e.clientX, e.clientY);
   };
 
@@ -146,6 +185,11 @@ export const MonsterArenaUI: React.FC<MonsterArenaUIProps> = ({
   const handleJoyUp = (e: React.PointerEvent<HTMLDivElement>) => {
     if (activePointerRef.current !== e.pointerId) return;
     e.stopPropagation();
+    try {
+      e.currentTarget.releasePointerCapture(e.pointerId);
+    } catch {
+      // Ignore if capture was already released
+    }
     activePointerRef.current = null;
     setJoyKnob({ x: 0, y: 0 });
     onJoystickMove(0, 0);
@@ -186,7 +230,7 @@ export const MonsterArenaUI: React.FC<MonsterArenaUIProps> = ({
   // Build 12-slot interactive board lookup for Drag & Tap Move/Merge
   const slotMap = new Map<
     number,
-    { petId: PetId; level: number; slot: number; hp?: number; maxHp?: number }
+    { petId: PetId; level: number; slot: number; hp?: number; maxHp?: number; bonusMaxHp?: number }
   >();
   for (const s of hud.petRoster) {
     slotMap.set(s.slot, s);
@@ -237,6 +281,18 @@ export const MonsterArenaUI: React.FC<MonsterArenaUIProps> = ({
       colorClass: 'border-yellow-300/70 text-yellow-200 bg-[#2a230b]/95',
     });
   }
+  if (hud.petFuryBuffTimer > 0) {
+    const parts: string[] = [];
+    if (hud.petFuryDmgPct > 0) parts.push(`+${hud.petFuryDmgPct}% DMG`);
+    if (hud.petFurySpdPct > 0) parts.push(`+${hud.petFurySpdPct}% SPD`);
+    activeBuffs.push({
+      label: isAr
+        ? `🥩 غضب الحيوانات ${parts.join(' ')}`
+        : `🥩 Pet Fury ${parts.join(' ')}`,
+      sec: Math.ceil(hud.petFuryBuffTimer),
+      colorClass: 'border-rose-400/70 text-rose-200 bg-[#320d17]/95',
+    });
+  }
 
   return (
     <div
@@ -251,13 +307,13 @@ export const MonsterArenaUI: React.FC<MonsterArenaUIProps> = ({
             <button
               type="button"
               onClick={onExit}
-              className="px-3 py-1.5 rounded-lg bg-[#161024]/95 hover:bg-[#231939] border border-slate-600/70 text-xs sm:text-sm font-bold text-slate-100 cursor-pointer transition-colors"
+              className="px-3 py-1.5 rounded-lg bg-[#081a2c]/95 hover:bg-[#102d4a] border border-cyan-500/40 text-xs sm:text-sm font-bold text-slate-100 cursor-pointer transition-colors"
             >
               {isAr ? '← خروج' : '← Exit'}
             </button>
 
             {/* Energy / HP Bar */}
-            <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-[#161024]/95 border border-emerald-500/45 min-w-[168px] sm:min-w-[205px]">
+            <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-[#081a2c]/95 border border-emerald-500/45 min-w-[168px] sm:min-w-[205px]">
               <span className="text-sm font-bold text-emerald-300">
                 {isAr ? 'الطاقة' : 'HP'}
               </span>
@@ -277,7 +333,7 @@ export const MonsterArenaUI: React.FC<MonsterArenaUIProps> = ({
             </div>
 
             {/* Coins */}
-            <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#241b0b]/95 border border-amber-400/55">
+            <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#1d1c0c]/95 border border-amber-400/55">
               <span className="text-sm">💰</span>
               <span className="font-num text-sm font-black text-amber-300">
                 {hud.coins.toLocaleString()}
@@ -285,10 +341,10 @@ export const MonsterArenaUI: React.FC<MonsterArenaUIProps> = ({
             </div>
 
             {/* Wave & Kills */}
-            <div className="hidden sm:flex items-center gap-3 px-3 py-1.5 rounded-lg bg-[#161024]/95 border border-indigo-400/40 text-xs font-bold">
+            <div className="hidden sm:flex items-center gap-3 px-3 py-1.5 rounded-lg bg-[#081a2c]/95 border border-cyan-400/45 text-xs font-bold">
               <span>
                 {isAr ? 'الموجة' : 'Wave'}{' '}
-                <strong className="font-num text-indigo-300">{hud.wave}</strong>
+                <strong className="font-num text-cyan-300">{hud.wave}</strong>
               </span>
               <span className="text-slate-500">|</span>
               <span>
@@ -332,7 +388,7 @@ export const MonsterArenaUI: React.FC<MonsterArenaUIProps> = ({
               className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border text-xs sm:text-sm font-extrabold ${
                 titanUrgent
                   ? 'bg-[#350d1b]/95 border-rose-500 text-rose-100'
-                  : 'bg-[#1b122b]/95 border-purple-400/55 text-purple-100'
+                  : 'bg-[#0b2136]/95 border-cyan-400/55 text-cyan-100'
               }`}
               title={
                 isAr
@@ -359,7 +415,7 @@ export const MonsterArenaUI: React.FC<MonsterArenaUIProps> = ({
               type="button"
               onClick={onToggleSound}
               aria-label={isAr ? 'الصوت' : 'Sound'}
-              className="px-2.5 py-1.5 rounded-lg bg-[#161024]/95 hover:bg-[#231939] border border-slate-600/70 text-sm font-bold cursor-pointer"
+              className="px-2.5 py-1.5 rounded-lg bg-[#081a2c]/95 hover:bg-[#102d4a] border border-cyan-500/40 text-sm font-bold cursor-pointer"
             >
               {soundEnabled ? '🔊' : '🔇'}
             </button>
@@ -369,7 +425,7 @@ export const MonsterArenaUI: React.FC<MonsterArenaUIProps> = ({
                 type="button"
                 onClick={onPause}
                 aria-label={isAr ? 'إيقاف مؤقت' : 'Pause'}
-                className="px-2.5 py-1.5 rounded-lg bg-[#161024]/95 hover:bg-[#231939] border border-slate-600/70 text-sm font-bold cursor-pointer"
+                className="px-2.5 py-1.5 rounded-lg bg-[#081a2c]/95 hover:bg-[#102d4a] border border-cyan-500/40 text-sm font-bold cursor-pointer"
               >
                 ⏸️
               </button>
@@ -434,7 +490,7 @@ export const MonsterArenaUI: React.FC<MonsterArenaUIProps> = ({
                   ? 'bg-[#331b08]/95 border-amber-400 text-amber-100'
                   : hud.bannerTone === 'shop'
                   ? 'bg-[#0e2a1e]/95 border-emerald-400 text-emerald-100'
-                  : 'bg-[#161129]/95 border-sky-400/60 text-sky-100'
+                  : 'bg-[#0a2036]/95 border-sky-400/60 text-sky-100'
               }`}
             >
               {hud.bannerText}
@@ -456,7 +512,7 @@ export const MonsterArenaUI: React.FC<MonsterArenaUIProps> = ({
 
           {/* 3D Selected Pet Helper Bar (Move or Merge Directly in 3D!) */}
           {hud.status === 'PLAYING' && !shopTab && hud.selectedPetInfo && (
-            <div className="pointer-events-auto flex flex-wrap items-center justify-center gap-2 px-3 py-1.5 rounded-xl bg-[#27143b]/95 border-2 border-amber-400 text-xs font-extrabold text-amber-100 shadow-lg">
+            <div className="pointer-events-auto flex flex-wrap items-center justify-center gap-2 px-3 py-1.5 rounded-xl bg-[#0c2842]/95 border-2 border-cyan-400 text-xs font-extrabold text-cyan-100 shadow-lg">
               <span>
                 {PET_ICONS[hud.selectedPetInfo.petId]}{' '}
                 {isAr
@@ -486,18 +542,18 @@ export const MonsterArenaUI: React.FC<MonsterArenaUIProps> = ({
               onPointerMove={handleJoyMove}
               onPointerUp={handleJoyUp}
               onPointerCancel={handleJoyUp}
-              className="relative w-24 h-24 sm:w-28 sm:h-28 rounded-full bg-[#150f24]/85 border-2 border-amber-400/50 touch-none flex items-center justify-center cursor-grab active:cursor-grabbing"
+              className="relative w-24 h-24 sm:w-28 sm:h-28 rounded-full bg-[#081a2c]/85 border-2 border-cyan-400/55 touch-none flex items-center justify-center cursor-grab active:cursor-grabbing"
               aria-label={isAr ? 'عصا التحرك' : 'Movement Joystick'}
             >
-              <div className="w-10 h-10 rounded-full border border-slate-500/40" />
+              <div className="w-10 h-10 rounded-full border border-cyan-400/35" />
               <div
-                className="absolute w-11 h-11 rounded-full bg-amber-400 border-2 border-amber-100 shadow-md"
+                className="absolute w-11 h-11 rounded-full bg-cyan-400 border-2 border-cyan-100 shadow-md"
                 style={{
                   transform: `translate(${joyKnob.x}px, ${joyKnob.y}px)`,
                 }}
               />
             </div>
-            <span className="text-[10px] font-bold text-slate-300 bg-[#120d1c]/85 px-2 py-0.5 rounded">
+            <span className="text-[10px] font-bold text-cyan-200 bg-[#071626]/85 px-2 py-0.5 rounded">
               WASD / {isAr ? 'اسحب للحركة' : 'Drag to Move'}
             </span>
           </div>
@@ -505,14 +561,14 @@ export const MonsterArenaUI: React.FC<MonsterArenaUIProps> = ({
           {/* Bottom-Center / Right Collapsible Action Dock */}
           <div className="pointer-events-auto flex flex-col items-end gap-1.5">
             <div className="flex items-center gap-2">
-              <span className="hidden md:inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-[#161024]/95 border border-slate-600/60 text-xs font-bold text-slate-200">
+              <span className="hidden md:inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-[#081a2c]/95 border border-cyan-500/40 text-xs font-bold text-cyan-100">
                 <span>{WEAPON_ICONS[hud.activeWeapon]}</span>
                 <span>{isAr ? activeWeaponSpec.nameAr : activeWeaponSpec.nameEn}</span>
               </span>
               <button
                 type="button"
                 onClick={() => setDockCollapsed((c) => !c)}
-                className="px-2.5 py-1 rounded-lg bg-[#161024]/95 hover:bg-[#231939] border border-slate-600/70 text-[11px] font-bold text-slate-200 cursor-pointer"
+                className="px-2.5 py-1 rounded-lg bg-[#081a2c]/95 hover:bg-[#102d4a] border border-cyan-500/40 text-[11px] font-bold text-cyan-100 cursor-pointer"
               >
                 {dockCollapsed
                   ? isAr
@@ -525,7 +581,7 @@ export const MonsterArenaUI: React.FC<MonsterArenaUIProps> = ({
             </div>
 
             {!dockCollapsed && (
-              <div className="flex flex-wrap items-center justify-end gap-1.5 sm:gap-2 p-1.5 rounded-xl bg-[#130e20]/95 border border-slate-600/60">
+              <div className="flex flex-wrap items-center justify-end gap-1.5 sm:gap-2 p-1.5 rounded-xl bg-[#071829]/95 border border-cyan-500/40">
                 {/* Fruit Energy Shop */}
                 <button
                   type="button"
@@ -533,7 +589,17 @@ export const MonsterArenaUI: React.FC<MonsterArenaUIProps> = ({
                   className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-emerald-700 hover:bg-emerald-600 border border-emerald-400/60 text-xs sm:text-sm font-extrabold text-white cursor-pointer transition-colors"
                 >
                   <span>🍎</span>
-                  <span>{isAr ? 'متجر الفواكه' : 'Fruit Shop'}</span>
+                  <span>{isAr ? 'الفواكه' : 'Fruits'}</span>
+                </button>
+
+                {/* Meat Shop for Pets */}
+                <button
+                  type="button"
+                  onClick={() => onOpenShopTab('meats')}
+                  className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-rose-700 hover:bg-rose-600 border border-rose-400/60 text-xs sm:text-sm font-extrabold text-white cursor-pointer transition-colors"
+                >
+                  <span>🥩</span>
+                  <span>{isAr ? 'متجر اللحوم' : 'Meat Shop'}</span>
                 </button>
 
                 {/* Weapons Shop */}
@@ -615,15 +681,19 @@ export const MonsterArenaUI: React.FC<MonsterArenaUIProps> = ({
       {/* UNIFIED SHOP MODAL (FRUITS / WEAPONS / BATTLE PETS) */}
       {shopTab && (
         <div className="pointer-events-auto fixed inset-0 z-40 flex items-center justify-center bg-black/75 p-3 sm:p-5">
-          <div className="w-full max-w-3xl max-h-[88vh] flex flex-col rounded-2xl bg-[#151024] border-2 border-amber-400/60 shadow-2xl overflow-hidden">
+          <div className="w-full max-w-3xl max-h-[88vh] flex flex-col rounded-2xl bg-[#071829] border-2 border-cyan-400/60 shadow-2xl overflow-hidden">
             {/* Modal Header */}
-            <div className="flex flex-wrap items-center justify-between gap-2 px-4 py-3 bg-[#1d1533] border-b border-slate-700">
+            <div className="flex flex-wrap items-center justify-between gap-2 px-4 py-3 bg-[#0c253d] border-b border-cyan-900/80">
               <div className="flex items-center gap-3">
-                <h2 className="text-base sm:text-lg font-black text-amber-200">
+                <h2 className="text-base sm:text-lg font-black text-cyan-200">
                   {shopTab === 'fruits'
                     ? isAr
                       ? '🍎 متجر الفواكه — طاقة وقوة دائمة'
                       : '🍎 Fruit Energy Shop'
+                    : shopTab === 'meats'
+                    ? isAr
+                      ? '🥩 متجر اللحوم — إطعام الحيوانات وزيادة طاقتهم'
+                      : '🥩 Meat Shop — Feed & Power Up Pets'
                     : shopTab === 'weapons'
                     ? isAr
                       ? '⚔️ متجر الأسلحة القتالية'
@@ -652,36 +722,50 @@ export const MonsterArenaUI: React.FC<MonsterArenaUIProps> = ({
             </div>
 
             {/* Tab Switcher */}
-            <div className="grid grid-cols-3 gap-1.5 p-2 bg-[#110c1d] border-b border-slate-800">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5 p-2 bg-[#061321] border-b border-cyan-950">
               <button
                 type="button"
                 onClick={() => onOpenShopTab('fruits')}
                 className={`py-2 rounded-lg text-xs sm:text-sm font-extrabold cursor-pointer transition-colors ${
                   shopTab === 'fruits'
                     ? 'bg-emerald-600 text-white border border-emerald-300/70'
-                    : 'bg-[#1c152e] text-slate-300 hover:bg-[#271d40]'
+                    : 'bg-[#0c2238] text-slate-300 hover:bg-[#133352]'
                 }`}
               >
-                🍎 {isAr ? 'الفواكه (6)' : 'Fruits (6)'}
+                🍎 {isAr ? `الفواكه (${ALL_FRUIT_IDS.length})` : `Fruits (${ALL_FRUIT_IDS.length})`}
+              </button>
+              <button
+                type="button"
+                onClick={() => onOpenShopTab('meats')}
+                className={`py-2 rounded-lg text-xs sm:text-sm font-extrabold cursor-pointer transition-colors ${
+                  shopTab === 'meats'
+                    ? 'bg-rose-600 text-white border border-rose-300/70'
+                    : 'bg-[#0c2238] text-slate-300 hover:bg-[#133352]'
+                }`}
+              >
+                🥩 {isAr ? `اللحوم (${ALL_MEAT_IDS.length})` : `Meats (${ALL_MEAT_IDS.length})`}
               </button>
               <button
                 type="button"
                 onClick={() => onOpenShopTab('weapons')}
                 className={`py-2 rounded-lg text-xs sm:text-sm font-extrabold cursor-pointer transition-colors ${
                   shopTab === 'weapons'
-                    ? 'bg-indigo-600 text-white border border-indigo-300/70'
-                    : 'bg-[#1c152e] text-slate-300 hover:bg-[#271d40]'
+                    ? 'bg-sky-600 text-white border border-sky-300/70'
+                    : 'bg-[#0c2238] text-slate-300 hover:bg-[#133352]'
                 }`}
               >
-                ⚔️ {isAr ? `الأسلحة (${hud.ownedWeapons.length}/8)` : `Weapons (${hud.ownedWeapons.length}/8)`}
+                ⚔️{' '}
+                {isAr
+                  ? `الأسلحة (${hud.ownedWeapons.length}/${ALL_WEAPON_IDS.length})`
+                  : `Weapons (${hud.ownedWeapons.length}/${ALL_WEAPON_IDS.length})`}
               </button>
               <button
                 type="button"
                 onClick={() => onOpenShopTab('pets')}
                 className={`py-2 rounded-lg text-xs sm:text-sm font-extrabold cursor-pointer transition-colors ${
                   shopTab === 'pets'
-                    ? 'bg-amber-600 text-white border border-amber-300/70'
-                    : 'bg-[#1c152e] text-slate-300 hover:bg-[#271d40]'
+                    ? 'bg-teal-600 text-white border border-teal-300/70'
+                    : 'bg-[#0c2238] text-slate-300 hover:bg-[#133352]'
                 }`}
               >
                 🐾 {isAr ? `الحيوانات (${ownedPetCount}/${MAX_PET_SQUAD})` : `Pets (${ownedPetCount}/${MAX_PET_SQUAD})`}
@@ -698,7 +782,7 @@ export const MonsterArenaUI: React.FC<MonsterArenaUIProps> = ({
                     return (
                       <div
                         key={fruitId}
-                        className="flex flex-col justify-between gap-2.5 p-3.5 rounded-xl bg-[#1c152e] border border-slate-700"
+                        className="flex flex-col justify-between gap-2.5 p-3.5 rounded-xl bg-[#0c2238] border border-cyan-900/80"
                       >
                         <div className="flex items-start gap-3">
                           <div
@@ -778,6 +862,161 @@ export const MonsterArenaUI: React.FC<MonsterArenaUIProps> = ({
                 </div>
               )}
 
+              {shopTab === 'meats' && (
+                <div className="flex flex-col gap-3">
+                  {/* Live Squad Pet Energy Overview */}
+                  <div className="p-3 rounded-xl bg-[#241016] border border-rose-400/50 flex flex-col gap-2">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <div>
+                        <div className="text-xs sm:text-sm font-black text-rose-200">
+                          {isAr
+                            ? `🥩 طاقة حيواناتك المقاتلة (${ownedPetCount}/${MAX_PET_SQUAD})`
+                            : `🥩 Battle Pets Energy (${ownedPetCount}/${MAX_PET_SQUAD})`}
+                        </div>
+                        <div className="text-[11px] text-rose-100/80 mt-0.5">
+                          {isAr
+                            ? 'شراء أي لحم يطعم جميع حيواناتك في الحلبة فوراً، يعالجهم، ويزيد طاقتهم القصوى بشكل دائم!'
+                            : 'Buying any meat immediately feeds all active pets, heals them, and permanently increases their Max Energy!'}
+                        </div>
+                      </div>
+                      {ownedPetCount === 0 && (
+                        <button
+                          type="button"
+                          onClick={() => onOpenShopTab('pets')}
+                          className="px-3 py-1.5 rounded-lg bg-amber-600 hover:bg-amber-500 text-xs font-black text-white cursor-pointer"
+                        >
+                          🐾 {isAr ? 'شراء حيوان أولاً' : 'Buy a Pet First'}
+                        </button>
+                      )}
+                    </div>
+
+                    {ownedPetCount > 0 && (
+                      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-1.5 pt-1.5 border-t border-white/10">
+                        {hud.petRoster.map((p) => {
+                          const maxHp =
+                            p.maxHp ?? getPetMaxHp(p.petId, p.level, p.bonusMaxHp ?? 0);
+                          const hp = p.hp ?? maxHp;
+                          const pct = Math.max(0, Math.min(100, (hp / Math.max(1, maxHp)) * 100));
+                          return (
+                            <div
+                              key={`${p.slot}-${p.petId}`}
+                              className="p-2 rounded-lg bg-[#140a0e] border border-rose-900/70 flex flex-col gap-1"
+                            >
+                              <div className="flex items-center justify-between gap-1 text-[11px] font-bold">
+                                <span className="truncate text-white">
+                                  {PET_ICONS[p.petId]}{' '}
+                                  {isAr ? PET_SPECS[p.petId].nameAr : PET_SPECS[p.petId].nameEn}
+                                </span>
+                                <span className="font-num text-amber-300 shrink-0">
+                                  Lv.{p.level}
+                                </span>
+                              </div>
+                              <div className="h-1.5 w-full bg-slate-900 rounded-sm overflow-hidden border border-slate-700">
+                                <div
+                                  className="h-full transition-all duration-150"
+                                  style={{
+                                    width: `${pct}%`,
+                                    backgroundColor:
+                                      pct > 50 ? '#22c55e' : pct > 25 ? '#f59e0b' : '#ef4444',
+                                  }}
+                                />
+                              </div>
+                              <div className="flex items-center justify-between text-[10px] font-num text-slate-300">
+                                <span>
+                                  ❤️ {hp}/{maxHp}
+                                </span>
+                                {(p.bonusMaxHp ?? 0) > 0 && (
+                                  <span className="text-rose-300">+{p.bonusMaxHp}</span>
+                                )}
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* 6 Meat Cards */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    {ALL_MEAT_IDS.map((meatId) => {
+                      const spec = MEAT_SPECS[meatId];
+                      const canAfford = hud.coins >= spec.cost && ownedPetCount > 0;
+                      return (
+                        <div
+                          key={meatId}
+                          className="flex flex-col justify-between gap-2.5 p-3.5 rounded-xl bg-[#1c0e14] border border-rose-900/80"
+                        >
+                          <div className="flex items-start gap-3">
+                            <div
+                              className="w-11 h-11 shrink-0 rounded-xl flex items-center justify-center text-2xl border border-white/20"
+                              style={{ backgroundColor: `${spec.color}33` }}
+                            >
+                              {MEAT_ICONS[meatId]}
+                            </div>
+                            <div className="min-w-0 flex-1">
+                              <div className="flex items-center justify-between gap-2">
+                                <h3 className="font-black text-sm sm:text-base text-white">
+                                  {isAr ? spec.nameAr : spec.nameEn}
+                                </h3>
+                                <span className="font-num text-xs font-black text-amber-300">
+                                  💰 {spec.cost.toLocaleString()}
+                                </span>
+                              </div>
+                              <p className="text-xs text-slate-300 mt-0.5 leading-relaxed">
+                                {isAr ? spec.descAr : spec.descEn}
+                              </p>
+                            </div>
+                          </div>
+
+                          <div className="flex flex-wrap items-center gap-1.5 text-[11px] font-bold">
+                            <span className="px-2 py-0.5 rounded bg-emerald-900/70 text-emerald-200 border border-emerald-500/40">
+                              {spec.petHealAmount >= 9999
+                                ? isAr
+                                  ? '❤️ شفاء 100% للحيوانات'
+                                  : '❤️ 100% Pet Heal'
+                                : `+${spec.petHealAmount} ${isAr ? 'طاقة للحيوانات' : 'Pet Energy'}`}
+                            </span>
+                            <span className="px-2 py-0.5 rounded bg-rose-900/70 text-rose-200 border border-rose-400/40">
+                              +{spec.petMaxHpBonus}{' '}
+                              {isAr ? 'طاقة قصوى دائمة' : 'Perm Max HP'}
+                            </span>
+                            {spec.petDmgBoostPct && spec.buffDurationSec && (
+                              <span className="px-2 py-0.5 rounded bg-orange-900/70 text-orange-200 border border-orange-400/40">
+                                🔥 +{spec.petDmgBoostPct}% DMG ({spec.buffDurationSec}s)
+                              </span>
+                            )}
+                            {spec.petSpeedBoostPct && spec.buffDurationSec && (
+                              <span className="px-2 py-0.5 rounded bg-amber-900/70 text-amber-200 border border-amber-400/40">
+                                ⚡ +{spec.petSpeedBoostPct}% SPD ({spec.buffDurationSec}s)
+                              </span>
+                            )}
+                          </div>
+
+                          <button
+                            type="button"
+                            onClick={() => onBuyMeat(meatId)}
+                            disabled={!canAfford}
+                            className={`w-full py-2 rounded-lg text-xs sm:text-sm font-black transition-colors ${
+                              canAfford
+                                ? 'bg-rose-600 hover:bg-rose-500 text-white cursor-pointer'
+                                : 'bg-slate-800 text-slate-500 cursor-not-allowed'
+                            }`}
+                          >
+                            {ownedPetCount === 0
+                              ? isAr
+                                ? 'اشترِ حيواناً أولاً 🐾'
+                                : 'Buy a Pet First 🐾'
+                              : isAr
+                              ? `🥩 إطعام جميع الحيوانات (${spec.cost.toLocaleString()} 💰)`
+                              : `🥩 Feed All Pets (${spec.cost.toLocaleString()} 💰)`}
+                          </button>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
               {shopTab === 'weapons' && (
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   {ALL_WEAPON_IDS.map((weaponId) => {
@@ -792,8 +1031,8 @@ export const MonsterArenaUI: React.FC<MonsterArenaUIProps> = ({
                         key={weaponId}
                         className={`flex flex-col justify-between gap-2.5 p-3.5 rounded-xl border ${
                           equipped
-                            ? 'bg-[#211a3d] border-sky-400'
-                            : 'bg-[#1c152e] border-slate-700'
+                            ? 'bg-[#103250] border-cyan-400'
+                            : 'bg-[#0c2238] border-cyan-900/80'
                         }`}
                       >
                         <div className="flex items-start gap-3">
@@ -887,10 +1126,10 @@ export const MonsterArenaUI: React.FC<MonsterArenaUIProps> = ({
               {shopTab === 'pets' && (
                 <div className="flex flex-col gap-3">
                   {/* Interactive 12-Slot Drag & Tap Move/Merge Board */}
-                  <div className="p-3 rounded-xl bg-[#1d1431] border border-fuchsia-400/50 flex flex-col gap-2.5">
+                  <div className="p-3 rounded-xl bg-[#0b243b] border border-cyan-400/50 flex flex-col gap-2.5">
                     <div className="flex flex-wrap items-center justify-between gap-2">
                       <div>
-                        <div className="text-xs sm:text-sm font-black text-amber-200">
+                        <div className="text-xs sm:text-sm font-black text-cyan-200">
                           {isAr
                             ? `🐾 لوحة النقل والدمج (${ownedPetCount}/${MAX_PET_SQUAD}) — اسحب أو اضغط لنقل الحيوان ودمج المتشابهين!`
                             : `🐾 Move & Merge Board (${ownedPetCount}/${MAX_PET_SQUAD}) — Drag or tap to move pets & merge matches!`}
@@ -983,8 +1222,8 @@ export const MonsterArenaUI: React.FC<MonsterArenaUIProps> = ({
                                 : canMoveHere
                                 ? 'bg-sky-900/45 border-dashed border-sky-400 cursor-pointer'
                                 : occupant
-                                ? 'bg-[#261a3d] hover:bg-[#312150] border-slate-600 cursor-grab'
-                                : 'bg-[#130d21] border-slate-800 text-slate-600'
+                                ? 'bg-[#112e4a] hover:bg-[#193e61] border-cyan-800/80 cursor-grab'
+                                : 'bg-[#071626] border-cyan-950 text-slate-600'
                             }`}
                           >
                             <span className="absolute top-1 start-1.5 text-[9px] font-num text-slate-500">
@@ -1009,7 +1248,12 @@ export const MonsterArenaUI: React.FC<MonsterArenaUIProps> = ({
                                 </span>
                                 {(() => {
                                   const maxHp =
-                                    occupant.maxHp ?? getPetMaxHp(occupant.petId, occupant.level);
+                                    occupant.maxHp ??
+                                    getPetMaxHp(
+                                      occupant.petId,
+                                      occupant.level,
+                                      occupant.bonusMaxHp ?? 0
+                                    );
                                   const hp = occupant.hp ?? maxHp;
                                   const pct = Math.max(0, Math.min(100, (hp / Math.max(1, maxHp)) * 100));
                                   return (
@@ -1109,10 +1353,10 @@ export const MonsterArenaUI: React.FC<MonsterArenaUIProps> = ({
                           key={petId}
                           className={`flex flex-col justify-between gap-2.5 p-3.5 rounded-xl border ${
                             mergeableLevel !== null
-                              ? 'bg-[#28163b] border-fuchsia-400'
+                              ? 'bg-[#0f2e4c] border-cyan-300'
                               : ownedOfType.length > 0
-                              ? 'bg-[#221a35] border-amber-400/60'
-                              : 'bg-[#1c152e] border-slate-700'
+                              ? 'bg-[#0d2842] border-teal-400/60'
+                              : 'bg-[#0c2238] border-cyan-900/80'
                           }`}
                         >
                           <div className="flex items-start gap-3">
@@ -1222,40 +1466,44 @@ export const MonsterArenaUI: React.FC<MonsterArenaUIProps> = ({
       {/* START OVERLAY */}
       {hud.status === 'START' && !shopTab && (
         <div className="pointer-events-auto fixed inset-0 z-30 flex items-center justify-center bg-black/70 p-4">
-          <div className="w-full max-w-lg rounded-2xl bg-[#161026] border-2 border-amber-400/60 p-5 sm:p-6 text-center shadow-2xl">
+          <div className="w-full max-w-lg rounded-2xl bg-[#071829] border-2 border-cyan-400/60 p-5 sm:p-6 text-center shadow-2xl">
             <div className="text-4xl mb-2">🏟️⚔️🐺</div>
-            <h1 className="text-2xl sm:text-3xl font-black text-amber-200">
+            <h1 className="text-2xl sm:text-3xl font-black text-cyan-200">
               {isAr ? 'حلبة الوحوش 3D' : 'Monster Arena 3D'}
             </h1>
-            <p className="text-xs sm:text-sm text-slate-300 mt-2 leading-relaxed">
+            <p className="text-xs sm:text-sm text-cyan-100/80 mt-2 leading-relaxed">
               {isAr
-                ? 'قاتل موجات الوحوش في الحلبة البركانية، اشترِ أسلحة أقوى وحيوانات تقاتل معك، وتناول الفواكه لرفع طاقتك قبل ظهور وحش الـ 10 دقائق الأسطوري!'
-                : 'Battle waves of monsters in a 3D volcanic colosseum, buy stronger weapons & battle pets, eat fruits to boost your Energy, and survive the 10-Minute Dread Titan!'}
+                ? 'قاتل موجات الوحوش في حلبة الكريستال الجليدي، اشترِ أسلحة أقوى وحيوانات تقاتل معك، وتناول الفواكه لرفع طاقتك قبل ظهور وحش الـ 10 دقائق الأسطوري!'
+                : 'Battle waves of monsters in a 3D glacial crystal colosseum, buy stronger weapons & battle pets, eat fruits to boost your Energy, and survive the 10-Minute Dread Titan!'}
             </p>
 
             <div className="grid grid-cols-3 gap-2 my-4 text-xs font-bold">
-              <div className="p-2.5 rounded-xl bg-[#1f1636] border border-emerald-500/40">
-                <div className="text-lg">🍎</div>
+              <div className="p-2.5 rounded-xl bg-[#0d263e] border border-emerald-500/40">
+                <div className="text-lg">🍎🥩</div>
                 <div className="text-emerald-300 mt-0.5">
-                  {isAr ? 'متجر فواكه' : 'Fruit Shop'}
+                  {isAr
+                    ? `${ALL_FRUIT_IDS.length} فاكهة + لحوم`
+                    : `${ALL_FRUIT_IDS.length} Fruits + Meats`}
                 </div>
                 <div className="text-[10px] text-slate-400">
-                  {isAr ? 'طاقة + بفات دائمة' : 'Heal & Max HP'}
+                  {isAr ? 'طاقة لك وللحيوانات' : 'Boost Hero & Pets'}
                 </div>
               </div>
-              <div className="p-2.5 rounded-xl bg-[#1f1636] border border-rose-500/40">
+              <div className="p-2.5 rounded-xl bg-[#0d263e] border border-cyan-500/40">
                 <div className="text-lg">🔥👹</div>
-                <div className="text-rose-300 mt-0.5">
+                <div className="text-cyan-300 mt-0.5">
                   {isAr ? 'كل 3د و 10د' : '3m & 10m Boss'}
                 </div>
                 <div className="text-[10px] text-slate-400">
                   {isAr ? 'سيد الحمم + الطاغية' : 'Warlord + Titan'}
                 </div>
               </div>
-              <div className="p-2.5 rounded-xl bg-[#1f1636] border border-amber-500/40">
+              <div className="p-2.5 rounded-xl bg-[#0d263e] border border-teal-500/40">
                 <div className="text-lg">🐾</div>
-                <div className="text-amber-300 mt-0.5">
-                  {isAr ? '8 أسلحة + 6 حيوانات' : '8 Guns + 6 Pets'}
+                <div className="text-teal-300 mt-0.5">
+                  {isAr
+                    ? `${ALL_WEAPON_IDS.length} سلاح + ${ALL_PET_IDS.length} حيوان`
+                    : `${ALL_WEAPON_IDS.length} Guns + ${ALL_PET_IDS.length} Pets`}
                 </div>
                 <div className="text-[10px] text-slate-400">
                   {isAr ? 'تقاتل بجانبك' : 'Fight Beside You'}
@@ -1285,10 +1533,10 @@ export const MonsterArenaUI: React.FC<MonsterArenaUIProps> = ({
             )}
 
             <div className="flex flex-wrap items-center justify-center gap-2 mb-3 text-xs font-extrabold">
-              <span className="px-2.5 py-1 rounded-lg bg-[#24120a] border border-orange-400/50 text-orange-200 font-num">
+              <span className="px-2.5 py-1 rounded-lg bg-[#0d2438] border border-sky-400/50 text-sky-200 font-num">
                 🔥 {isAr ? 'عدّاد وحش 3د المحفوظ:' : 'Saved 3m Boss:'} {formatCountdown(hud.warlordTimer)}
               </span>
-              <span className="px-2.5 py-1 rounded-lg bg-[#240d1d] border border-purple-400/50 text-purple-200 font-num">
+              <span className="px-2.5 py-1 rounded-lg bg-[#0b2338] border border-cyan-400/50 text-cyan-200 font-num">
                 👹 {isAr ? 'عدّاد زعيم 10د المحفوظ:' : 'Saved 10m Boss:'} {formatCountdown(hud.titanTimer)}
               </span>
             </div>
@@ -1308,7 +1556,7 @@ export const MonsterArenaUI: React.FC<MonsterArenaUIProps> = ({
               <button
                 type="button"
                 onClick={onStartNew}
-                className="w-full py-3 rounded-xl bg-amber-600 hover:bg-amber-500 text-white font-black text-sm sm:text-base cursor-pointer transition-colors"
+                className="w-full py-3 rounded-xl bg-gradient-to-b from-cyan-400 to-sky-600 hover:from-cyan-300 hover:to-sky-500 text-slate-950 font-black text-sm sm:text-base cursor-pointer transition-colors"
               >
                 {hud.hasSavedRun
                   ? isAr
@@ -1326,7 +1574,7 @@ export const MonsterArenaUI: React.FC<MonsterArenaUIProps> = ({
       {/* PAUSED OVERLAY (only when shop modal is closed) */}
       {hud.status === 'PAUSED' && !shopTab && (
         <div className="pointer-events-auto fixed inset-0 z-30 flex items-center justify-center bg-black/70 p-4">
-          <div className="w-full max-w-sm rounded-2xl bg-[#161026] border-2 border-indigo-400/60 p-5 text-center shadow-2xl">
+          <div className="w-full max-w-sm rounded-2xl bg-[#071829] border-2 border-cyan-400/60 p-5 text-center shadow-2xl">
             <h2 className="text-xl font-black text-white mb-4">
               {isAr ? '⏸️ الحلبة متوقفة مؤقتاً' : '⏸️ Arena Paused'}
             </h2>
@@ -1341,28 +1589,35 @@ export const MonsterArenaUI: React.FC<MonsterArenaUIProps> = ({
               <button
                 type="button"
                 onClick={() => onOpenShopTab('fruits')}
-                className="w-full py-2.5 rounded-xl bg-[#22183a] hover:bg-[#2d204d] border border-emerald-400/40 text-emerald-200 font-bold text-sm cursor-pointer"
+                className="w-full py-2.5 rounded-xl bg-[#0d263e] hover:bg-[#143758] border border-emerald-400/40 text-emerald-200 font-bold text-sm cursor-pointer"
               >
                 🍎 {isAr ? 'فتح متجر الفواكه' : 'Open Fruit Shop'}
               </button>
               <button
                 type="button"
+                onClick={() => onOpenShopTab('meats')}
+                className="w-full py-2.5 rounded-xl bg-[#271017] hover:bg-[#381620] border border-rose-400/40 text-rose-200 font-bold text-sm cursor-pointer"
+              >
+                🥩 {isAr ? 'فتح متجر اللحوم للحيوانات' : 'Open Meat Shop'}
+              </button>
+              <button
+                type="button"
                 onClick={() => onOpenShopTab('weapons')}
-                className="w-full py-2.5 rounded-xl bg-[#22183a] hover:bg-[#2d204d] border border-indigo-400/40 text-indigo-200 font-bold text-sm cursor-pointer"
+                className="w-full py-2.5 rounded-xl bg-[#0d263e] hover:bg-[#143758] border border-sky-400/40 text-sky-200 font-bold text-sm cursor-pointer"
               >
                 ⚔️ {isAr ? 'فتح متجر الأسلحة' : 'Open Weapons Shop'}
               </button>
               <button
                 type="button"
                 onClick={() => onOpenShopTab('pets')}
-                className="w-full py-2.5 rounded-xl bg-[#22183a] hover:bg-[#2d204d] border border-amber-400/40 text-amber-200 font-bold text-sm cursor-pointer"
+                className="w-full py-2.5 rounded-xl bg-[#0d263e] hover:bg-[#143758] border border-teal-400/40 text-teal-200 font-bold text-sm cursor-pointer"
               >
                 🐾 {isAr ? 'فتح متجر الحيوانات' : 'Open Pets Shop'}
               </button>
               <button
                 type="button"
                 onClick={onStartNew}
-                className="w-full py-2 rounded-xl bg-amber-700/80 hover:bg-amber-600 text-white font-bold text-xs cursor-pointer mt-1"
+                className="w-full py-2 rounded-xl bg-sky-700/85 hover:bg-sky-600 text-white font-bold text-xs cursor-pointer mt-1"
               >
                 {isAr ? '🔄 إعادة من البداية' : '🔄 Restart Run'}
               </button>
@@ -1381,29 +1636,29 @@ export const MonsterArenaUI: React.FC<MonsterArenaUIProps> = ({
       {/* GAME OVER OVERLAY */}
       {hud.status === 'GAME_OVER' && (
         <div className="pointer-events-auto fixed inset-0 z-30 flex items-center justify-center bg-black/75 p-4">
-          <div className="w-full max-w-md rounded-2xl bg-[#1a0d19] border-2 border-rose-500/70 p-6 text-center shadow-2xl">
+          <div className="w-full max-w-md rounded-2xl bg-[#071829] border-2 border-rose-500/70 p-6 text-center shadow-2xl">
             <div className="text-4xl mb-2">💥</div>
             <h2 className="text-2xl font-black text-rose-300">
               {isAr ? 'سقط البطل في الحلبة!' : 'Defeated in the Arena!'}
             </h2>
             <div className="grid grid-cols-2 gap-2.5 my-4 text-xs sm:text-sm font-bold">
-              <div className="p-2.5 rounded-xl bg-black/35 border border-slate-700">
+              <div className="p-2.5 rounded-xl bg-black/35 border border-cyan-900/70">
                 <div className="text-slate-400">{isAr ? 'النقاط' : 'Score'}</div>
                 <div className="font-num text-lg font-black text-amber-300">
                   {hud.score.toLocaleString()}
                 </div>
               </div>
-              <div className="p-2.5 rounded-xl bg-black/35 border border-slate-700">
+              <div className="p-2.5 rounded-xl bg-black/35 border border-cyan-900/70">
                 <div className="text-slate-400">{isAr ? 'الموجة' : 'Wave'}</div>
                 <div className="font-num text-lg font-black text-sky-300">{hud.wave}</div>
               </div>
-              <div className="p-2.5 rounded-xl bg-black/35 border border-slate-700">
+              <div className="p-2.5 rounded-xl bg-black/35 border border-cyan-900/70">
                 <div className="text-slate-400">{isAr ? 'الوحوش المهزومة' : 'Kills'}</div>
                 <div className="font-num text-lg font-black text-rose-300">{hud.kills}</div>
               </div>
-              <div className="p-2.5 rounded-xl bg-black/35 border border-slate-700">
+              <div className="p-2.5 rounded-xl bg-black/35 border border-cyan-900/70">
                 <div className="text-slate-400">{isAr ? 'الطغاة المهزومون' : 'Titans Slain'}</div>
-                <div className="font-num text-lg font-black text-purple-300">
+                <div className="font-num text-lg font-black text-cyan-300">
                   {hud.titansDefeated}
                 </div>
               </div>
@@ -1412,7 +1667,7 @@ export const MonsterArenaUI: React.FC<MonsterArenaUIProps> = ({
               <button
                 type="button"
                 onClick={onStartNew}
-                className="w-full py-3 rounded-xl bg-amber-600 hover:bg-amber-500 text-white font-black text-sm sm:text-base cursor-pointer"
+                className="w-full py-3 rounded-xl bg-gradient-to-b from-cyan-400 to-sky-600 hover:from-cyan-300 hover:to-sky-500 text-slate-950 font-black text-sm sm:text-base cursor-pointer"
               >
                 {isAr ? '⚔️ قتال مجدداً' : '⚔️ Fight Again'}
               </button>

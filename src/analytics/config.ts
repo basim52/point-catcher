@@ -21,3 +21,4 @@ export const STATS_ADMIN_EMAILS: readonly string[] = [
 ];
 
 export const SESSIONS_COLLECTION = 'analytics_sessions';
+export const GAME_STATS_COLLECTION = 'game_stats';

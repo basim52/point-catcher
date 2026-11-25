@@ -2,6 +2,11 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useGamePlayTracking } from './analytics/tracker';
 import { miniGameId } from './analytics/games';
 import {
+  formatVisitLabel,
+  refreshGameVisits,
+  useGameVisitCounts,
+} from './analytics/visits';
+import {
   Neon2048Game,
   Neon2048PreviewArt,
   read2048Stats,
@@ -57,6 +62,18 @@ import {
   readDevilTrapStats,
 } from './devilTrap/DevilTrapGame';
 import type { DevilTrapStats } from './devilTrap/types';
+import { GumShopGame, GumShopPreviewArt } from './gumShop/GumShopGame';
+import {
+  MAX_SHELVES,
+  readGumShopHubStats,
+  type GumShopHubStats,
+} from './gumShop/types';
+import {
+  FruitSlashGame,
+  FruitSlashPreviewArt,
+  readFruitSlashStats,
+  type FruitSlashStats,
+} from './gameFruitSlash';
 
 type Dir = 'UP' | 'DOWN' | 'LEFT' | 'RIGHT';
 type TierKey = 'intro' | 'curved' | 'woven' | 'hard' | 'master' | 'legend';
@@ -1344,6 +1361,8 @@ function HeartIcon({ filled, pulse }: { filled: boolean; pulse: boolean }) {
 }
 
 export type MiniGameId =
+  | 'gum-shop'
+  | 'fruit-slash'
   | 'devil-trap'
   | 'monster-arena'
   | 'plant-merge'
@@ -1390,10 +1409,10 @@ const HUB_COPY = {
     plantMergeTitle: 'مزرعة النباتات 3D',
     plantMergeDesc:
       'اقتل الوحوش لجمع الفلوس، اشترِ 11 نوعاً من النباتات من المتجر مع أسعارها وفوائدها، احمِ المنزل من الأكل، وواجه العملاق كل 5 دقائق!',
-    monsterArenaTag: 'فواكه · أسلحة · حيوانات · زعيم 3د و10د',
+    monsterArenaTag: 'فواكه · لحوم · 13 سلاح · 11 حيوان',
     monsterArenaTitle: 'حلبة الوحوش 3D',
     monsterArenaDesc:
-      'قاتل الوحوش في حلبة بركانية 3D، تناول الفواكه لرفع الطاقة، اشترِ 8 أسلحة أقوى و6 حيوانات تقاتل معك، وواجه وحش الـ 3 دقائق ووحش الـ 10 دقائق!',
+      'قاتل الوحوش في حلبة 3D، تناول 11 فاكهة لرفع طاقتك، أطعم حيواناتك من متجر اللحوم، افتح 13 سلاحاً و11 حيواناً مقاتلاً، وواجه وحش الـ 3 دقائق والـ 10 دقائق!',
     devilTrapTag: '300 مرحلة · عادي · صعب · مستحيل',
     devilTrapTitle: 'بوابة الشيطان 2D',
     devilTrapDesc:
@@ -1419,6 +1438,14 @@ const HUB_COPY = {
     brickBreakerTitle: 'تكسير النيون',
     brickBreakerDesc:
       'كسّر طوب النيون والفولاذ والقنابل المتفجرة مع قدرات الكرة النارية وتعدد الكرات ×3 عبر 15 مرحلة مشوقة.',
+    gumShopTag: '3D · طلب · تسعير · رفوف · إيجار',
+    gumShopTitle: 'بياع العلك 3D',
+    gumShopDesc:
+      'اطلب كراتين العلك واخرج لأخذها من خارج المحل، اشترِ رفوف 3D، سعّر كل نكهة بنفسك، وادفع الإيجار اليومي مع حفظ تلقائي دائم!',
+    fruitSlashTag: '2D · كلاسيك و Zen',
+    fruitSlashTitle: 'سيف الفواكه 2D',
+    fruitSlashDesc:
+      'قطّع الفواكه المتطايرة بسيف الكاتانا وحقق سلاسل الكومبو مع فاكهة التجميد والفاكهة الذهبية وتفادَ القنابل في وضع كلاسيك أو Zen!',
     comingSoonTitle: 'ألعاب جديدة قريباً',
     comingSoonDesc: 'هذه المساحة جاهزة لإضافة المزيد من الألعاب الممتعة.',
   },
@@ -1453,10 +1480,10 @@ const HUB_COPY = {
     plantMergeTitle: 'Plant Defense 3D',
     plantMergeDesc:
       'Earn Coins by killing monsters, buy all 11 plants from the Plant Shop with listed prices & abilities, protect your house, and survive the 5-min Colossal Boss!',
-    monsterArenaTag: 'Fruits · 8 Guns · 6 Pets · 3m & 10m Boss',
+    monsterArenaTag: '11 Fruits · Meats · 13 Guns · 11 Pets',
     monsterArenaTitle: 'Monster Arena 3D',
     monsterArenaDesc:
-      'Fight waves of monsters in a 3D colosseum, eat fruits to raise Energy, unlock 8 weapons & 6 companion battle pets, and survive the 3-Min Warlord & 10-Min Dread Titan!',
+      'Fight waves of monsters in a 3D colosseum, eat 11 fruits, feed pets at the Meat Shop to raise their energy, unlock 13 weapons & 11 battle pets, and survive the 3-Min & 10-Min Bosses!',
     devilTrapTag: '300 Stages · Normal · Hard · Impossible',
     devilTrapTitle: "Devil's Gate 2D",
     devilTrapDesc:
@@ -1482,6 +1509,14 @@ const HUB_COPY = {
     brickBreakerTitle: 'Neon Brick Breaker',
     brickBreakerDesc:
       'Shatter neon, armored steel, and chain-exploding bomb bricks with ×3 Multi-Ball & Fireball across 15 stages.',
+    gumShopTag: '3D · Order · Price · Shelves · Rent',
+    gumShopTitle: 'Gum Shop 3D',
+    gumShopDesc:
+      'Order gum cartons and walk outside to haul them in, buy 3D shelves, set your own prices, and pay daily rent with automatic permanent saving!',
+    fruitSlashTag: '2D · Classic & Zen',
+    fruitSlashTitle: 'Fruit Slash 2D',
+    fruitSlashDesc:
+      'Slice flying fruit with a calligraphic katana blade, chain multi-slice combos with Freeze & Golden Frenzy fruits, and dodge bombs in Classic or Zen!',
     comingSoonTitle: 'More Games Soon',
     comingSoonDesc: 'Space ready for adding new mini-games anytime.',
   },
@@ -2496,9 +2531,16 @@ export const GamesModal: React.FC<GamesModalProps> = ({
   const [devilTrapStats, setDevilTrapStats] = useState<DevilTrapStats>(() =>
     readDevilTrapStats()
   );
+  const [gumShopStats, setGumShopStats] = useState<GumShopHubStats>(() =>
+    readGumShopHubStats()
+  );
+  const [fruitSlashStats, setFruitSlashStats] = useState<FruitSlashStats>(() =>
+    readFruitSlashStats()
+  );
 
   // Private analytics: visit + active minutes for the open mini game.
   useGamePlayTracking(miniGameId(activeGame), activeGame !== null);
+  const visitCounts = useGameVisitCounts();
 
   // Play soft arcade lounge music while browsing the Games Hub
   useGameMusic('hub', musicEnabled && activeGame === null);
@@ -2531,8 +2573,27 @@ export const GamesModal: React.FC<GamesModalProps> = ({
     setPlantMergeStats(readPlantMergeStats());
     setMonsterArenaStats(readMonsterArenaStats());
     setDevilTrapStats(readDevilTrapStats());
+    setGumShopStats(readGumShopHubStats());
+    setFruitSlashStats(readFruitSlashStats());
+    void refreshGameVisits();
     setActiveGame(null);
   }, []);
+
+  if (activeGame === 'gum-shop') {
+    return <GumShopGame lang={lang} onExit={handleExitGameToHub} />;
+  }
+
+  if (activeGame === 'fruit-slash') {
+    return (
+      <FruitSlashGame
+        lang={lang}
+        sfxEnabled={sfxEnabled}
+        musicEnabled={musicEnabled}
+        onToggleMusic={onToggleMusic}
+        onExitToHub={handleExitGameToHub}
+      />
+    );
+  }
 
   if (activeGame === 'devil-trap') {
     return <DevilTrapGame lang={lang} onExit={handleExitGameToHub} />;
@@ -2645,6 +2706,30 @@ export const GamesModal: React.FC<GamesModalProps> = ({
   const ht = HUB_COPY[lang];
   const bestFruitTier = FRUIT_TIERS[Math.min(fruitMergeStats.maxTier, FRUIT_TIERS.length - 1)];
 
+  const renderVisitsRow = (gameId: string) => (
+    <div className="flex items-center justify-between gap-1 text-[10.5px] sm:text-xs text-slate-400 mb-2 sm:mb-2.5">
+      <span className="inline-flex items-center gap-1 truncate">
+        <svg
+          viewBox="0 0 24 24"
+          className="w-3.5 h-3.5 text-sky-400/90 shrink-0"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          aria-hidden="true"
+        >
+          <path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7z" />
+          <circle cx="12" cy="12" r="3" />
+        </svg>
+        <span>{lang === 'ar' ? 'الزيارات' : 'Visits'}</span>
+      </span>
+      <span className="font-num font-bold text-slate-200 whitespace-nowrap">
+        {formatVisitLabel(visitCounts[gameId] ?? 0, lang)}
+      </span>
+    </div>
+  );
+
   return (
     <div
       dir={lang === 'ar' ? 'rtl' : 'ltr'}
@@ -2686,7 +2771,7 @@ export const GamesModal: React.FC<GamesModalProps> = ({
           {/* Available Games Count + Music Toggle */}
           <div className="flex items-center gap-2.5 shrink-0">
             <div className="text-xs sm:text-sm font-semibold text-sky-300 whitespace-nowrap">
-              {ht.gamesCount(13)}
+              {ht.gamesCount(15)}
             </div>
             <MusicToggleButton
               enabled={musicEnabled}
@@ -2725,12 +2810,13 @@ export const GamesModal: React.FC<GamesModalProps> = ({
                   {ht.arrowGameDesc}
                 </p>
 
-                <div className="flex items-center justify-between gap-1 text-[10.5px] sm:text-xs text-slate-400 mb-2 sm:mb-3 pt-2 sm:pt-2.5 border-t border-white/8">
+                <div className="flex items-center justify-between gap-1 text-[10.5px] sm:text-xs text-slate-400 mb-1 pt-2 sm:pt-2.5 border-t border-white/8">
                   <span className="truncate">{ht.progressLabel}</span>
                   <span className="font-num font-bold text-amber-300 whitespace-nowrap">
                     {arrowSolvedCount}/{TOTAL_LEVELS}
                   </span>
                 </div>
+                {renderVisitsRow('mini-arrow-escape')}
 
                 <button
                   type="button"
@@ -2762,13 +2848,14 @@ export const GamesModal: React.FC<GamesModalProps> = ({
                   {ht.neon2048Desc}
                 </p>
 
-                <div className="flex items-center justify-between gap-1 text-[10.5px] sm:text-xs text-slate-400 mb-2 sm:mb-3 pt-2 sm:pt-2.5 border-t border-white/8">
+                <div className="flex items-center justify-between gap-1 text-[10.5px] sm:text-xs text-slate-400 mb-1 pt-2 sm:pt-2.5 border-t border-white/8">
                   <span className="truncate">{ht.bestScoreLabel}</span>
                   <span className="font-num font-bold text-cyan-300 truncate">
                     {stats2048.bestScore}
                     {stats2048.bestTile > 0 ? ` · ${stats2048.bestTile}` : ''}
                   </span>
                 </div>
+                {renderVisitsRow('mini-neon-2048')}
 
                 <button
                   type="button"
@@ -2800,12 +2887,13 @@ export const GamesModal: React.FC<GamesModalProps> = ({
                   {ht.neonSnakeDesc}
                 </p>
 
-                <div className="flex items-center justify-between gap-1 text-[10.5px] sm:text-xs text-slate-400 mb-2 sm:mb-3 pt-2 sm:pt-2.5 border-t border-white/8">
+                <div className="flex items-center justify-between gap-1 text-[10.5px] sm:text-xs text-slate-400 mb-1 pt-2 sm:pt-2.5 border-t border-white/8">
                   <span className="truncate">{ht.bestScoreLabel}</span>
                   <span className="font-num font-bold text-emerald-300 whitespace-nowrap">
                     {snakeStats.bestScore}
                   </span>
                 </div>
+                {renderVisitsRow('mini-neon-snake')}
 
                 <button
                   type="button"
@@ -2837,12 +2925,13 @@ export const GamesModal: React.FC<GamesModalProps> = ({
                   {ht.appleCatchDesc}
                 </p>
 
-                <div className="flex items-center justify-between gap-1 text-[10.5px] sm:text-xs text-slate-400 mb-2 sm:mb-3 pt-2 sm:pt-2.5 border-t border-white/8">
+                <div className="flex items-center justify-between gap-1 text-[10.5px] sm:text-xs text-slate-400 mb-1 pt-2 sm:pt-2.5 border-t border-white/8">
                   <span className="truncate">{ht.progressLabel}</span>
                   <span className="font-num font-bold text-rose-300 whitespace-nowrap">
                     {appleCatchCleared}/{APPLE_CATCH_TOTAL_LEVELS}
                   </span>
                 </div>
+                {renderVisitsRow('mini-apple-catch')}
 
                 <button
                   type="button"
@@ -2874,12 +2963,13 @@ export const GamesModal: React.FC<GamesModalProps> = ({
                   {ht.arrowMosaicDesc}
                 </p>
 
-                <div className="flex items-center justify-between gap-1 text-[10.5px] sm:text-xs text-slate-400 mb-2 sm:mb-3 pt-2 sm:pt-2.5 border-t border-white/8">
+                <div className="flex items-center justify-between gap-1 text-[10.5px] sm:text-xs text-slate-400 mb-1 pt-2 sm:pt-2.5 border-t border-white/8">
                   <span className="truncate">{ht.progressLabel}</span>
                   <span className="font-num font-bold text-indigo-300 whitespace-nowrap">
                     {mosaicCleared}/{ARROW_MOSAIC_TOTAL_LEVELS}
                   </span>
                 </div>
+                {renderVisitsRow('mini-arrow-mosaic')}
 
                 <button
                   type="button"
@@ -2911,7 +3001,7 @@ export const GamesModal: React.FC<GamesModalProps> = ({
                   {ht.fruitMergeDesc}
                 </p>
 
-                <div className="flex items-center justify-between gap-1 text-[10.5px] sm:text-xs text-slate-400 mb-2 sm:mb-3 pt-2 sm:pt-2.5 border-t border-white/8">
+                <div className="flex items-center justify-between gap-1 text-[10.5px] sm:text-xs text-slate-400 mb-1 pt-2 sm:pt-2.5 border-t border-white/8">
                   <span className="truncate">{ht.bestScoreLabel}</span>
                   <span className="font-num font-bold text-orange-300 truncate">
                     {fruitMergeStats.bestScore}
@@ -2920,6 +3010,7 @@ export const GamesModal: React.FC<GamesModalProps> = ({
                       : ''}
                   </span>
                 </div>
+                {renderVisitsRow('mini-fruit-merge')}
 
                 <button
                   type="button"
@@ -2951,7 +3042,7 @@ export const GamesModal: React.FC<GamesModalProps> = ({
                   {ht.brickBreakerDesc}
                 </p>
 
-                <div className="flex items-center justify-between gap-1 text-[10.5px] sm:text-xs text-slate-400 mb-2 sm:mb-3 pt-2 sm:pt-2.5 border-t border-white/8">
+                <div className="flex items-center justify-between gap-1 text-[10.5px] sm:text-xs text-slate-400 mb-1 pt-2 sm:pt-2.5 border-t border-white/8">
                   <span className="truncate">{ht.progressLabel}</span>
                   <span className="font-num font-bold text-sky-300 truncate">
                     {brickBreakerStats.clearedStages.length}/{BRICK_BREAKER_TOTAL_LEVELS}
@@ -2960,6 +3051,7 @@ export const GamesModal: React.FC<GamesModalProps> = ({
                       : ''}
                   </span>
                 </div>
+                {renderVisitsRow('mini-brick-breaker')}
 
                 <button
                   type="button"
@@ -2991,12 +3083,13 @@ export const GamesModal: React.FC<GamesModalProps> = ({
                   {ht.dateCatcherDesc}
                 </p>
 
-                <div className="flex items-center justify-between gap-1 text-[10.5px] sm:text-xs text-amber-200/75 mb-2 sm:mb-3 pt-2 sm:pt-2.5 border-t border-white/10">
+                <div className="flex items-center justify-between gap-1 text-[10.5px] sm:text-xs text-amber-200/75 mb-1 pt-2 sm:pt-2.5 border-t border-white/10">
                   <span className="truncate">{ht.bestScoreLabel}</span>
                   <span className="font-num font-bold text-amber-300 whitespace-nowrap">
                     {dateCatcherBest}
                   </span>
                 </div>
+                {renderVisitsRow('mini-date-catcher')}
 
                 <button
                   type="button"
@@ -3028,7 +3121,7 @@ export const GamesModal: React.FC<GamesModalProps> = ({
                   {ht.desertRallyDesc}
                 </p>
 
-                <div className="flex items-center justify-between gap-1 text-[10.5px] sm:text-xs text-orange-200/75 mb-2 sm:mb-3 pt-2 sm:pt-2.5 border-t border-white/10">
+                <div className="flex items-center justify-between gap-1 text-[10.5px] sm:text-xs text-orange-200/75 mb-1 pt-2 sm:pt-2.5 border-t border-white/10">
                   <span className="truncate">{ht.bestScoreLabel}</span>
                   <span className="font-num font-bold text-orange-300 whitespace-nowrap">
                     {desertRallyStats.bestScore}
@@ -3037,6 +3130,7 @@ export const GamesModal: React.FC<GamesModalProps> = ({
                       : ''}
                   </span>
                 </div>
+                {renderVisitsRow('mini-desert-rally')}
 
                 <button
                   type="button"
@@ -3068,7 +3162,7 @@ export const GamesModal: React.FC<GamesModalProps> = ({
                   {ht.shawarmaDesc}
                 </p>
 
-                <div className="flex items-center justify-between gap-1 text-[10.5px] sm:text-xs text-amber-200/75 mb-2 sm:mb-3 pt-2 sm:pt-2.5 border-t border-white/10">
+                <div className="flex items-center justify-between gap-1 text-[10.5px] sm:text-xs text-amber-200/75 mb-1 pt-2 sm:pt-2.5 border-t border-white/10">
                   <span className="truncate">{ht.bestScoreLabel}</span>
                   <span className="font-num font-bold text-amber-300 whitespace-nowrap">
                     {shawarmaStats.bestCash > 0
@@ -3076,6 +3170,7 @@ export const GamesModal: React.FC<GamesModalProps> = ({
                       : '0'}
                   </span>
                 </div>
+                {renderVisitsRow('mini-shawarma-shop')}
 
                 <button
                   type="button"
@@ -3107,7 +3202,7 @@ export const GamesModal: React.FC<GamesModalProps> = ({
                   {ht.plantMergeDesc}
                 </p>
 
-                <div className="flex items-center justify-between gap-1 text-[10.5px] sm:text-xs text-emerald-200/75 mb-2 sm:mb-3 pt-2 sm:pt-2.5 border-t border-white/10">
+                <div className="flex items-center justify-between gap-1 text-[10.5px] sm:text-xs text-emerald-200/75 mb-1 pt-2 sm:pt-2.5 border-t border-white/10">
                   <span className="truncate">{ht.bestScoreLabel}</span>
                   <span className="font-num font-bold text-emerald-300 whitespace-nowrap">
                     {plantMergeStats.bestScore > 0
@@ -3115,6 +3210,7 @@ export const GamesModal: React.FC<GamesModalProps> = ({
                       : '0'}
                   </span>
                 </div>
+                {renderVisitsRow('mini-plant-merge')}
 
                 <button
                   type="button"
@@ -3127,38 +3223,39 @@ export const GamesModal: React.FC<GamesModalProps> = ({
             </div>
 
             {/* Game Card 12: Monster Arena 3D (حلبة الوحوش 3D) */}
-            <div className="group rounded-xl sm:rounded-2xl border border-rose-400/60 bg-[#1a1026] hover:border-amber-300/85 transition-colors overflow-hidden shadow-xl flex flex-col">
-              <div className="aspect-[2/1] w-full border-b border-white/10 overflow-hidden bg-[#241232]">
+            <div className="group rounded-xl sm:rounded-2xl border border-cyan-400/60 bg-[#081a2b] hover:border-sky-300/85 transition-colors overflow-hidden shadow-xl flex flex-col">
+              <div className="aspect-[2/1] w-full border-b border-white/10 overflow-hidden bg-[#0b233a]">
                 <MonsterArenaPreviewArt />
               </div>
 
               <div className="p-2.5 sm:p-4 flex-1 flex flex-col">
                 <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-0.5 sm:gap-2 mb-1 sm:mb-1.5">
-                  <h2 className="text-xs sm:text-lg font-bold text-amber-100 leading-snug">
+                  <h2 className="text-xs sm:text-lg font-bold text-cyan-100 leading-snug">
                     {ht.monsterArenaTitle}
                   </h2>
-                  <span className="font-num text-[10px] sm:text-xs font-semibold text-rose-300 whitespace-nowrap">
+                  <span className="font-num text-[10px] sm:text-xs font-semibold text-sky-300 whitespace-nowrap">
                     {ht.monsterArenaTag}
                   </span>
                 </div>
 
-                <p className="text-[11px] sm:text-sm text-rose-100/80 leading-snug sm:leading-relaxed mb-2.5 sm:mb-4 flex-1 line-clamp-2 sm:line-clamp-none">
+                <p className="text-[11px] sm:text-sm text-cyan-100/80 leading-snug sm:leading-relaxed mb-2.5 sm:mb-4 flex-1 line-clamp-2 sm:line-clamp-none">
                   {ht.monsterArenaDesc}
                 </p>
 
-                <div className="flex items-center justify-between gap-1 text-[10.5px] sm:text-xs text-amber-200/80 mb-2 sm:mb-3 pt-2 sm:pt-2.5 border-t border-white/10">
+                <div className="flex items-center justify-between gap-1 text-[10.5px] sm:text-xs text-sky-200/80 mb-1 pt-2 sm:pt-2.5 border-t border-white/10">
                   <span className="truncate">{ht.bestScoreLabel}</span>
-                  <span className="font-num font-bold text-amber-300 whitespace-nowrap">
+                  <span className="font-num font-bold text-cyan-300 whitespace-nowrap">
                     {monsterArenaStats.bestScore > 0
                       ? `${monsterArenaStats.bestScore} · W${monsterArenaStats.bestWave}`
                       : '0'}
                   </span>
                 </div>
+                {renderVisitsRow('mini-monster-arena')}
 
                 <button
                   type="button"
                   onClick={() => setActiveGame('monster-arena')}
-                  className="w-full h-9 sm:h-11 rounded-lg bg-gradient-to-b from-amber-400 to-rose-500 hover:from-amber-300 hover:to-rose-400 active:scale-[0.99] text-slate-950 font-extrabold text-xs sm:text-base transition-all cursor-pointer"
+                  className="w-full h-9 sm:h-11 rounded-lg bg-gradient-to-b from-cyan-300 to-sky-500 hover:from-cyan-200 hover:to-sky-400 active:scale-[0.99] text-slate-950 font-extrabold text-xs sm:text-base transition-all cursor-pointer"
                 >
                   {ht.playBtn}
                 </button>
@@ -3166,36 +3263,117 @@ export const GamesModal: React.FC<GamesModalProps> = ({
             </div>
 
             {/* Game Card 13: Devil's Gate 2D (بوابة الشيطان 2D) */}
-            <div className="group rounded-xl sm:rounded-2xl border border-amber-400/65 bg-[#2a150f] hover:border-yellow-300/90 transition-colors overflow-hidden shadow-xl flex flex-col">
-              <div className="aspect-[2/1] w-full border-b border-white/10 overflow-hidden bg-[#381c13]">
+            <div className="group rounded-xl sm:rounded-2xl border border-teal-400/65 bg-[#091826] hover:border-cyan-300/90 transition-colors overflow-hidden shadow-xl flex flex-col">
+              <div className="aspect-[2/1] w-full border-b border-white/10 overflow-hidden bg-[#102a3e]">
                 <DevilTrapPreviewArt />
               </div>
 
               <div className="p-2.5 sm:p-4 flex-1 flex flex-col">
                 <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-0.5 sm:gap-2 mb-1 sm:mb-1.5">
-                  <h2 className="text-xs sm:text-lg font-bold text-amber-100 leading-snug">
+                  <h2 className="text-xs sm:text-lg font-bold text-teal-100 leading-snug">
                     {ht.devilTrapTitle}
                   </h2>
-                  <span className="font-num text-[10px] sm:text-xs font-semibold text-amber-300 whitespace-nowrap">
+                  <span className="font-num text-[10px] sm:text-xs font-semibold text-teal-300 whitespace-nowrap">
                     {ht.devilTrapTag}
                   </span>
                 </div>
 
-                <p className="text-[11px] sm:text-sm text-amber-100/80 leading-snug sm:leading-relaxed mb-2.5 sm:mb-4 flex-1 line-clamp-2 sm:line-clamp-none">
+                <p className="text-[11px] sm:text-sm text-cyan-100/80 leading-snug sm:leading-relaxed mb-2.5 sm:mb-4 flex-1 line-clamp-2 sm:line-clamp-none">
                   {ht.devilTrapDesc}
                 </p>
 
-                <div className="flex items-center justify-between gap-1 text-[10.5px] sm:text-xs text-amber-200/80 mb-2 sm:mb-3 pt-2 sm:pt-2.5 border-t border-white/10">
+                <div className="flex items-center justify-between gap-1 text-[10.5px] sm:text-xs text-teal-200/80 mb-1 pt-2 sm:pt-2.5 border-t border-white/10">
                   <span className="truncate">{ht.progressLabel}</span>
-                  <span className="font-num font-bold text-yellow-300 whitespace-nowrap">
+                  <span className="font-num font-bold text-teal-300 whitespace-nowrap">
                     {devilTrapStats.completedLevelIds.length}/{DEVIL_TRAP_TOTAL_LEVELS}
                   </span>
                 </div>
+                {renderVisitsRow('mini-devil-trap')}
 
                 <button
                   type="button"
                   onClick={() => setActiveGame('devil-trap')}
-                  className="w-full h-9 sm:h-11 rounded-lg bg-gradient-to-b from-amber-300 to-orange-500 hover:from-amber-200 hover:to-orange-400 active:scale-[0.99] text-stone-950 font-extrabold text-xs sm:text-base transition-all cursor-pointer"
+                  className="w-full h-9 sm:h-11 rounded-lg bg-gradient-to-b from-teal-300 to-cyan-500 hover:from-teal-200 hover:to-cyan-400 active:scale-[0.99] text-slate-950 font-extrabold text-xs sm:text-base transition-all cursor-pointer"
+                >
+                  {ht.playBtn}
+                </button>
+              </div>
+            </div>
+
+            {/* Game Card 14: Gum Shop 3D (بياع العلك 3D) */}
+            <div className="group rounded-xl sm:rounded-2xl border border-teal-400/65 bg-[#0d1c2b] hover:border-emerald-300/90 transition-colors overflow-hidden shadow-xl flex flex-col">
+              <div className="aspect-[2/1] w-full border-b border-white/10 overflow-hidden bg-[#173042]">
+                <GumShopPreviewArt />
+              </div>
+
+              <div className="p-2.5 sm:p-4 flex-1 flex flex-col">
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-0.5 sm:gap-2 mb-1 sm:mb-1.5">
+                  <h2 className="text-xs sm:text-lg font-bold text-teal-100 leading-snug">
+                    {ht.gumShopTitle}
+                  </h2>
+                  <span className="font-num text-[10px] sm:text-xs font-semibold text-emerald-300 whitespace-nowrap">
+                    {ht.gumShopTag}
+                  </span>
+                </div>
+
+                <p className="text-[11px] sm:text-sm text-teal-100/80 leading-snug sm:leading-relaxed mb-2.5 sm:mb-4 flex-1 line-clamp-2 sm:line-clamp-none">
+                  {ht.gumShopDesc}
+                </p>
+
+                <div className="flex items-center justify-between gap-1 text-[10.5px] sm:text-xs text-teal-200/80 mb-1 pt-2 sm:pt-2.5 border-t border-white/10">
+                  <span className="truncate">{ht.progressLabel}</span>
+                  <span className="font-num font-bold text-emerald-300 whitespace-nowrap">
+                    {gumShopStats.hasSave
+                      ? `${lang === 'ar' ? 'يوم' : 'Day'} ${gumShopStats.day} · ${gumShopStats.shelvesCount}/${MAX_SHELVES} · ${gumShopStats.money}`
+                      : lang === 'ar'
+                      ? 'محل جديد'
+                      : 'New Shop'}
+                  </span>
+                </div>
+                {renderVisitsRow('mini-gum-shop')}
+
+                <button
+                  type="button"
+                  onClick={() => setActiveGame('gum-shop')}
+                  className="w-full h-9 sm:h-11 rounded-lg bg-gradient-to-b from-teal-300 to-emerald-500 hover:from-teal-200 hover:to-emerald-400 active:scale-[0.99] text-slate-950 font-extrabold text-xs sm:text-base transition-all cursor-pointer"
+                >
+                  {ht.playBtn}
+                </button>
+              </div>
+            </div>
+
+            {/* Game Card 15: Fruit Slash 2D (سيف الفواكه 2D) */}
+            <div className="group rounded-xl sm:rounded-2xl border border-rose-400/65 bg-[#1b120e] hover:border-orange-300/90 transition-colors overflow-hidden shadow-xl flex flex-col">
+              <div className="aspect-[2/1] w-full border-b border-white/10 overflow-hidden bg-[#2b1a12]">
+                <FruitSlashPreviewArt />
+              </div>
+
+              <div className="p-2.5 sm:p-4 flex-1 flex flex-col">
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-0.5 sm:gap-2 mb-1 sm:mb-1.5">
+                  <h2 className="text-xs sm:text-lg font-bold text-orange-100 leading-snug">
+                    {ht.fruitSlashTitle}
+                  </h2>
+                  <span className="font-num text-[10px] sm:text-xs font-semibold text-rose-300 whitespace-nowrap">
+                    {ht.fruitSlashTag}
+                  </span>
+                </div>
+
+                <p className="text-[11px] sm:text-sm text-orange-100/80 leading-snug sm:leading-relaxed mb-2.5 sm:mb-4 flex-1 line-clamp-2 sm:line-clamp-none">
+                  {ht.fruitSlashDesc}
+                </p>
+
+                <div className="flex items-center justify-between gap-1 text-[10.5px] sm:text-xs text-rose-200/80 mb-1 pt-2 sm:pt-2.5 border-t border-white/10">
+                  <span className="truncate">{ht.bestScoreLabel}</span>
+                  <span className="font-num font-bold text-orange-300 whitespace-nowrap">
+                    {Math.max(fruitSlashStats.bestClassic, fruitSlashStats.bestZen)}
+                  </span>
+                </div>
+                {renderVisitsRow('mini-fruit-slash')}
+
+                <button
+                  type="button"
+                  onClick={() => setActiveGame('fruit-slash')}
+                  className="w-full h-9 sm:h-11 rounded-lg bg-gradient-to-b from-orange-300 to-rose-500 hover:from-orange-200 hover:to-rose-400 active:scale-[0.99] text-slate-950 font-extrabold text-xs sm:text-base transition-all cursor-pointer"
                 >
                   {ht.playBtn}
                 </button>

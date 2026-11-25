@@ -598,16 +598,6 @@ function getPlantAt(
   return world.plants.find((p) => p.row === row && p.col === col);
 }
 
-export function actionSelectShopTier(
-  world: PlantMergeWorld,
-  tier: PlantTier
-): void {
-  world.selectedShopTier = clampPlantTier(tier);
-  world.selectedPlot = null;
-  savePlantMergeWorldNow(world);
-  world.version++;
-}
-
 /**
  * Buy a specific plant tier from the Shop and place it on the target plot (or first open plot)
  */

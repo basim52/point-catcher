@@ -150,8 +150,11 @@ const CANVAS_W = 960;
 const CANVAS_H = 540;
 
 // Physics constants (tuned for crisp, fair, zero-slip 2D platforming)
-const PLAYER_W = 24;
-const PLAYER_H = 32;
+const BASE_PLAYER_W = 24;
+const BASE_PLAYER_H = 32;
+const PLAYER_SCALE = 1.5;
+const PLAYER_W = Math.round(BASE_PLAYER_W * PLAYER_SCALE); // 36 (+50%)
+const PLAYER_H = Math.round(BASE_PLAYER_H * PLAYER_SCALE); // 48 (+50%)
 const DOOR_W = 36;
 const DOOR_H = 54;
 const GRAVITY = 1650;
@@ -188,67 +191,67 @@ interface Palette {
 
 const PALETTES: Record<DevilDifficulty, Palette> = {
   normal: {
-    bg: '#381C13',
-    bgInner: '#4A2519',
-    blockFill: '#DCA052',
-    blockTop: '#F3C57E',
-    blockEdge: '#A96D2A',
-    crumbleFill: '#C2823D',
-    crumbleCrack: '#5A2F15',
-    bouncyFill: '#10B981',
-    spikeFill: '#1A0B08',
-    spikeGlint: '#FDE68A',
-    sawBlade: '#1E1414',
-    sawCore: '#EF4444',
-    doorGlow: 'rgba(255, 241, 194, 0.28)',
-    doorInner: '#FFF6D8',
-    doorFrame: '#2A130C',
-    playerFill: '#160A08',
-    playerEye: '#FFF7ED',
-    accent: '#F59E0B',
-    badgeText: '#FEF3C7',
+    bg: '#091826',
+    bgInner: '#102A3E',
+    blockFill: '#14B8A6',
+    blockTop: '#5EEAD4',
+    blockEdge: '#0F766E',
+    crumbleFill: '#0D9488',
+    crumbleCrack: '#042F2E',
+    bouncyFill: '#FACC15',
+    spikeFill: '#0B0F1A',
+    spikeGlint: '#38BDF8',
+    sawBlade: '#0F172A',
+    sawCore: '#F43F5E',
+    doorGlow: 'rgba(103, 232, 249, 0.34)',
+    doorInner: '#ECFEFF',
+    doorFrame: '#062030',
+    playerFill: '#070B14',
+    playerEye: '#67E8F9',
+    accent: '#2DD4BF',
+    badgeText: '#CCFBF1',
   },
   hard: {
-    bg: '#230B12',
-    bgInner: '#34111B',
-    blockFill: '#C94444',
-    blockTop: '#ED786C',
-    blockEdge: '#8A2128',
-    crumbleFill: '#A83238',
-    crumbleCrack: '#3D0F16',
-    bouncyFill: '#34D399',
-    spikeFill: '#180509',
-    spikeGlint: '#FECACA',
-    sawBlade: '#1C090F',
-    sawCore: '#F97316',
-    doorGlow: 'rgba(255, 214, 196, 0.28)',
-    doorInner: '#FFE8DD',
-    doorFrame: '#1D070C',
-    playerFill: '#120408',
-    playerEye: '#FFE4E6',
-    accent: '#F43F5E',
-    badgeText: '#FFE4E6',
+    bg: '#130A2A',
+    bgInner: '#211245',
+    blockFill: '#A855F7',
+    blockTop: '#D8B4FE',
+    blockEdge: '#6B21A8',
+    crumbleFill: '#9333EA',
+    crumbleCrack: '#2E1065',
+    bouncyFill: '#22D3EE',
+    spikeFill: '#0D061F',
+    spikeGlint: '#F472B6',
+    sawBlade: '#140826',
+    sawCore: '#FB7185',
+    doorGlow: 'rgba(244, 114, 182, 0.34)',
+    doorInner: '#FDF2F8',
+    doorFrame: '#190830',
+    playerFill: '#0A0416',
+    playerEye: '#F9A8D4',
+    accent: '#E879F9',
+    badgeText: '#FAE8FF',
   },
   impossible: {
-    bg: '#110917',
-    bgInner: '#1E1028',
-    blockFill: '#E3A422',
-    blockTop: '#FDE047',
-    blockEdge: '#945B0B',
-    crumbleFill: '#B97E18',
-    crumbleCrack: '#2C1406',
-    bouncyFill: '#22D3EE',
+    bg: '#07140E',
+    bgInner: '#0F261A',
+    blockFill: '#84CC16',
+    blockTop: '#BEF264',
+    blockEdge: '#4D7C0F',
+    crumbleFill: '#65A30D',
+    crumbleCrack: '#1A2E05',
+    bouncyFill: '#38BDF8',
     spikeFill: '#DC2626',
-    spikeGlint: '#FEF08A',
-    sawBlade: '#0F0712',
-    sawCore: '#EF4444',
-    doorGlow: 'rgba(254, 249, 195, 0.34)',
-    doorInner: '#FEFCE8',
-    doorFrame: '#09040C',
-    playerFill: '#0A050E',
-    playerEye: '#FEF08A',
-    accent: '#FACC15',
-    badgeText: '#FEF9C3',
+    spikeGlint: '#D9F99D',
+    sawBlade: '#07120B',
+    sawCore: '#F43F5E',
+    doorGlow: 'rgba(190, 242, 100, 0.36)',
+    doorInner: '#F7FEE7',
+    doorFrame: '#081C10',
+    playerFill: '#050C08',
+    playerEye: '#BEF264',
+    accent: '#A3E635',
+    badgeText: '#ECFCCB',
   },
 };
 
@@ -360,8 +363,8 @@ interface RuntimeState {
 function createRuntimeState(level: DevilLevelDef): RuntimeState {
   return {
     level,
-    px: level.spawn.x,
-    py: level.spawn.y,
+    px: level.spawn.x - (PLAYER_W - BASE_PLAYER_W) / 2,
+    py: level.spawn.y - (PLAYER_H - BASE_PLAYER_H),
     vx: 0,
     vy: 0,
     facing: 1,
@@ -476,27 +479,27 @@ const DIFF_META: Record<
     en: 'Normal',
     subAr: '100 مرحلة · خدع كلاسيكية متدرجة',
     subEn: '100 Stages · Classic Troll Traps',
-    accentClass: 'text-amber-300',
-    borderClass: 'border-amber-400/50',
-    bgClass: 'bg-amber-500/15',
+    accentClass: 'text-teal-300',
+    borderClass: 'border-teal-400/55',
+    bgClass: 'bg-teal-500/15',
   },
   hard: {
     ar: 'صعب',
     en: 'Hard',
     subAr: '100 مرحلة · مناشير وأبواب كاذبة وعكس تحكم',
     subEn: '100 Stages · Saws, Fake Doors & Reversed Controls',
-    accentClass: 'text-rose-300',
-    borderClass: 'border-rose-400/50',
-    bgClass: 'bg-rose-500/15',
+    accentClass: 'text-fuchsia-300',
+    borderClass: 'border-fuchsia-400/55',
+    bgClass: 'bg-fuchsia-500/15',
   },
   impossible: {
     ar: 'مستحيل',
     en: 'Impossible',
     subAr: '100 مرحلة · جاذبية مقلوبة ومكابس وجحيم الخدع',
     subEn: '100 Stages · Gravity Flips, Crushers & Pure Chaos',
-    accentClass: 'text-yellow-300',
-    borderClass: 'border-yellow-400/50',
-    bgClass: 'bg-yellow-500/15',
+    accentClass: 'text-lime-300',
+    borderClass: 'border-lime-400/55',
+    bgClass: 'bg-lime-500/15',
   },
 };
 
@@ -1141,17 +1144,17 @@ export const DevilTrapGame: React.FC<DevilTrapGameProps> = ({ lang, onExit }) =>
         return;
       }
 
-      // Spikes (forgiving 4px inset)
+      // Spikes (forgiving inset scaled for enlarged hero)
       for (const sp of s.spikes) {
         if (sp.extend < 0.35) continue;
         const insetX = 4;
         const insetY = 4;
         if (
           rectsOverlap(
-            s.px + 2,
-            s.py + 2,
-            PLAYER_W - 4,
-            PLAYER_H - 4,
+            s.px + 5,
+            s.py + 5,
+            PLAYER_W - 10,
+            PLAYER_H - 10,
             sp.x + insetX,
             sp.y + insetY,
             Math.max(4, sp.w - insetX * 2),
@@ -1166,8 +1169,8 @@ export const DevilTrapGame: React.FC<DevilTrapGameProps> = ({ lang, onExit }) =>
       // Saws (circle vs player box)
       for (const saw of s.saws) {
         if (!saw.active) continue;
-        const nearestX = Math.max(s.px + 2, Math.min(saw.x, s.px + PLAYER_W - 2));
-        const nearestY = Math.max(s.py + 2, Math.min(saw.y, s.py + PLAYER_H - 2));
+        const nearestX = Math.max(s.px + 5, Math.min(saw.x, s.px + PLAYER_W - 5));
+        const nearestY = Math.max(s.py + 5, Math.min(saw.y, s.py + PLAYER_H - 5));
         const dx = saw.x - nearestX;
         const dy = saw.y - nearestY;
         const hitR = saw.r - 4;
@@ -1453,7 +1456,7 @@ export const DevilTrapGame: React.FC<DevilTrapGameProps> = ({ lang, onExit }) =>
 
         ctx.save();
         ctx.translate(cx, pivotY);
-        ctx.scale(s.scaleX, s.scaleY * s.gravityDir);
+        ctx.scale(s.scaleX * PLAYER_SCALE, s.scaleY * PLAYER_SCALE * s.gravityDir);
 
         // Tiny animated legs
         const legSwing = Math.sin(s.runCycle) * 4.5;
@@ -1585,7 +1588,7 @@ export const DevilTrapGame: React.FC<DevilTrapGameProps> = ({ lang, onExit }) =>
     return (
       <div
         dir={isAr ? 'rtl' : 'ltr'}
-        className="fixed inset-0 z-50 flex flex-col overflow-y-auto text-amber-50 select-none"
+        className="fixed inset-0 z-50 flex flex-col overflow-y-auto text-cyan-50 select-none"
         style={{ backgroundColor: pal.bg }}
       >
         {/* Minimalist Top Bar */}
@@ -1593,13 +1596,13 @@ export const DevilTrapGame: React.FC<DevilTrapGameProps> = ({ lang, onExit }) =>
           <button
             type="button"
             onClick={onExit}
-            className="inline-flex items-center gap-2 rounded-xl bg-black/30 hover:bg-black/45 px-3.5 py-2 text-sm font-bold text-amber-100 transition cursor-pointer"
+            className="inline-flex items-center gap-2 rounded-xl bg-black/30 hover:bg-black/45 px-3.5 py-2 text-sm font-bold text-cyan-100 transition cursor-pointer"
           >
             <X className="w-4 h-4" />
             <span>{isAr ? 'خروج' : 'Exit'}</span>
           </button>
 
-          <div className="flex items-center gap-3 text-sm font-bold text-amber-100/90 tabular-nums">
+          <div className="flex items-center gap-3 text-sm font-bold text-cyan-100/90 tabular-nums">
             <span>
               {completedSet.size}/{DEVIL_TRAP_TOTAL_LEVELS} {isAr ? 'مكتمل' : 'Cleared'}
             </span>
@@ -1623,13 +1626,13 @@ export const DevilTrapGame: React.FC<DevilTrapGameProps> = ({ lang, onExit }) =>
         <main className="mx-auto flex w-full max-w-4xl flex-1 flex-col justify-center px-5 py-7 gap-7">
           <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
             <div>
-              <div className="text-xs font-black tracking-widest uppercase text-amber-300/80 mb-1">
+              <div className="text-xs font-black tracking-widest uppercase text-teal-300/85 mb-1">
                 {isAr ? 'لعبة منصات 2D · فخاخ غير متوقعة' : '2D TROLL PLATFORMER · UNFAIRLY FUN'}
               </div>
               <h1 className="text-4xl sm:text-5xl font-black tracking-tight text-white">
                 {isAr ? 'بوابة الشيطان' : "Devil's Gate"}
               </h1>
-              <p className="mt-2 text-sm sm:text-base text-amber-100/75 max-w-xl">
+              <p className="mt-2 text-sm sm:text-base text-cyan-100/75 max-w-xl">
                 {isAr
                   ? 'كل خطوة قد تخونك! حفر تفتح فجأة، أشواك مختبئة، أبواب تهرب، وجاذبية مقلوبة عبر 300 مرحلة (100 مرحلة في كل مستوى صعوبة).'
                   : 'Every step can betray you! Sudden pits, ambush spikes, runaway doors, and gravity flips across 300 stages (100 per difficulty tier).'}
@@ -1639,7 +1642,7 @@ export const DevilTrapGame: React.FC<DevilTrapGameProps> = ({ lang, onExit }) =>
             <button
               type="button"
               onClick={() => startLevel(nextInTier)}
-              className="inline-flex items-center justify-center gap-2.5 rounded-2xl px-6 py-3.5 text-base font-black text-stone-950 shadow-lg transition hover:brightness-110 active:scale-95 cursor-pointer shrink-0"
+              className="inline-flex items-center justify-center gap-2.5 rounded-2xl px-6 py-3.5 text-base font-black text-slate-950 shadow-lg transition hover:brightness-110 active:scale-95 cursor-pointer shrink-0"
               style={{ backgroundColor: pal.blockFill }}
             >
               <Play className="w-5 h-5 fill-current" />
@@ -1723,7 +1726,7 @@ export const DevilTrapGame: React.FC<DevilTrapGameProps> = ({ lang, onExit }) =>
                 );
               })}
             </div>
-            <span className="text-xs font-bold text-amber-200/75 tabular-nums">
+            <span className="text-xs font-bold text-cyan-200/75 tabular-nums">
               {isAr
                 ? `المراحل ${stagePage * 20 + 1} – ${stagePage * 20 + 20} من 100`
                 : `Stages ${stagePage * 20 + 1}–${stagePage * 20 + 20} of 100`}
@@ -1750,9 +1753,9 @@ export const DevilTrapGame: React.FC<DevilTrapGameProps> = ({ lang, onExit }) =>
                       : isDone
                         ? 'border-emerald-400/45 bg-emerald-950/35 hover:bg-emerald-950/50 hover:-translate-y-0.5 cursor-pointer'
                         : isCurrentNext
-                          ? 'border-amber-300/80 bg-amber-500/20 hover:bg-amber-500/30 hover:-translate-y-0.5 shadow-md cursor-pointer'
+                          ? 'border-cyan-300/80 bg-cyan-500/20 hover:bg-cyan-500/30 hover:-translate-y-0.5 shadow-md cursor-pointer'
                           : isMilestone
-                            ? 'border-amber-400/55 bg-amber-950/35 hover:bg-amber-950/55 hover:-translate-y-0.5 cursor-pointer'
+                            ? 'border-teal-400/55 bg-teal-950/35 hover:bg-teal-950/55 hover:-translate-y-0.5 cursor-pointer'
                             : 'border-white/14 bg-black/30 hover:bg-black/45 hover:-translate-y-0.5 cursor-pointer'
                   }`}
                 >
@@ -1763,7 +1766,7 @@ export const DevilTrapGame: React.FC<DevilTrapGameProps> = ({ lang, onExit }) =>
                         color: !unlocked
                           ? 'rgba(255,255,255,0.38)'
                           : isMilestone
-                            ? '#FDE047'
+                            ? '#67E8F9'
                             : pal.blockTop,
                       }}
                     >
@@ -1772,13 +1775,13 @@ export const DevilTrapGame: React.FC<DevilTrapGameProps> = ({ lang, onExit }) =>
                     {!unlocked ? (
                       <Lock className="w-4 h-4 text-white/40" />
                     ) : isDone ? (
-                      <span className="flex h-5 w-5 items-center justify-center rounded-full bg-emerald-500 text-stone-950">
+                      <span className="flex h-5 w-5 items-center justify-center rounded-full bg-emerald-500 text-slate-950">
                         <Check className="w-3.5 h-3.5 stroke-[3]" />
                       </span>
                     ) : isMilestone ? (
-                      <Flame className="w-4 h-4 text-amber-400" />
+                      <Flame className="w-4 h-4 text-cyan-300" />
                     ) : (
-                      <Play className="w-3.5 h-3.5 text-amber-200 group-hover:text-white transition" />
+                      <Play className="w-3.5 h-3.5 text-cyan-200 group-hover:text-white transition" />
                     )}
                   </div>
 
@@ -1826,7 +1829,7 @@ export const DevilTrapGame: React.FC<DevilTrapGameProps> = ({ lang, onExit }) =>
     <div
       dir={isAr ? 'rtl' : 'ltr'}
       className="fixed inset-0 z-50 flex flex-col items-center justify-between text-white select-none overflow-hidden"
-      style={{ backgroundColor: '#0E0706' }}
+      style={{ backgroundColor: '#050C14' }}
     >
       {/* Compact Unobtrusive Top HUD */}
       <header className="w-full max-w-5xl flex items-center justify-between gap-2 px-4 py-2.5">
@@ -1862,7 +1865,7 @@ export const DevilTrapGame: React.FC<DevilTrapGameProps> = ({ lang, onExit }) =>
             onClick={() => setShowHint((h) => !h)}
             title={isAr ? 'تلميح' : 'Hint'}
             className={`rounded-xl px-2.5 py-1.5 transition cursor-pointer inline-flex items-center gap-1 ${
-              showHint ? 'bg-amber-500 text-stone-950' : 'bg-white/10 hover:bg-white/20 text-white'
+              showHint ? 'bg-teal-400 text-slate-950' : 'bg-white/10 hover:bg-white/20 text-white'
             }`}
           >
             <HelpCircle className="w-4 h-4" />
@@ -1892,7 +1895,7 @@ export const DevilTrapGame: React.FC<DevilTrapGameProps> = ({ lang, onExit }) =>
       {/* Optional Hint Strip */}
       {showHint && (
         <div className="w-full max-w-4xl px-4 pb-1">
-          <div className="rounded-xl border border-amber-400/35 bg-amber-950/60 px-4 py-2 text-center text-xs sm:text-sm font-bold text-amber-100">
+          <div className="rounded-xl border border-teal-400/35 bg-teal-950/65 px-4 py-2 text-center text-xs sm:text-sm font-bold text-teal-100">
             {isAr ? currentLevel.hintAr : currentLevel.hintEn}
           </div>
         </div>
@@ -1921,7 +1924,7 @@ export const DevilTrapGame: React.FC<DevilTrapGameProps> = ({ lang, onExit }) =>
                   borderColor: pal.blockFill,
                 }}
               >
-                <div className="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-2xl bg-amber-400/20 text-amber-300">
+                <div className="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-2xl bg-cyan-400/20 text-cyan-300">
                   {nextLevelObj ? <Sparkles className="w-8 h-8" /> : <Trophy className="w-8 h-8" />}
                 </div>
                 <h2 className="text-2xl font-black text-white">
@@ -1933,7 +1936,7 @@ export const DevilTrapGame: React.FC<DevilTrapGameProps> = ({ lang, onExit }) =>
                       ? 'أسطورة بوابة الشيطان!'
                       : "Devil's Gate Conquered!"}
                 </h2>
-                <p className="mt-1.5 text-sm font-bold text-amber-100/80 tabular-nums">
+                <p className="mt-1.5 text-sm font-bold text-cyan-100/80 tabular-nums">
                   {isAr
                     ? `${currentLevel.titleAr} · عدد الوفيات: ${stageDeaths}`
                     : `${currentLevel.titleEn} · Deaths: ${stageDeaths}`}
@@ -1950,7 +1953,7 @@ export const DevilTrapGame: React.FC<DevilTrapGameProps> = ({ lang, onExit }) =>
                   <button
                     type="button"
                     onClick={handleNextLevel}
-                    className="flex-1 inline-flex items-center justify-center gap-2 rounded-xl px-5 py-2.5 text-sm font-black text-stone-950 transition hover:brightness-110 cursor-pointer"
+                    className="flex-1 inline-flex items-center justify-center gap-2 rounded-xl px-5 py-2.5 text-sm font-black text-slate-950 transition hover:brightness-110 cursor-pointer"
                     style={{ backgroundColor: pal.blockFill }}
                   >
                     <span>
@@ -2034,38 +2037,38 @@ export const DevilTrapPreviewArt: React.FC = () => (
   >
     <defs>
       <radialGradient id="dt-bg" cx="50%" cy="45%" r="65%">
-        <stop offset="0%" stopColor="#542719" />
-        <stop offset="100%" stopColor="#2B120C" />
+        <stop offset="0%" stopColor="#123047" />
+        <stop offset="100%" stopColor="#081523" />
       </radialGradient>
       <radialGradient id="dt-door-glow" cx="50%" cy="50%" r="50%">
-        <stop offset="0%" stopColor="#FEF08A" stopOpacity="0.6" />
-        <stop offset="100%" stopColor="#FEF08A" stopOpacity="0" />
+        <stop offset="0%" stopColor="#67E8F9" stopOpacity="0.65" />
+        <stop offset="100%" stopColor="#67E8F9" stopOpacity="0" />
       </radialGradient>
     </defs>
 
-    {/* Deep terracotta room void */}
+    {/* Deep midnight navy chamber */}
     <rect width="320" height="180" fill="url(#dt-bg)" />
 
-    {/* Iconic Level Devil sandstone framing walls */}
-    <rect x="0" y="0" width="320" height="28" fill="#DCA052" />
-    <rect x="0" y="0" width="18" height="180" fill="#DCA052" />
-    <rect x="302" y="0" width="18" height="180" fill="#DCA052" />
+    {/* Electric teal framing walls */}
+    <rect x="0" y="0" width="320" height="28" fill="#14B8A6" />
+    <rect x="0" y="0" width="18" height="180" fill="#14B8A6" />
+    <rect x="302" y="0" width="18" height="180" fill="#14B8A6" />
 
     {/* Left floor & right floor with collapsing pit in the middle */}
-    <rect x="18" y="132" width="88" height="48" fill="#DCA052" />
-    <rect x="18" y="132" width="88" height="4" fill="#F3C57E" />
+    <rect x="18" y="132" width="88" height="48" fill="#14B8A6" />
+    <rect x="18" y="132" width="88" height="4" fill="#5EEAD4" />
 
     {/* Dropping trap block mid-fall */}
     <g transform="translate(110, 148) rotate(8)">
-      <rect x="0" y="0" width="44" height="36" fill="#C2823D" stroke="#6E3917" strokeWidth="1.5" />
-      <rect x="0" y="0" width="44" height="3" fill="#F3C57E" />
+      <rect x="0" y="0" width="44" height="36" fill="#0D9488" stroke="#042F2E" strokeWidth="1.5" />
+      <rect x="0" y="0" width="44" height="3" fill="#5EEAD4" />
     </g>
 
-    <rect x="162" y="132" width="140" height="48" fill="#DCA052" />
-    <rect x="162" y="132" width="140" height="4" fill="#F3C57E" />
+    <rect x="162" y="132" width="140" height="48" fill="#14B8A6" />
+    <rect x="162" y="132" width="140" height="4" fill="#5EEAD4" />
 
     {/* Pop-up ambush spikes */}
-    <g fill="#1A0B08" stroke="#FDE68A" strokeWidth="1.2">
+    <g fill="#0B0F1A" stroke="#38BDF8" strokeWidth="1.2">
       <polygon points="172,132 180,114 188,132" />
       <polygon points="188,132 196,114 204,132" />
       <polygon points="204,132 212,114 220,132" />
@@ -2073,26 +2076,26 @@ export const DevilTrapPreviewArt: React.FC = () => (
 
     {/* Glowing runaway exit door with motion streaks */}
     <circle cx="268" cy="108" r="34" fill="url(#dt-door-glow)" />
-    <line x1="234" y1="98" x2="246" y2="98" stroke="#FDE68A" strokeWidth="2" strokeLinecap="round" opacity="0.7" />
-    <line x1="228" y1="108" x2="244" y2="108" stroke="#FDE68A" strokeWidth="2" strokeLinecap="round" opacity="0.55" />
-    <rect x="252" y="84" width="30" height="48" rx="14" fill="#2A130C" />
-    <rect x="256" y="88" width="22" height="44" rx="10" fill="#FFF6D8" />
+    <line x1="234" y1="98" x2="246" y2="98" stroke="#67E8F9" strokeWidth="2" strokeLinecap="round" opacity="0.7" />
+    <line x1="228" y1="108" x2="244" y2="108" stroke="#67E8F9" strokeWidth="2" strokeLinecap="round" opacity="0.55" />
+    <rect x="252" y="84" width="30" height="48" rx="14" fill="#062030" />
+    <rect x="256" y="88" width="22" height="44" rx="10" fill="#ECFEFF" />
 
-    {/* Silhouetted Hero leaping over the collapsing pit */}
-    <g transform="translate(114, 78) rotate(-10)">
-      <rect x="0" y="0" width="22" height="24" rx="5" fill="#160A08" />
-      <rect x="2" y="22" width="5" height="7" rx="1.5" fill="#160A08" />
-      <rect x="14" y="20" width="5" height="7" rx="1.5" fill="#160A08" />
+    {/* Enlarged (+50%) Silhouetted Hero leaping over the collapsing pit */}
+    <g transform="translate(106, 62) rotate(-10) scale(1.5)">
+      <rect x="0" y="0" width="22" height="24" rx="5" fill="#070B14" />
+      <rect x="2" y="22" width="5" height="7" rx="1.5" fill="#070B14" />
+      <rect x="14" y="20" width="5" height="7" rx="1.5" fill="#070B14" />
       {/* Wide surprised eyes */}
-      <circle cx="9" cy="10" r="2.7" fill="#FFF7ED" />
-      <circle cx="16.5" cy="10" r="2.7" fill="#FFF7ED" />
-      <circle cx="13" cy="16.5" r="2" fill="#FFF7ED" />
+      <circle cx="9" cy="10" r="2.7" fill="#67E8F9" />
+      <circle cx="16.5" cy="10" r="2.7" fill="#67E8F9" />
+      <circle cx="13" cy="16.5" r="2" fill="#67E8F9" />
     </g>
 
     {/* Tiny spinning saw near ceiling */}
     <g transform="translate(176, 56)">
-      <circle cx="0" cy="0" r="13" fill="#1E1414" stroke="#FDE68A" strokeWidth="1.5" strokeDasharray="4 3" />
-      <circle cx="0" cy="0" r="5" fill="#EF4444" />
+      <circle cx="0" cy="0" r="13" fill="#0F172A" stroke="#38BDF8" strokeWidth="1.5" strokeDasharray="4 3" />
+      <circle cx="0" cy="0" r="5" fill="#F43F5E" />
     </g>
   </svg>
 );

@@ -5,26 +5,49 @@ export type WeaponId =
   | 'twin_blasters'
   | 'scatter_shotgun'
   | 'frost_rifle'
+  | 'laser_sniper'
   | 'thunder_cannon'
+  | 'sawblade_launcher'
   | 'venom_gatling'
+  | 'magma_mortar'
   | 'dragon_flamethrower'
-  | 'cosmic_annihilator';
+  | 'cryo_minigun'
+  | 'cosmic_annihilator'
+  | 'solar_nova_blade';
 
 export type PetId =
   | 'wolf'
   | 'falcon'
+  | 'tiger'
   | 'bear'
+  | 'rhino'
   | 'panther'
+  | 'gorilla'
   | 'lion'
-  | 'baby_dragon';
+  | 'shark'
+  | 'baby_dragon'
+  | 'trex';
 
 export type FruitId =
   | 'apple'
+  | 'strawberry'
   | 'banana'
+  | 'grapes'
   | 'watermelon'
+  | 'pineapple'
   | 'mango'
+  | 'kiwi'
   | 'dragonfruit'
-  | 'golden_date';
+  | 'golden_date'
+  | 'coconut';
+
+export type MeatId =
+  | 'chicken_leg'
+  | 'lamb_chop'
+  | 'beef_steak'
+  | 'grilled_ribs'
+  | 'wagyu_feast'
+  | 'dragon_meat';
 
 export type ArenaMonsterKind =
   | 'imp'
@@ -48,28 +71,52 @@ export const ALL_WEAPON_IDS: readonly WeaponId[] = [
   'twin_blasters',
   'scatter_shotgun',
   'frost_rifle',
+  'laser_sniper',
   'thunder_cannon',
+  'sawblade_launcher',
   'venom_gatling',
+  'magma_mortar',
   'dragon_flamethrower',
+  'cryo_minigun',
   'cosmic_annihilator',
+  'solar_nova_blade',
 ];
 
 export const ALL_PET_IDS: readonly PetId[] = [
   'wolf',
   'falcon',
+  'tiger',
   'bear',
+  'rhino',
   'panther',
+  'gorilla',
   'lion',
+  'shark',
   'baby_dragon',
+  'trex',
 ];
 
 export const ALL_FRUIT_IDS: readonly FruitId[] = [
   'apple',
+  'strawberry',
   'banana',
+  'grapes',
   'watermelon',
+  'pineapple',
   'mango',
+  'kiwi',
   'dragonfruit',
   'golden_date',
+  'coconut',
+];
+
+export const ALL_MEAT_IDS: readonly MeatId[] = [
+  'chicken_leg',
+  'lamb_chop',
+  'beef_steak',
+  'grilled_ribs',
+  'wagyu_feast',
+  'dragon_meat',
 ];
 
 export interface WeaponSpec {
@@ -130,6 +177,22 @@ export interface FruitSpec {
   damageBuffSec?: number;
   shieldBuffSec?: number;
   rapidFireBuffSec?: number;
+  color: string;
+  accent: string;
+}
+
+export interface MeatSpec {
+  id: MeatId;
+  cost: number;
+  nameAr: string;
+  nameEn: string;
+  descAr: string;
+  descEn: string;
+  petHealAmount: number; // 9999 = full pet energy heal
+  petMaxHpBonus: number; // permanent max energy/HP bonus for every active pet
+  petDmgBoostPct?: number; // temporary pet damage boost %
+  petSpeedBoostPct?: number; // temporary pet attack speed boost %
+  buffDurationSec?: number;
   color: string;
   accent: string;
 }
@@ -236,6 +299,27 @@ export const WEAPON_SPECS: Record<WeaponId, WeaponSpec> = {
     color: '#67e8f9',
     accent: '#06b6d4',
   },
+  laser_sniper: {
+    id: 'laser_sniper',
+    cost: 520,
+    nameAr: 'قناص الليزر الثاقب',
+    nameEn: 'Laser Rail Sniper',
+    descAr: 'شعاع ليزر فائق السرعة يخترق 5 وحوش بخط مستقيم بضرر قاتل!',
+    descEn: 'Hyper-velocity crimson rail beam piercing up to 5 monsters.',
+    damage: 135,
+    fireInterval: 0.65,
+    projectileSpeed: 38,
+    range: 22,
+    pellets: 1,
+    spreadAngle: 0,
+    splashRadius: 0.9,
+    slowDuration: 0,
+    poisonDps: 0,
+    poisonDuration: 0,
+    pierce: 4,
+    color: '#f43f5e',
+    accent: '#9f1239',
+  },
   thunder_cannon: {
     id: 'thunder_cannon',
     cost: 650,
@@ -256,6 +340,27 @@ export const WEAPON_SPECS: Record<WeaponId, WeaponSpec> = {
     pierce: 0,
     color: '#fde047',
     accent: '#eab308',
+  },
+  sawblade_launcher: {
+    id: 'sawblade_launcher',
+    cost: 860,
+    nameAr: 'قاذف المناشير الفولاذية',
+    nameEn: 'Sawblade Launcher',
+    descAr: 'يطلق 3 مناشير فولاذية دوّارة تخترق 4 وحوش وتمزّق الصفوف!',
+    descEn: 'Launches 3 spinning steel sawblades that shred through lines.',
+    damage: 64,
+    fireInterval: 0.44,
+    projectileSpeed: 25,
+    range: 17,
+    pellets: 3,
+    spreadAngle: 0.3,
+    splashRadius: 1.5,
+    slowDuration: 0,
+    poisonDps: 0,
+    poisonDuration: 0,
+    pierce: 3,
+    color: '#cbd5e1',
+    accent: '#475569',
   },
   venom_gatling: {
     id: 'venom_gatling',
@@ -278,6 +383,27 @@ export const WEAPON_SPECS: Record<WeaponId, WeaponSpec> = {
     color: '#a3e635',
     accent: '#65a30d',
   },
+  magma_mortar: {
+    id: 'magma_mortar',
+    cost: 1350,
+    nameAr: 'هاون الحمم المنصهرة',
+    nameEn: 'Magma Mortar',
+    descAr: 'قذائف حمم عملاقة بانفجار واسع النطاق وحروق مستمرة تلتهم الحشود!',
+    descEn: 'Colossal molten shells with massive blast radius and burn DoT.',
+    damage: 165,
+    fireInterval: 0.68,
+    projectileSpeed: 21,
+    range: 19,
+    pellets: 1,
+    spreadAngle: 0,
+    splashRadius: 4.8,
+    slowDuration: 0.8,
+    poisonDps: 45,
+    poisonDuration: 4.0,
+    pierce: 0,
+    color: '#ff5722',
+    accent: '#9a3412',
+  },
   dragon_flamethrower: {
     id: 'dragon_flamethrower',
     cost: 1650,
@@ -299,13 +425,34 @@ export const WEAPON_SPECS: Record<WeaponId, WeaponSpec> = {
     color: '#fb7185',
     accent: '#e11d48',
   },
+  cryo_minigun: {
+    id: 'cryo_minigun',
+    cost: 2100,
+    nameAr: 'رشاش العاصفة الجليدية',
+    nameEn: 'Cryo Storm Minigun',
+    descAr: 'رشاش ثلاثي المواسير يطلق عاصفة جليد متواصلة تجمّد وتخترق كل من يقترب!',
+    descEn: 'Tri-barrel frost minigun unleashing piercing sub-zero volleys.',
+    damage: 58,
+    fireInterval: 0.16,
+    projectileSpeed: 30,
+    range: 18.5,
+    pellets: 3,
+    spreadAngle: 0.22,
+    splashRadius: 1.6,
+    slowDuration: 4.0,
+    poisonDps: 0,
+    poisonDuration: 0,
+    pierce: 1,
+    color: '#38bdf8',
+    accent: '#0369a1',
+  },
   cosmic_annihilator: {
     id: 'cosmic_annihilator',
     cost: 2600,
     nameAr: 'مدمّر المجرة',
     nameEn: 'Cosmic Annihilator',
-    descAr: 'أقوى سلاح في الحلبة — 5 أشعة كونية بالتجميد والسم والانفجار الواسع!',
-    descEn: 'Ultimate 5-beam cosmic railgun with freeze, venom, and nova splash.',
+    descAr: '5 أشعة كونية بالتجميد والسم والانفجار الواسع لسحق موجات الوحوش!',
+    descEn: '5-beam cosmic railgun with freeze, venom, and nova splash.',
     damage: 142,
     fireInterval: 0.28,
     projectileSpeed: 31,
@@ -319,6 +466,27 @@ export const WEAPON_SPECS: Record<WeaponId, WeaponSpec> = {
     pierce: 2,
     color: '#e879f9',
     accent: '#9333ea',
+  },
+  solar_nova_blade: {
+    id: 'solar_nova_blade',
+    cost: 3800,
+    nameAr: 'مدفع السوبرنوفا الشمسي',
+    nameEn: 'Solar Nova Cannon',
+    descAr: 'أقوى سلاح أسطوري — 7 موجات شمسية خارقة بالتجميد والحرق والانفجار الهائل!',
+    descEn: 'Ultimate 7-wave solar nova launcher with burn, freeze, pierce & huge blast!',
+    damage: 185,
+    fireInterval: 0.26,
+    projectileSpeed: 34,
+    range: 21.5,
+    pellets: 7,
+    spreadAngle: 0.52,
+    splashRadius: 3.8,
+    slowDuration: 3.5,
+    poisonDps: 75,
+    poisonDuration: 5.0,
+    pierce: 3,
+    color: '#fef08a',
+    accent: '#ca8a04',
   },
 };
 
@@ -364,6 +532,26 @@ export const PET_SPECS: Record<PetId, PetSpec> = {
     accentColor: '#fde047',
     scale: 0.95,
   },
+  tiger: {
+    id: 'tiger',
+    cost: 310,
+    upgradeCostBase: 320,
+    nameAr: 'النمر البنغالي',
+    nameEn: 'Bengal Tiger',
+    descAr: 'مفترس مخطط فائق السرعة يقفز على الوحوش بمخالب حادة واسعة.',
+    descEn: 'Blazing-fast striped predator cleaving monsters with fierce slashes.',
+    style: 'melee',
+    baseHp: 135,
+    damage: 9,
+    attackInterval: 0.48,
+    speed: 11.8,
+    range: 11,
+    splashRadius: 1.5,
+    slowDuration: 0,
+    primaryColor: '#f97316',
+    accentColor: '#fde047',
+    scale: 1.06,
+  },
   bear: {
     id: 'bear',
     cost: 420,
@@ -384,6 +572,26 @@ export const PET_SPECS: Record<PetId, PetSpec> = {
     accentColor: '#f59e0b',
     scale: 1.22,
   },
+  rhino: {
+    id: 'rhino',
+    cost: 540,
+    upgradeCostBase: 540,
+    nameAr: 'وحيد القرن المدرّع',
+    nameEn: 'Armored Rhino',
+    descAr: 'مدرّعة حية بطاقة عالية جداً ينطح الوحوش ويبطّئهم بصدمة أرضية!',
+    descEn: 'Heavy armored tank with massive HP and stunning horn charges.',
+    style: 'melee',
+    baseHp: 265,
+    damage: 13,
+    attackInterval: 0.88,
+    speed: 8.8,
+    range: 10.5,
+    splashRadius: 3.0,
+    slowDuration: 1.8,
+    primaryColor: '#475569',
+    accentColor: '#e2e8f0',
+    scale: 1.24,
+  },
   panther: {
     id: 'panther',
     cost: 680,
@@ -403,6 +611,26 @@ export const PET_SPECS: Record<PetId, PetSpec> = {
     primaryColor: '#312e81',
     accentColor: '#67e8f9',
     scale: 1.08,
+  },
+  gorilla: {
+    id: 'gorilla',
+    cost: 880,
+    upgradeCostBase: 820,
+    nameAr: 'الغوريلا العملاقة',
+    nameEn: 'Titan Gorilla',
+    descAr: 'مقاتل جبار يضرب الأرض بموجات صدمية تدمّر الحشود وتبطئهم!',
+    descEn: 'Colossal silverback brawler crushing monster packs with shockwaves.',
+    style: 'melee',
+    baseHp: 310,
+    damage: 19,
+    attackInterval: 0.82,
+    speed: 9.4,
+    range: 10.5,
+    splashRadius: 3.5,
+    slowDuration: 1.5,
+    primaryColor: '#1e293b',
+    accentColor: '#c084fc',
+    scale: 1.28,
   },
   lion: {
     id: 'lion',
@@ -425,6 +653,28 @@ export const PET_SPECS: Record<PetId, PetSpec> = {
     accentColor: '#fef08a',
     scale: 1.2,
   },
+  shark: {
+    id: 'shark',
+    cost: 1420,
+    upgradeCostBase: 1200,
+    nameAr: 'القرش السماوي',
+    nameEn: 'Sky Cyber Shark',
+    descAr: 'قرش طائر يطلق قذائف بلازما مجمّدة ويزيد عملات القتل +10%!',
+    descEn: 'Hovering cyber-shark firing freezing hydro-plasma + +10% Coins!',
+    style: 'ranged',
+    flying: true,
+    baseHp: 270,
+    damage: 21,
+    attackInterval: 0.56,
+    speed: 11.4,
+    range: 16,
+    splashRadius: 2.6,
+    slowDuration: 2.0,
+    coinBonusPct: 10,
+    primaryColor: '#0284c7',
+    accentColor: '#67e8f9',
+    scale: 1.18,
+  },
   baby_dragon: {
     id: 'baby_dragon',
     cost: 1850,
@@ -446,6 +696,27 @@ export const PET_SPECS: Record<PetId, PetSpec> = {
     accentColor: '#fb923c',
     scale: 1.25,
   },
+  trex: {
+    id: 'trex',
+    cost: 2500,
+    upgradeCostBase: 1950,
+    nameAr: 'الديناصور الملكي',
+    nameEn: 'Royal T-Rex',
+    descAr: 'أقوى وحش مرافق — طاقة عملاقة وزئير بلازما متفجر + +20% عملات!',
+    descEn: 'Apex colossal T-Rex with huge HP, explosive plasma roars & +20% Coins!',
+    style: 'ranged',
+    baseHp: 460,
+    damage: 36,
+    attackInterval: 0.58,
+    speed: 10.6,
+    range: 16.5,
+    splashRadius: 4.2,
+    slowDuration: 1.6,
+    coinBonusPct: 20,
+    primaryColor: '#15803d',
+    accentColor: '#fde047',
+    scale: 1.38,
+  },
 };
 
 export const FRUIT_SPECS: Record<FruitId, FruitSpec> = {
@@ -461,6 +732,18 @@ export const FRUIT_SPECS: Record<FruitId, FruitSpec> = {
     color: '#ef4444',
     accent: '#fca5a5',
   },
+  strawberry: {
+    id: 'strawberry',
+    cost: 35,
+    nameAr: 'فراولة الانتعاش',
+    nameEn: 'Fresh Strawberry',
+    descAr: 'تستعيد +55 طاقة فوراً وتزيد الحد الأقصى لطاقتك +10 بشكل دائم!',
+    descEn: 'Restores +55 Energy + permanent +10 Max Energy!',
+    healAmount: 55,
+    maxEnergyBonus: 10,
+    color: '#fb7185',
+    accent: '#fecdd3',
+  },
   banana: {
     id: 'banana',
     cost: 45,
@@ -474,6 +757,19 @@ export const FRUIT_SPECS: Record<FruitId, FruitSpec> = {
     color: '#facc15',
     accent: '#fef08a',
   },
+  grapes: {
+    id: 'grapes',
+    cost: 60,
+    nameAr: 'عنب الحماية',
+    nameEn: 'Shield Grapes',
+    descAr: 'يستعيد +85 طاقة + +15 طاقة قصوى دائمة + درع حماية 8 ثوانٍ!',
+    descEn: 'Restores +85 Energy + permanent +15 Max Energy + 8s Shield!',
+    healAmount: 85,
+    maxEnergyBonus: 15,
+    shieldBuffSec: 8,
+    color: '#a855f7',
+    accent: '#e9d5ff',
+  },
   watermelon: {
     id: 'watermelon',
     cost: 80,
@@ -485,6 +781,19 @@ export const FRUIT_SPECS: Record<FruitId, FruitSpec> = {
     maxEnergyBonus: 20,
     color: '#22c55e',
     accent: '#fb7185',
+  },
+  pineapple: {
+    id: 'pineapple',
+    cost: 105,
+    nameAr: 'أناناس الإعصار',
+    nameEn: 'Storm Pineapple',
+    descAr: 'طاقة 100% + +28 طاقة قصوى دائمة + سرعة إطلاق +35% لمدة 18 ثانية!',
+    descEn: 'Full Energy + permanent +28 Max Energy + +35% Fire Rate for 18s!',
+    healAmount: 9999,
+    maxEnergyBonus: 28,
+    rapidFireBuffSec: 18,
+    color: '#eab308',
+    accent: '#fef08a',
   },
   mango: {
     id: 'mango',
@@ -498,6 +807,20 @@ export const FRUIT_SPECS: Record<FruitId, FruitSpec> = {
     damageBuffSec: 20,
     color: '#f97316',
     accent: '#fde047',
+  },
+  kiwi: {
+    id: 'kiwi',
+    cost: 175,
+    nameAr: 'كيوي الصاعقة',
+    nameEn: 'Thunder Kiwi',
+    descAr: 'شفاء كامل + +48 طاقة قصوى دائمة + سرعة +28% وضرر +25% لمدة 22 ثانية!',
+    descEn: 'Full heal + permanent +48 Max Energy + Speed & DMG buffs for 22s!',
+    healAmount: 9999,
+    maxEnergyBonus: 48,
+    speedBuffSec: 22,
+    damageBuffSec: 22,
+    color: '#84cc16',
+    accent: '#d9f99d',
   },
   dragonfruit: {
     id: 'dragonfruit',
@@ -524,6 +847,108 @@ export const FRUIT_SPECS: Record<FruitId, FruitSpec> = {
     rapidFireBuffSec: 25,
     color: '#eab308',
     accent: '#fef9c3',
+  },
+  coconut: {
+    id: 'coconut',
+    cost: 520,
+    nameAr: 'جوز الهند الأسطوري',
+    nameEn: 'Mythic Coconut',
+    descAr: 'شفاء كامل + +160 طاقة قصوى دائمة + درع وضرر وإطلاق سريع معاً!',
+    descEn: 'Full heal + permanent +160 Max Energy + Shield, DMG & Rapid Fire!',
+    healAmount: 9999,
+    maxEnergyBonus: 160,
+    shieldBuffSec: 20,
+    damageBuffSec: 25,
+    rapidFireBuffSec: 25,
+    color: '#d97706',
+    accent: '#fef3c7',
+  },
+};
+
+export const MEAT_SPECS: Record<MeatId, MeatSpec> = {
+  chicken_leg: {
+    id: 'chicken_leg',
+    cost: 30,
+    nameAr: 'فخذ دجاج مشوي',
+    nameEn: 'Roasted Chicken Leg',
+    descAr: 'يطعم جميع حيواناتك ويعيد +60 طاقة + يزيد طاقتهم القصوى +15 دائماً!',
+    descEn: 'Feeds all pets: restores +60 Energy & +15 permanent Max HP!',
+    petHealAmount: 60,
+    petMaxHpBonus: 15,
+    color: '#f59e0b',
+    accent: '#fde68a',
+  },
+  lamb_chop: {
+    id: 'lamb_chop',
+    cost: 65,
+    nameAr: 'ريش لحم غنم',
+    nameEn: 'Grilled Lamb Chops',
+    descAr: 'يعيد +140 طاقة للحيوانات + +35 طاقة قصوى دائمة + ضرر +15% لمدة 20 ثانية!',
+    descEn: '+140 Pet Energy + +35 permanent Max HP + +15% Pet DMG for 20s!',
+    petHealAmount: 140,
+    petMaxHpBonus: 35,
+    petDmgBoostPct: 15,
+    buffDurationSec: 20,
+    color: '#ef4444',
+    accent: '#fecaca',
+  },
+  beef_steak: {
+    id: 'beef_steak',
+    cost: 120,
+    nameAr: 'ستيك لحم بقري فاخر',
+    nameEn: 'Prime Beef Steak',
+    descAr: 'شفاء 100% لجميع حيواناتك + +65 طاقة قصوى دائمة + سرعة هجوم +20% (25ث)!',
+    descEn: 'Full 100% Pet Heal + +65 permanent Max HP + +20% Attack Speed (25s)!',
+    petHealAmount: 9999,
+    petMaxHpBonus: 65,
+    petSpeedBoostPct: 20,
+    buffDurationSec: 25,
+    color: '#dc2626',
+    accent: '#fca5a5',
+  },
+  grilled_ribs: {
+    id: 'grilled_ribs',
+    cost: 220,
+    nameAr: 'أضلاع مشوية عملاقة',
+    nameEn: 'Giant BBQ Ribs',
+    descAr: 'شفاء 100% لجميع الحيوانات + +120 طاقة قصوى دائمة + ضرر +25% (30ث)!',
+    descEn: 'Full Pet Heal + +120 permanent Max HP + +25% Pet DMG (30s)!',
+    petHealAmount: 9999,
+    petMaxHpBonus: 120,
+    petDmgBoostPct: 25,
+    buffDurationSec: 30,
+    color: '#ea580c',
+    accent: '#fed7aa',
+  },
+  wagyu_feast: {
+    id: 'wagyu_feast',
+    cost: 390,
+    nameAr: 'وليمة لحم واغيو الملكي',
+    nameEn: 'Royal Wagyu Feast',
+    descAr: 'شفاء 100% + +220 طاقة قصوى دائمة لكل حيوان + ضرر +35% وسرعة +25% (35ث)!',
+    descEn: 'Full Pet Heal + +220 Max HP + +35% Pet DMG & +25% Speed (35s)!',
+    petHealAmount: 9999,
+    petMaxHpBonus: 220,
+    petDmgBoostPct: 35,
+    petSpeedBoostPct: 25,
+    buffDurationSec: 35,
+    color: '#be123c',
+    accent: '#fda4af',
+  },
+  dragon_meat: {
+    id: 'dragon_meat',
+    cost: 680,
+    nameAr: 'لحم التنين الأسطوري',
+    nameEn: 'Mythic Dragon Meat',
+    descAr: 'أقوى وجبة — شفاء 100% + +400 طاقة قصوى دائمة لكل حيوان + ضرر +50% وسرعة +30% (45ث)!',
+    descEn: 'Ultimate feast — Full Heal + +400 Max HP + +50% DMG & +30% Speed (45s)!',
+    petHealAmount: 9999,
+    petMaxHpBonus: 400,
+    petDmgBoostPct: 50,
+    petSpeedBoostPct: 30,
+    buffDurationSec: 45,
+    color: '#9333ea',
+    accent: '#f0abfc',
   },
 };
 
@@ -653,6 +1078,7 @@ export interface ArenaPetEntity {
   slot: number;
   hp: number;
   maxHp: number;
+  bonusMaxHp: number;
   hitFlash: number;
   hurtCooldown: number;
   x: number;
@@ -741,6 +1167,7 @@ export interface SavedPetSlot {
   slot: number;
   hp?: number;
   maxHp?: number;
+  bonusMaxHp?: number;
   guardX?: number | null;
   guardZ?: number | null;
 }
@@ -769,6 +1196,7 @@ export interface MonsterArenaSavedRun {
   titanTimer: number;
   titanLevel: number;
   fruitsEaten: number;
+  meatsFed?: number;
   savedAt: number;
 }
 
@@ -801,6 +1229,9 @@ export interface MonsterArenaHudSnapshot {
   damageBuffTimer: number;
   shieldBuffTimer: number;
   rapidFireBuffTimer: number;
+  petFuryBuffTimer: number;
+  petFuryDmgPct: number;
+  petFurySpdPct: number;
   dashCooldown: number;
   bannerText: string;
   bannerTone: 'info' | 'boss' | 'shop' | 'warn';
@@ -933,12 +1364,22 @@ export function readMonsterArenaSavedRun(): MonsterArenaSavedRun | null {
           const lv = Math.max(1, Math.min(MAX_PET_LEVEL, Math.floor(Number(slot.level) || 1)));
           const gx = typeof slot.guardX === 'number' && Number.isFinite(slot.guardX) ? slot.guardX : null;
           const gz = typeof slot.guardZ === 'number' && Number.isFinite(slot.guardZ) ? slot.guardZ : null;
-          const savedHp = typeof slot.hp === 'number' && Number.isFinite(slot.hp) && slot.hp > 0 ? slot.hp : undefined;
+          const savedHp =
+            typeof slot.hp === 'number' && Number.isFinite(slot.hp) && slot.hp > 0
+              ? slot.hp
+              : undefined;
+          const savedBonusMaxHp =
+            typeof slot.bonusMaxHp === 'number' &&
+            Number.isFinite(slot.bonusMaxHp) &&
+            slot.bonusMaxHp > 0
+              ? Math.floor(slot.bonusMaxHp)
+              : 0;
           petRoster.push({
             petId: slot.petId as PetId,
             level: lv,
             slot: pickFreeSlot(slot.slot),
             hp: savedHp,
+            bonusMaxHp: savedBonusMaxHp,
             guardX: gx,
             guardZ: gz,
           });
@@ -953,6 +1394,7 @@ export function readMonsterArenaSavedRun(): MonsterArenaSavedRun | null {
             petId: pid,
             level: Math.min(MAX_PET_LEVEL, lv),
             slot: pickFreeSlot(),
+            bonusMaxHp: 0,
             guardX: null,
             guardZ: null,
           });
@@ -987,6 +1429,7 @@ export function readMonsterArenaSavedRun(): MonsterArenaSavedRun | null {
       titanTimer,
       titanLevel: Math.max(0, Math.floor(Number(p.titanLevel) || 0)),
       fruitsEaten: Math.max(0, Math.floor(Number(p.fruitsEaten) || 0)),
+      meatsFed: Math.max(0, Math.floor(Number(p.meatsFed) || 0)),
       savedAt: Math.max(0, Number(p.savedAt) || Date.now()),
     };
   } catch {

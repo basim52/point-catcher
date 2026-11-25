@@ -18,25 +18,25 @@ function createArenaFloorTexture(maxAnisotropy: number): THREE.CanvasTexture {
   canvas.height = 512;
   const ctx = canvas.getContext('2d');
   if (ctx) {
-    ctx.fillStyle = '#332824';
+    ctx.fillStyle = '#1b3147';
     ctx.fillRect(0, 0, 512, 512);
 
-    // Subtle stone flagstones grid
+    // Subtle glacial slate flagstones grid
     const tile = 64;
     for (let gx = 0; gx < 8; gx++) {
       for (let gy = 0; gy < 8; gy++) {
         const shade = ((gx * 7 + gy * 13) % 5) * 4;
-        ctx.fillStyle = `rgb(${54 + shade}, ${44 + shade}, ${40 + shade})`;
+        ctx.fillStyle = `rgb(${34 + shade}, ${60 + shade}, ${86 + shade})`;
         ctx.fillRect(gx * tile + 2, gy * tile + 2, tile - 4, tile - 4);
       }
     }
 
-    // Fine stone grain
+    // Fine frost-stone grain
     for (let i = 0; i < 900; i++) {
       const rx = Math.random() * 512;
       const ry = Math.random() * 512;
       ctx.fillStyle =
-        Math.random() > 0.5 ? 'rgba(255,220,180,0.05)' : 'rgba(10,6,8,0.09)';
+        Math.random() > 0.5 ? 'rgba(186,230,253,0.06)' : 'rgba(6,16,28,0.1)';
       ctx.fillRect(rx, ry, 2, 2);
     }
   }
@@ -58,13 +58,18 @@ export const ArenaEnvironment: React.FC<ArenaEnvironmentProps> = ({
 
   // Mandatory procedural RoomEnvironment for PBR reflections on armor & weapons
   useEffect(() => {
-    const pmrem = new THREE.PMREMGenerator(gl);
-    const envTarget = pmrem.fromScene(new RoomEnvironment(), 0.04);
-    scene.environment = envTarget.texture;
-    pmrem.dispose();
+    let envTarget: THREE.WebGLRenderTarget | null = null;
+    try {
+      const pmrem = new THREE.PMREMGenerator(gl);
+      envTarget = pmrem.fromScene(new RoomEnvironment(), 0.04);
+      scene.environment = envTarget.texture;
+      pmrem.dispose();
+    } catch {
+      // Safe fallback if software WebGL cannot generate PMREM
+    }
     return () => {
       scene.environment = null;
-      envTarget.dispose();
+      envTarget?.dispose();
     };
   }, [gl, scene]);
 
@@ -121,16 +126,16 @@ export const ArenaEnvironment: React.FC<ArenaEnvironmentProps> = ({
 
   return (
     <group>
-      {/* Twilight Volcanic Sky & Horizon-Matched Fog */}
-      <color attach="background" args={['#181121']} />
-      <fogExp2 attach="fog" args={['#181121', 0.017]} />
+      {/* Glacial Sapphire Sky & Horizon-Matched Fog */}
+      <color attach="background" args={['#081829']} />
+      <fogExp2 attach="fog" args={['#081829', 0.017]} />
 
-      {/* Warm Key Light + Cool Hemisphere Fill + Rim Backlight */}
-      <hemisphereLight args={['#a5b4fc', '#3b241c', 0.95]} />
+      {/* Crisp Key Light + Glacial Hemisphere Fill + Teal Rim Backlight */}
+      <hemisphereLight args={['#7dd3fc', '#0f293a', 1.05]} />
       <directionalLight
         position={[18, 28, 16]}
         intensity={1.75}
-        color="#ffe2b8"
+        color="#e0f7ff"
         castShadow={!isSoftwareGl}
         shadow-mapSize-width={1024}
         shadow-mapSize-height={1024}
@@ -145,18 +150,18 @@ export const ArenaEnvironment: React.FC<ArenaEnvironmentProps> = ({
       />
       <directionalLight
         position={[-18, 14, -18]}
-        intensity={0.65}
-        color="#818cf8"
+        intensity={0.7}
+        color="#2dd4bf"
       />
 
-      {/* Extended Outer Canyon Ground Plane (Never floating in an empty void) */}
+      {/* Extended Outer Glacial Ground Plane (Never floating in an empty void) */}
       <mesh
         rotation={[-Math.PI / 2, 0, 0]}
         position={[0, -0.08, 0]}
         receiveShadow
       >
         <planeGeometry args={[140, 140]} />
-        <meshStandardMaterial color="#24191e" roughness={0.95} metalness={0.05} />
+        <meshStandardMaterial color="#0d2033" roughness={0.92} metalness={0.08} />
       </mesh>
 
       {/* Main Circular Colosseum Battle Floor */}
@@ -179,15 +184,15 @@ export const ArenaEnvironment: React.FC<ArenaEnvironmentProps> = ({
         />
       </mesh>
 
-      {/* Center Carved Bronze Medallion Ring */}
+      {/* Center Carved Crystal Medallion Ring */}
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.025, 0]}>
         <ringGeometry args={[3.4, 3.85, 40]} />
         <meshStandardMaterial
-          color="#d97706"
-          emissive="#b45309"
-          emissiveIntensity={0.35}
-          roughness={0.38}
-          metalness={0.7}
+          color="#06b6d4"
+          emissive="#0891b2"
+          emissiveIntensity={0.45}
+          roughness={0.32}
+          metalness={0.72}
           polygonOffset
           polygonOffsetFactor={-1}
         />
@@ -195,9 +200,9 @@ export const ArenaEnvironment: React.FC<ArenaEnvironmentProps> = ({
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.025, 0]}>
         <ringGeometry args={[11.2, 11.48, 48]} />
         <meshStandardMaterial
-          color="#78350f"
-          roughness={0.55}
-          metalness={0.45}
+          color="#0e7490"
+          roughness={0.5}
+          metalness={0.5}
           polygonOffset
           polygonOffsetFactor={-1}
         />
@@ -207,46 +212,46 @@ export const ArenaEnvironment: React.FC<ArenaEnvironmentProps> = ({
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.03, 0]}>
         <ringGeometry args={[ARENA_RADIUS - 0.18, ARENA_RADIUS + 0.32, 64]} />
         <meshStandardMaterial
-          color="#f59e0b"
-          emissive="#ea580c"
-          emissiveIntensity={0.85}
-          roughness={0.35}
-          metalness={0.5}
+          color="#22d3ee"
+          emissive="#06b6d4"
+          emissiveIntensity={0.9}
+          roughness={0.3}
+          metalness={0.55}
           polygonOffset
           polygonOffsetFactor={-1}
         />
       </mesh>
 
-      {/* Low Carved Stone Curb Segments Around Perimeter */}
+      {/* Low Carved Frost-Stone Curb Around Perimeter */}
       <mesh position={[0, 0.28, 0]} rotation={[Math.PI / 2, 0, 0]} receiveShadow>
         <torusGeometry args={[ARENA_RADIUS + 0.65, 0.38, 10, 56]} />
-        <meshStandardMaterial color="#44383b" roughness={0.88} metalness={0.14} />
+        <meshStandardMaterial color="#1e3a52" roughness={0.82} metalness={0.18} />
       </mesh>
 
-      {/* 8 Composite Stone Pillars with Flaming Braziers */}
+      {/* 8 Composite Crystal-Stone Pillars with Cyan Plasma Braziers */}
       {pillars.map((p, idx) => (
         <group key={idx} position={[p.x, 0, p.z]} rotation={[0, p.rotY, 0]}>
           {/* Stepped Plinth Base */}
           <mesh position={[0, 0.4, 0]} castShadow receiveShadow>
             <boxGeometry args={[1.85, 0.8, 1.85]} />
-            <meshStandardMaterial color="#3c3035" roughness={0.9} />
+            <meshStandardMaterial color="#162c42" roughness={0.85} />
           </mesh>
           {/* Main Fluted Column Shaft */}
           <mesh position={[0, 2.55, 0]} castShadow receiveShadow>
             <cylinderGeometry args={[0.58, 0.72, 3.6, 8]} />
-            <meshStandardMaterial color="#524349" roughness={0.82} metalness={0.12} />
+            <meshStandardMaterial color="#2a4a68" roughness={0.76} metalness={0.16} />
           </mesh>
-          {/* Bronze Collar Ring */}
+          {/* Crystal Collar Ring */}
           <mesh position={[0, 4.3, 0]}>
             <cylinderGeometry args={[0.88, 0.7, 0.42, 8]} />
-            <meshStandardMaterial color="#b45309" roughness={0.35} metalness={0.78} />
+            <meshStandardMaterial color="#38bdf8" roughness={0.28} metalness={0.78} />
           </mesh>
-          {/* Iron Brazier Bowl */}
+          {/* Dark Alloy Brazier Bowl */}
           <mesh position={[0, 4.72, 0]} castShadow>
             <cylinderGeometry args={[0.92, 0.56, 0.5, 8]} />
-            <meshStandardMaterial color="#27272a" roughness={0.42} metalness={0.75} />
+            <meshStandardMaterial color="#0f172a" roughness={0.38} metalness={0.78} />
           </mesh>
-          {/* Animated Fire Core */}
+          {/* Animated Cyan Plasma Flame Core */}
           <mesh
             ref={(el) => {
               flameRefs.current[idx] = el;
@@ -255,8 +260,8 @@ export const ArenaEnvironment: React.FC<ArenaEnvironmentProps> = ({
           >
             <coneGeometry args={[0.56, 1.25, 7]} />
             <meshStandardMaterial
-              color="#fef08a"
-              emissive="#f97316"
+              color="#a5f3fc"
+              emissive="#06b6d4"
               emissiveIntensity={2.1}
               roughness={0.2}
             />
@@ -264,7 +269,7 @@ export const ArenaEnvironment: React.FC<ArenaEnvironmentProps> = ({
         </group>
       ))}
 
-      {/* Natural Outer Volcanic Rock Formations */}
+      {/* Natural Outer Glacial Rock Formations */}
       {outerRocks.map((rock, idx) => (
         <mesh
           key={idx}
@@ -274,7 +279,7 @@ export const ArenaEnvironment: React.FC<ArenaEnvironmentProps> = ({
           receiveShadow
         >
           <dodecahedronGeometry args={[1.2, 0]} />
-          <meshStandardMaterial color="#2d2028" roughness={0.94} metalness={0.05} />
+          <meshStandardMaterial color="#12273c" roughness={0.9} metalness={0.08} />
         </mesh>
       ))}
     </group>

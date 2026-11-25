@@ -15,6 +15,8 @@ import {
   FruitId,
   MAX_PET_LEVEL,
   MAX_PET_SQUAD,
+  MEAT_SPECS,
+  MeatId,
   MonsterArenaHudSnapshot,
   MonsterArenaSavedRun,
   PET_SPECS,
@@ -47,6 +49,7 @@ export interface MonsterArenaWorld {
   waveTargetKills: number;
   kills: number;
   fruitsEaten: number;
+  meatsFed: number;
   energy: number;
   maxEnergy: number;
   playerX: number;
@@ -79,6 +82,9 @@ export interface MonsterArenaWorld {
   damageBuffTimer: number;
   shieldBuffTimer: number;
   rapidFireBuffTimer: number;
+  petFuryBuffTimer: number;
+  petFuryDmgPct: number;
+  petFurySpdPct: number;
   spawnTimer: number;
   autoSaveTimer: number;
   bannerText: string;
@@ -106,9 +112,9 @@ export function getPetDamageMultiplier(level: number): number {
   return PET_LEVEL_DMG_MUL[idx];
 }
 
-export function getPetMaxHp(petId: PetId, level: number): number {
+export function getPetMaxHp(petId: PetId, level: number, bonusMaxHp = 0): number {
   const idx = Math.max(0, Math.min(PET_LEVEL_HP_MUL.length - 1, level - 1));
-  return Math.round(PET_SPECS[petId].baseHp * PET_LEVEL_HP_MUL[idx]);
+  return Math.round(PET_SPECS[petId].baseHp * PET_LEVEL_HP_MUL[idx]) + Math.max(0, Math.round(bonusMaxHp));
 }
 
 export function countMergeablePairs(
@@ -210,7 +216,11 @@ function loadPetsFromRoster(
     const gx = typeof slot.guardX === 'number' && Number.isFinite(slot.guardX) ? slot.guardX : null;
     const gz = typeof slot.guardZ === 'number' && Number.isFinite(slot.guardZ) ? slot.guardZ : null;
     const lv = Math.max(1, Math.min(MAX_PET_LEVEL, slot.level));
-    const maxHp = getPetMaxHp(slot.petId, lv);
+    const bonusMaxHp =
+      typeof slot.bonusMaxHp === 'number' && Number.isFinite(slot.bonusMaxHp) && slot.bonusMaxHp > 0
+        ? Math.floor(slot.bonusMaxHp)
+        : 0;
+    const maxHp = getPetMaxHp(slot.petId, lv, bonusMaxHp);
     const hp =
       typeof slot.hp === 'number' && Number.isFinite(slot.hp) && slot.hp > 0
         ? Math.min(maxHp, Math.max(1, Math.round(slot.hp)))
@@ -222,6 +232,7 @@ function loadPetsFromRoster(
       slot: slotIdx,
       hp,
       maxHp,
+      bonusMaxHp,
       hitFlash: 0,
       hurtCooldown: 0,
       x: gx !== null ? gx : world.playerX + Math.cos(ang) * 2.6,
@@ -291,6 +302,7 @@ export function saveMonsterArenaNow(world: MonsterArenaWorld): void {
       slot: p.slot,
       hp: Math.ceil(p.hp),
       maxHp: p.maxHp,
+      bonusMaxHp: p.bonusMaxHp,
       guardX: p.guardX,
       guardZ: p.guardZ,
     })),
@@ -299,6 +311,7 @@ export function saveMonsterArenaNow(world: MonsterArenaWorld): void {
     titanTimer: clampedTitan,
     titanLevel: world.titanLevel,
     fruitsEaten: world.fruitsEaten,
+    meatsFed: world.meatsFed,
     savedAt: Date.now(),
   };
   saveMonsterArenaRun(run);
@@ -328,6 +341,7 @@ export function createInitialMonsterArenaWorld(lang: 'ar' | 'en'): MonsterArenaW
     waveTargetKills: waveTargetFor(saved ? saved.wave : 1),
     kills: saved ? saved.kills : 0,
     fruitsEaten: saved ? saved.fruitsEaten : 0,
+    meatsFed: saved?.meatsFed ?? 0,
     energy: saved ? saved.energy : BASE_MAX_ENERGY,
     maxEnergy: saved ? saved.maxEnergy : BASE_MAX_ENERGY,
     playerX: 0,
@@ -360,6 +374,9 @@ export function createInitialMonsterArenaWorld(lang: 'ar' | 'en'): MonsterArenaW
     damageBuffTimer: 0,
     shieldBuffTimer: 0,
     rapidFireBuffTimer: 0,
+    petFuryBuffTimer: 0,
+    petFuryDmgPct: 0,
+    petFurySpdPct: 0,
     spawnTimer: 0.8,
     autoSaveTimer: 1.0,
     bannerText: '',
@@ -397,6 +414,7 @@ export function startNewMonsterArenaRun(
   world.waveTargetKills = waveTargetFor(1);
   world.kills = 0;
   world.fruitsEaten = 0;
+  world.meatsFed = 0;
   world.maxEnergy = BASE_MAX_ENERGY;
   world.energy = BASE_MAX_ENERGY;
   world.playerX = 0;
@@ -427,6 +445,9 @@ export function startNewMonsterArenaRun(
   world.damageBuffTimer = 0;
   world.shieldBuffTimer = 0;
   world.rapidFireBuffTimer = 0;
+  world.petFuryBuffTimer = 0;
+  world.petFuryDmgPct = 0;
+  world.petFurySpdPct = 0;
   world.spawnTimer = 0.5;
   world.autoSaveTimer = 1.0;
   world.shakeTimer = 0;
@@ -461,6 +482,7 @@ export function resumeMonsterArenaRun(
   world.waveTargetKills = waveTargetFor(saved.wave);
   world.kills = saved.kills;
   world.fruitsEaten = saved.fruitsEaten;
+  world.meatsFed = saved.meatsFed ?? 0;
   world.maxEnergy = saved.maxEnergy;
   world.energy = saved.energy;
   world.activeWeapon = saved.activeWeapon;
@@ -491,6 +513,13 @@ export function resumeMonsterArenaRun(
   world.projectiles = [];
   world.pickups = [];
   world.particles = [];
+  world.speedBuffTimer = 0;
+  world.damageBuffTimer = 0;
+  world.shieldBuffTimer = 0;
+  world.rapidFireBuffTimer = 0;
+  world.petFuryBuffTimer = 0;
+  world.petFuryDmgPct = 0;
+  world.petFurySpdPct = 0;
   world.spawnTimer = 0.7;
   world.autoSaveTimer = 1.0;
   loadPetsFromRoster(world, saved.petRoster ?? []);
@@ -575,6 +604,61 @@ export function actionBuyFruit(
   return true;
 }
 
+export function actionBuyMeat(
+  world: MonsterArenaWorld,
+  meatId: MeatId,
+  audio: MonsterArenaAudio
+): boolean {
+  const spec = MEAT_SPECS[meatId];
+  if (world.pets.length === 0) {
+    setBanner(
+      world,
+      world.lang === 'ar'
+        ? 'اشترِ حيواناً أولاً من متجر الحيوانات لإطعامه اللحوم!'
+        : 'Buy a battle pet first from the Pets Shop to feed them meat!',
+      'warn',
+      2.6
+    );
+    world.version++;
+    return false;
+  }
+  if (world.coins < spec.cost) return false;
+
+  world.coins -= spec.cost;
+  world.meatsFed++;
+
+  for (const pet of world.pets) {
+    pet.bonusMaxHp += spec.petMaxHpBonus;
+    pet.maxHp = getPetMaxHp(pet.petId, pet.level, pet.bonusMaxHp);
+    pet.hp = Math.min(pet.maxHp, pet.hp + spec.petHealAmount);
+    pet.lungeTimer = 0.25;
+    spawnParticles(world, pet.x, 1.0, pet.z, spec.color, 12, 4.4);
+  }
+
+  if (spec.buffDurationSec && spec.buffDurationSec > 0) {
+    world.petFuryBuffTimer = Math.max(world.petFuryBuffTimer, spec.buffDurationSec);
+    if (spec.petDmgBoostPct) {
+      world.petFuryDmgPct = Math.max(world.petFuryDmgPct, spec.petDmgBoostPct);
+    }
+    if (spec.petSpeedBoostPct) {
+      world.petFurySpdPct = Math.max(world.petFurySpdPct, spec.petSpeedBoostPct);
+    }
+  }
+
+  audio.playFruitEat();
+  setBanner(
+    world,
+    world.lang === 'ar'
+      ? `🥩 أطعمت ${world.pets.length} حيوانات بـ ${spec.nameAr}! +${spec.petMaxHpBonus} طاقة قصوى دائمة!`
+      : `🥩 Fed ${world.pets.length} pet${world.pets.length > 1 ? 's' : ''} ${spec.nameEn}! +${spec.petMaxHpBonus} permanent Max Energy!`,
+    'shop',
+    2.6
+  );
+  saveMonsterArenaNow(world);
+  world.version++;
+  return true;
+}
+
 export function actionBuyOrEquipWeapon(
   world: MonsterArenaWorld,
   weaponId: WeaponId,
@@ -639,7 +723,7 @@ export function actionBuyPet(
   const ang = (freeSlot / MAX_PET_SQUAD) * Math.PI * 2;
   const px = world.playerX + Math.cos(ang) * 2.5;
   const pz = world.playerZ + Math.sin(ang) * 2.5;
-  const maxHp = getPetMaxHp(petId, 1);
+  const maxHp = getPetMaxHp(petId, 1, 0);
   world.pets.push({
     id: world.nextId++,
     petId,
@@ -647,6 +731,7 @@ export function actionBuyPet(
     slot: freeSlot,
     hp: maxHp,
     maxHp,
+    bonusMaxHp: 0,
     hitFlash: 0,
     hurtCooldown: 0,
     x: px,
@@ -719,11 +804,12 @@ export function actionMoveOrMergeSlot(
 
   const petB = world.pets[idxB];
   if (petA.petId === petB.petId && petA.level === petB.level && petB.level < MAX_PET_LEVEL) {
-    // Merge petA into petB at toSlot (preserve combined HP ratio — pets cannot be healed!)
+    // Merge petA into petB at toSlot (preserve combined HP ratio & meat bonusMaxHp)
     const avgRatio =
       (petA.hp / Math.max(1, petA.maxHp) + petB.hp / Math.max(1, petB.maxHp)) * 0.5;
     petB.level += 1;
-    petB.maxHp = getPetMaxHp(petB.petId, petB.level);
+    petB.bonusMaxHp += petA.bonusMaxHp;
+    petB.maxHp = getPetMaxHp(petB.petId, petB.level, petB.bonusMaxHp);
     petB.hp = Math.max(1, Math.min(petB.maxHp, Math.round(petB.maxHp * avgRatio)));
     petB.lungeTimer = 0.35;
     const mx = (petA.x + petB.x) * 0.5;
@@ -805,11 +891,12 @@ export function actionSelectOrMerge3DPet(
     selPet.level === targetPet.level &&
     targetPet.level < MAX_PET_LEVEL
   ) {
-    // Direct 3D Merge right at targetPet's spot! (preserve combined HP ratio — no healing)
+    // Direct 3D Merge right at targetPet's spot (preserve combined HP ratio & meat bonusMaxHp)
     const avgRatio =
       (selPet.hp / Math.max(1, selPet.maxHp) + targetPet.hp / Math.max(1, targetPet.maxHp)) * 0.5;
     targetPet.level += 1;
-    targetPet.maxHp = getPetMaxHp(targetPet.petId, targetPet.level);
+    targetPet.bonusMaxHp += selPet.bonusMaxHp;
+    targetPet.maxHp = getPetMaxHp(targetPet.petId, targetPet.level, targetPet.bonusMaxHp);
     targetPet.hp = Math.max(1, Math.min(targetPet.maxHp, Math.round(targetPet.maxHp * avgRatio)));
     targetPet.lungeTimer = 0.35;
     const mx = targetPet.x;
@@ -942,7 +1029,8 @@ export function actionMergePetPair(
   const avgRatio =
     (keeper.hp / Math.max(1, keeper.maxHp) + consumed.hp / Math.max(1, consumed.maxHp)) * 0.5;
   keeper.level = level + 1;
-  keeper.maxHp = getPetMaxHp(keeper.petId, keeper.level);
+  keeper.bonusMaxHp += consumed.bonusMaxHp;
+  keeper.maxHp = getPetMaxHp(keeper.petId, keeper.level, keeper.bonusMaxHp);
   keeper.hp = Math.max(1, Math.min(keeper.maxHp, Math.round(keeper.maxHp * avgRatio)));
   keeper.lungeTimer = 0.35;
   const mx = (keeper.x + consumed.x) * 0.5;
@@ -986,7 +1074,8 @@ export function actionMergeAllPets(
           const avgRatio =
             (a.hp / Math.max(1, a.maxHp) + b.hp / Math.max(1, b.maxHp)) * 0.5;
           a.level++;
-          a.maxHp = getPetMaxHp(a.petId, a.level);
+          a.bonusMaxHp += b.bonusMaxHp;
+          a.maxHp = getPetMaxHp(a.petId, a.level, a.bonusMaxHp);
           a.hp = Math.max(1, Math.min(a.maxHp, Math.round(a.maxHp * avgRatio)));
           a.lungeTimer = 0.35;
           const mx = (a.x + b.x) * 0.5;
@@ -1276,6 +1365,13 @@ export function stepMonsterArenaWorld(
   if (world.shieldBuffTimer > 0) world.shieldBuffTimer = Math.max(0, world.shieldBuffTimer - dt);
   if (world.rapidFireBuffTimer > 0)
     world.rapidFireBuffTimer = Math.max(0, world.rapidFireBuffTimer - dt);
+  if (world.petFuryBuffTimer > 0) {
+    world.petFuryBuffTimer = Math.max(0, world.petFuryBuffTimer - dt);
+    if (world.petFuryBuffTimer === 0) {
+      world.petFuryDmgPct = 0;
+      world.petFurySpdPct = 0;
+    }
+  }
 
   // 1a) 3-Minute Strong Boss Countdown (Inferno Warlord)
   world.warlordTimer -= dt;
@@ -1408,6 +1504,8 @@ export function stepMonsterArenaWorld(
 
   // 4) Update Companion Battle Pets
   const petCount = world.pets.length;
+  const petDmgMul = world.petFuryBuffTimer > 0 ? 1 + world.petFuryDmgPct / 100 : 1;
+  const petSpdMul = world.petFuryBuffTimer > 0 ? 1 + world.petFurySpdPct / 100 : 1;
   world.pets.forEach((pet) => {
     const spec = PET_SPECS[pet.petId];
     const lvMul = getPetDamageMultiplier(pet.level);
@@ -1438,9 +1536,9 @@ export function stepMonsterArenaWorld(
         pet.x += (dx / dist) * step;
         pet.z += (dz / dist) * step;
       } else if (pet.attackCooldown <= 0) {
-        pet.attackCooldown = spec.attackInterval / (1 + (pet.level - 1) * 0.12);
+        pet.attackCooldown = spec.attackInterval / ((1 + (pet.level - 1) * 0.12) * petSpdMul);
         pet.lungeTimer = 0.2;
-        const dmg = Math.round(spec.damage * lvMul);
+        const dmg = Math.round(spec.damage * lvMul * petDmgMul);
         damageMonster(target, dmg, spec.slowDuration);
         if (spec.splashRadius > 0) {
           for (const other of world.monsters) {
@@ -1466,9 +1564,9 @@ export function stepMonsterArenaWorld(
       if (target) {
         pet.angle = Math.atan2(target.x - pet.x, target.z - pet.z);
         if (spec.style === 'ranged' && pet.attackCooldown <= 0) {
-          pet.attackCooldown = spec.attackInterval / (1 + (pet.level - 1) * 0.14);
+          pet.attackCooldown = spec.attackInterval / ((1 + (pet.level - 1) * 0.14) * petSpdMul);
           pet.lungeTimer = 0.18;
-          const dmg = Math.round(spec.damage * lvMul);
+          const dmg = Math.round(spec.damage * lvMul * petDmgMul);
           const ang = Math.atan2(target.x - pet.x, target.z - pet.z);
           world.projectiles.push({
             id: world.nextId++,
@@ -1610,11 +1708,11 @@ export function stepMonsterArenaWorld(
   }
 
   // 7) Update Monsters (Movement, Ranged Shots, Boss Summons, Contact Damage, Drops)
-  const totalLionLevels = world.pets.reduce(
-    (sum, p) => sum + (p.petId === 'lion' ? p.level : 0),
+  const totalCoinBonusPct = world.pets.reduce(
+    (sum, p) => sum + (PET_SPECS[p.petId].coinBonusPct ?? 0) * p.level,
     0
   );
-  const coinBonusMul = 1 + Math.min(1.5, totalLionLevels * 0.15);
+  const coinBonusMul = 1 + Math.min(2.5, totalCoinBonusPct / 100);
 
   for (let i = world.monsters.length - 1; i >= 0; i--) {
     const m = world.monsters[i];
@@ -1864,17 +1962,23 @@ export function stepMonsterArenaWorld(
       }
     }
 
-    // Boss minion summons (3-Min Warlord & 10-Min Titan)
+    // Boss minion summons (3-Min Warlord & 10-Min Titan) — radially clamped inside circular arena
+    const clampSummonPos = (rawX: number, rawZ: number) => {
+      const limitR = ARENA_RADIUS - 1.5;
+      const r = Math.hypot(rawX, rawZ);
+      if (r > limitR && r > 0.001) {
+        return { x: (rawX / r) * limitR, z: (rawZ / r) * limitR };
+      }
+      return { x: rawX, z: rawZ };
+    };
     if (m.kind === 'titanBoss') {
       m.summonCooldown -= dt;
       if (m.summonCooldown <= 0 && world.monsters.length < 28) {
         m.summonCooldown = 8.5;
         for (let s = 0; s < 2; s++) {
           const sa = Math.random() * Math.PI * 2;
-          spawnArenaMonster(world, s === 0 ? 'crawler' : 'brute', {
-            x: Math.max(-maxR, Math.min(maxR, m.x + Math.cos(sa) * 3.0)),
-            z: Math.max(-maxR, Math.min(maxR, m.z + Math.sin(sa) * 3.0)),
-          });
+          const pos = clampSummonPos(m.x + Math.cos(sa) * 3.0, m.z + Math.sin(sa) * 3.0);
+          spawnArenaMonster(world, s === 0 ? 'crawler' : 'brute', pos);
         }
         spawnParticles(world, m.x, 1.6, m.z, '#c084fc', 16, 4.5);
       }
@@ -1883,10 +1987,8 @@ export function stepMonsterArenaWorld(
       if (m.summonCooldown <= 0 && world.monsters.length < 26) {
         m.summonCooldown = 9.5;
         const sa = Math.random() * Math.PI * 2;
-        spawnArenaMonster(world, Math.random() < 0.5 ? 'imp' : 'crawler', {
-          x: Math.max(-maxR, Math.min(maxR, m.x + Math.cos(sa) * 2.6)),
-          z: Math.max(-maxR, Math.min(maxR, m.z + Math.sin(sa) * 2.6)),
-        });
+        const pos = clampSummonPos(m.x + Math.cos(sa) * 2.6, m.z + Math.sin(sa) * 2.6);
+        spawnArenaMonster(world, Math.random() < 0.5 ? 'imp' : 'crawler', pos);
         spawnParticles(world, m.x, 1.3, m.z, '#f97316', 10, 4.0);
       }
     }
@@ -1960,6 +2062,7 @@ export function extractMonsterArenaHud(
       slot: p.slot,
       hp: Math.ceil(p.hp),
       maxHp: p.maxHp,
+      bonusMaxHp: p.bonusMaxHp,
       guardX: p.guardX,
       guardZ: p.guardZ,
     })),
@@ -1983,6 +2086,9 @@ export function extractMonsterArenaHud(
     damageBuffTimer: world.damageBuffTimer,
     shieldBuffTimer: world.shieldBuffTimer,
     rapidFireBuffTimer: world.rapidFireBuffTimer,
+    petFuryBuffTimer: world.petFuryBuffTimer,
+    petFuryDmgPct: world.petFuryDmgPct,
+    petFurySpdPct: world.petFurySpdPct,
     dashCooldown: world.dashCooldown,
     bannerText: world.bannerText,
     bannerTone: world.bannerTone,

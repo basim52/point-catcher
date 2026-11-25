@@ -88,6 +88,7 @@ const SHOP_ITEM_PRICES: Record<PowerUpKind, number> = {
   magnet: 77,
   eraser: 62,
 };
+const CONTINUE_COST_GOLD = 140;
 
 interface MosaicWallet {
   gold: number;
@@ -1345,8 +1346,13 @@ const COPY_MOSAIC = {
     replayBtn: 'إعادة المرحلة',
     loseTitle: 'انتهت القلوب!',
     loseSub: (rem: number) =>
-      `تبقّى ${rem} سهم فقط — كبّر اللوحة بدقة واستخدم التلميح والمغناطيس وحاول مجدداً!`,
-    tryAgainBtn: 'حاول مجدداً',
+      `تبقّى ${rem} سهم فقط — يمكنك دفع ${CONTINUE_COST_GOLD} فلوس لاستعادة القلوب واستكمال المرحلة من مكانك، أو البدء من جديد.`,
+    continueBtn: (cost: number) => `استكمال المرحلة (${cost} فلوس)`,
+    continueNotEnough: (cost: number, have: number) =>
+      `تحتاج ${cost} فلوس للاستكمال (لديك ${have})`,
+    continueSuccessToast: 'تم استعادة 5 قلوب! واصل اللعب!',
+    balanceLabel: (amount: number) => `رصيدك الحالي: ${amount} فلوس`,
+    tryAgainBtn: 'إعادة المرحلة من البداية',
     levelsModalTitle: 'مراحل فسيفساء الأسهم (10 أشكال ضخمة)',
     levelsModalSub: 'أفرغ الشكل من جميع الأسهم لفتح المرحلة التالية بالتسلسل',
     arrowsCount: (n: number) => `${n} سهم`,
@@ -1401,8 +1407,13 @@ const COPY_MOSAIC = {
     replayBtn: 'Replay Stage',
     loseTitle: 'Out of Hearts!',
     loseSub: (rem: number) =>
-      `${rem} arrows left — zoom in closely and use Hint, Magnet & Eraser!`,
-    tryAgainBtn: 'Try Again',
+      `${rem} arrows left — pay ${CONTINUE_COST_GOLD} coins to restore all 5 hearts and continue right where you left off, or restart.`,
+    continueBtn: (cost: number) => `Continue Stage (${cost} Coins)`,
+    continueNotEnough: (cost: number, have: number) =>
+      `Need ${cost} coins to continue (You have ${have})`,
+    continueSuccessToast: '5 Hearts Restored! Keep going!',
+    balanceLabel: (amount: number) => `Current Balance: ${amount} Coins`,
+    tryAgainBtn: 'Restart Stage',
     levelsModalTitle: 'Arrow Mosaic Stages (10 Giant Shapes)',
     levelsModalSub: 'Clear every arrow in each shape to unlock the next stage',
     arrowsCount: (n: number) => `${n} arrows`,
@@ -2146,6 +2157,31 @@ export const ArrowMosaicGame: React.FC<ArrowMosaicGameProps> = ({
     [lost, showGoldToast, t, updateWallet, won]
   );
 
+  // Revive / Continue current stage on loss for 140 coins (keeps remaining arrows & restores all 5 hearts)
+  const handleContinueWithGold = useCallback(() => {
+    if (!lostRef.current || wonRef.current) return;
+    if (walletRef.current.gold < CONTINUE_COST_GOLD) {
+      audioRef.current.playBlocked();
+      return;
+    }
+    if (loseTimerRef.current !== null) {
+      window.clearTimeout(loseTimerRef.current);
+      loseTimerRef.current = null;
+    }
+    updateWallet((prev) => ({
+      ...prev,
+      gold: Math.max(0, prev.gold - CONTINUE_COST_GOLD),
+    }));
+    heartsRef.current = MAX_HEARTS;
+    lostRef.current = false;
+    blockedRef.current = null;
+    setHearts(MAX_HEARTS);
+    setLost(false);
+    setStatusBanner('');
+    audioRef.current.playBuy();
+    showGoldToast(t.continueSuccessToast);
+  }, [showGoldToast, t.continueSuccessToast, updateWallet]);
+
   const adjustZoom = useCallback(
     (factor: number) => {
       const cam = camRef.current;
@@ -2683,16 +2719,46 @@ export const ArrowMosaicGame: React.FC<ArrowMosaicGameProps> = ({
                 <h2 className="text-xl sm:text-2xl font-bold text-rose-300 mb-2">
                   {t.loseTitle}
                 </h2>
-                <p className="text-xs sm:text-sm text-indigo-100 leading-relaxed mb-5">
+                <p className="text-xs sm:text-sm text-indigo-100 leading-relaxed mb-3">
                   {t.loseSub(remainingCount)}
                 </p>
-                <button
-                  type="button"
-                  onClick={() => loadStage(currentLevel, true)}
-                  className="min-w-[165px] px-6 py-3 rounded-xl bg-rose-500 hover:bg-rose-400 text-white font-bold text-sm sm:text-base transition-colors cursor-pointer"
-                >
-                  {t.tryAgainBtn}
-                </button>
+
+                <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg border border-amber-300/35 bg-amber-500/15 text-amber-200 font-num text-xs font-extrabold mb-4">
+                  <svg
+                    viewBox="0 0 24 24"
+                    className="w-4 h-4 shrink-0"
+                    aria-hidden="true"
+                  >
+                    <circle cx="12" cy="12" r="9.5" fill="#fbbf24" stroke="#b45309" strokeWidth="1.8" />
+                    <circle cx="12" cy="12" r="5.5" fill="#fde68a" stroke="#d97706" strokeWidth="1.2" />
+                  </svg>
+                  <span>{t.balanceLabel(gold)}</span>
+                </div>
+
+                <div className="flex flex-col gap-2.5">
+                  <button
+                    type="button"
+                    disabled={gold < CONTINUE_COST_GOLD}
+                    onClick={handleContinueWithGold}
+                    className={`w-full px-5 py-3 rounded-xl font-num font-extrabold text-sm sm:text-base transition-all ${
+                      gold >= CONTINUE_COST_GOLD
+                        ? 'bg-gradient-to-b from-amber-300 to-amber-500 hover:from-amber-200 hover:to-amber-400 active:scale-[0.99] text-slate-950 shadow-lg cursor-pointer'
+                        : 'border border-white/12 bg-indigo-950/80 text-indigo-400 cursor-not-allowed'
+                    }`}
+                  >
+                    {gold >= CONTINUE_COST_GOLD
+                      ? t.continueBtn(CONTINUE_COST_GOLD)
+                      : t.continueNotEnough(CONTINUE_COST_GOLD, gold)}
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => loadStage(currentLevel, true)}
+                    className="w-full px-5 py-2.5 rounded-xl border border-rose-400/45 bg-rose-500/20 hover:bg-rose-500/35 text-rose-100 font-bold text-sm transition-colors cursor-pointer"
+                  >
+                    {t.tryAgainBtn}
+                  </button>
+                </div>
               </div>
             </div>
           )}

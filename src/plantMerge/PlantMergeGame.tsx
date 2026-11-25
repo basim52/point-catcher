@@ -3,7 +3,6 @@ import { PlantMergeAudio } from './audio';
 import {
   actionBuyAndPlant,
   actionInteractPlot,
-  actionSelectShopTier,
   actionSellSelectedPlant,
   actionToggleSpeed,
   actionUpgradePower,
@@ -219,15 +218,6 @@ export const PlantMergeGame: React.FC<PlantMergeGameProps> = ({
     [syncHud]
   );
 
-  const handleSelectShopTier = useCallback(
-    (tier: PlantTier) => {
-      actionSelectShopTier(worldRef.current, tier);
-      syncHud();
-      setShopOpen(false);
-    },
-    [syncHud]
-  );
-
   const handleSellSelectedPlant = useCallback(() => {
     if (actionSellSelectedPlant(worldRef.current, audioRef.current)) {
       syncHud();
@@ -379,7 +369,6 @@ export const PlantMergeGame: React.FC<PlantMergeGameProps> = ({
         onToggleSound={handleToggleSound}
         onQuickBuyPlant={handleQuickBuyPlant}
         onBuySpecificPlant={handleBuySpecificPlant}
-        onSelectShopTier={handleSelectShopTier}
         onSellSelectedPlant={handleSellSelectedPlant}
         onWaterBoost={handleWaterBoost}
         onUpgradePower={handleUpgradePower}

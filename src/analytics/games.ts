@@ -18,6 +18,8 @@ export const TRACKED_GAMES = {
   'mini-neon-snake': 'ثعبان النيون',
   'mini-apple-catch': 'أمسك التفاح وتجنب الخضار',
   'mini-brick-breaker': 'تكسير النيون',
+  'mini-gum-shop': 'بياع العلك 3D',
+  'mini-fruit-slash': 'سيف الفواكه 2D',
 } as const;
 
 export type TrackedGameId = keyof typeof TRACKED_GAMES;

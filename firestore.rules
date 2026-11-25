@@ -16,16 +16,20 @@ service cloud.firestore {
         ];
     }
 
+    function isValidGameId(id) {
+      return id in [
+        'world-normal', 'world-fruit', 'world-gold', 'world-space', 'world-monster',
+        'mini-devil-trap', 'mini-monster-arena', 'mini-plant-merge', 'mini-shawarma-shop',
+        'mini-desert-rally', 'mini-date-catcher', 'mini-arrow-escape', 'mini-arrow-mosaic',
+        'mini-fruit-merge', 'mini-neon-2048', 'mini-neon-snake', 'mini-apple-catch',
+        'mini-brick-breaker', 'mini-gum-shop', 'mini-fruit-slash'
+      ];
+    }
+
     function isValidSession(d) {
       return d.keys().hasOnly(['gameId', 'gameName', 'startedAt', 'endedAt', 'durationSeconds', 'visit'])
         && d.keys().hasAll(['gameId', 'gameName', 'startedAt', 'endedAt', 'durationSeconds', 'visit'])
-        && d.gameId in [
-          'world-normal', 'world-fruit', 'world-gold', 'world-space', 'world-monster',
-          'mini-devil-trap', 'mini-monster-arena', 'mini-plant-merge', 'mini-shawarma-shop',
-          'mini-desert-rally', 'mini-date-catcher', 'mini-arrow-escape', 'mini-arrow-mosaic',
-          'mini-fruit-merge', 'mini-neon-2048', 'mini-neon-snake', 'mini-apple-catch',
-          'mini-brick-breaker'
-        ]
+        && isValidGameId(d.gameId)
         && d.gameName is string && d.gameName.size() > 0 && d.gameName.size() <= 60
         && d.startedAt is timestamp
         && d.endedAt is timestamp
@@ -43,6 +47,27 @@ service cloud.firestore {
       allow read: if isStatsAdmin();
       allow create: if isValidSession(request.resource.data);
       allow update, delete: if false;
+    }
+
+    // Public per-game visit counters shown next to each game card.
+    // Anyone may read or atomically increment by +1; admins may sync counts.
+    match /game_stats/{gameId} {
+      allow read: if true;
+      allow create: if isValidGameId(gameId)
+        && request.resource.data.keys().hasOnly(['visits'])
+        && request.resource.data.visits is int
+        && (
+          request.resource.data.visits == 1
+          || (isStatsAdmin() && request.resource.data.visits >= 0)
+        );
+      allow update: if isValidGameId(gameId)
+        && request.resource.data.keys().hasOnly(['visits'])
+        && request.resource.data.visits is int
+        && (
+          (resource.data.visits is int && request.resource.data.visits == resource.data.visits + 1)
+          || (isStatsAdmin() && request.resource.data.visits >= 0)
+        );
+      allow delete: if false;
     }
 
     match /{document=**} {

@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react';
 import { firebaseWebConfig, isAnalyticsConfigured, SESSIONS_COLLECTION } from './config';
 import { gameNameFor, type TrackedGameId } from './games';
+import { recordGameVisit } from './visits';
 
 // Anonymous play-time tracking. No player data is stored: only which game,
 // when, and how many seconds were actively played (visible tab only).
@@ -149,7 +150,9 @@ export function useGamePlayTracking(gameId: TrackedGameId | null, active: boolea
   activeRef.current = active;
 
   useEffect(() => {
-    if (!gameId || !isAnalyticsConfigured) return;
+    if (!gameId) return;
+    recordGameVisit(gameId);
+    if (!isAnalyticsConfigured) return;
     installPageListeners();
     const session = new PlaySession(gameId);
     session.setActive(activeRef.current);

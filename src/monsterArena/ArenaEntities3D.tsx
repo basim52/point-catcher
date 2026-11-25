@@ -70,8 +70,16 @@ const HeroWarrior3D: React.FC<{
     activeWeapon === 'thunder_cannon' ||
     activeWeapon === 'dragon_flamethrower' ||
     activeWeapon === 'cosmic_annihilator' ||
-    activeWeapon === 'venom_gatling';
+    activeWeapon === 'venom_gatling' ||
+    activeWeapon === 'magma_mortar' ||
+    activeWeapon === 'cryo_minigun' ||
+    activeWeapon === 'solar_nova_blade';
   const isTwin = activeWeapon === 'twin_blasters';
+  const isSniper = activeWeapon === 'laser_sniper';
+  const isSawblade = activeWeapon === 'sawblade_launcher';
+  const isMortar = activeWeapon === 'magma_mortar';
+  const isCryoMini = activeWeapon === 'cryo_minigun';
+  const isSolarNova = activeWeapon === 'solar_nova_blade';
 
   return (
     <group ref={rootRef}>
@@ -183,6 +191,79 @@ const HeroWarrior3D: React.FC<{
                 />
               </mesh>
             </>
+          ) : isSniper ? (
+            <group position={[0.38, 0, 0.28]}>
+              <mesh castShadow>
+                <boxGeometry args={[0.14, 0.16, 1.48]} />
+                <meshStandardMaterial color={wSpec.accent} roughness={0.26} metalness={0.82} />
+              </mesh>
+              <mesh position={[0, 0.12, 0.05]}>
+                <cylinderGeometry args={[0.055, 0.055, 0.42, 8]} />
+                <meshStandardMaterial color="#0f172a" roughness={0.3} metalness={0.85} />
+              </mesh>
+              <mesh position={[0, 0.02, 0.82]} rotation={[Math.PI / 2, 0, 0]}>
+                <cylinderGeometry args={[0.045, 0.06, 0.34, 8]} />
+                <meshStandardMaterial color={wSpec.color} emissive={wSpec.color} emissiveIntensity={2.0} />
+              </mesh>
+            </group>
+          ) : isSawblade ? (
+            <group position={[0.38, 0, 0.18]}>
+              <mesh castShadow>
+                <boxGeometry args={[0.24, 0.22, 0.82]} />
+                <meshStandardMaterial color={wSpec.accent} roughness={0.32} metalness={0.8} />
+              </mesh>
+              <mesh position={[0, 0.02, 0.56]} rotation={[0, 0, 0]}>
+                <cylinderGeometry args={[0.24, 0.24, 0.05, 12]} />
+                <meshStandardMaterial color={wSpec.color} emissive="#94a3b8" emissiveIntensity={0.8} metalness={0.9} roughness={0.2} />
+              </mesh>
+            </group>
+          ) : isMortar ? (
+            <group position={[0.42, 0.05, 0.16]}>
+              <mesh rotation={[Math.PI / 2, 0, 0]} castShadow>
+                <cylinderGeometry args={[0.2, 0.24, 1.05, 12]} />
+                <meshStandardMaterial color={wSpec.accent} roughness={0.42} metalness={0.72} />
+              </mesh>
+              <mesh position={[0, 0, 0.54]}>
+                <sphereGeometry args={[0.17, 10, 10]} />
+                <meshStandardMaterial color={wSpec.color} emissive={wSpec.color} emissiveIntensity={2.1} />
+              </mesh>
+            </group>
+          ) : isCryoMini ? (
+            <group position={[0.42, 0, 0.2]}>
+              <mesh castShadow>
+                <boxGeometry args={[0.28, 0.26, 0.52]} />
+                <meshStandardMaterial color={wSpec.accent} roughness={0.28} metalness={0.8} />
+              </mesh>
+              {[
+                [-0.075, 0.065],
+                [0.075, 0.065],
+                [0, -0.065],
+              ].map(([bx, by], i) => (
+                <mesh key={i} position={[bx, by, 0.52]} rotation={[Math.PI / 2, 0, 0]} castShadow>
+                  <cylinderGeometry args={[0.048, 0.048, 0.72, 8]} />
+                  <meshStandardMaterial color={wSpec.color} emissive={wSpec.color} emissiveIntensity={1.5} metalness={0.6} roughness={0.2} />
+                </mesh>
+              ))}
+            </group>
+          ) : isSolarNova ? (
+            <group position={[0.42, 0.02, 0.24]}>
+              <mesh castShadow>
+                <boxGeometry args={[0.24, 0.22, 1.12]} />
+                <meshStandardMaterial color={wSpec.accent} roughness={0.22} metalness={0.88} />
+              </mesh>
+              <mesh position={[-0.18, 0.02, 0.22]} rotation={[0, 0, 0.2]}>
+                <boxGeometry args={[0.06, 0.34, 0.72]} />
+                <meshStandardMaterial color={wSpec.color} emissive="#f59e0b" emissiveIntensity={1.8} />
+              </mesh>
+              <mesh position={[0.18, 0.02, 0.22]} rotation={[0, 0, -0.2]}>
+                <boxGeometry args={[0.06, 0.34, 0.72]} />
+                <meshStandardMaterial color={wSpec.color} emissive="#f59e0b" emissiveIntensity={1.8} />
+              </mesh>
+              <mesh position={[0, 0.02, 0.68]}>
+                <octahedronGeometry args={[0.18, 0]} />
+                <meshStandardMaterial color="#ffffff" emissive={wSpec.color} emissiveIntensity={2.3} />
+              </mesh>
+            </group>
           ) : (
             <group position={[0.38, 0, 0.12]}>
               <mesh castShadow>
@@ -236,6 +317,7 @@ const CompanionPet3D: React.FC<{
   const rightWingRef = useRef<THREE.Mesh>(null);
   const selectRingRef = useRef<THREE.Mesh>(null);
   const mergeRingRef = useRef<THREE.Mesh>(null);
+  const hpBarRef = useRef<THREE.Group>(null);
   const hpFillRef = useRef<THREE.Mesh>(null);
   const hpMatRef = useRef<THREE.MeshBasicMaterial>(null);
 
@@ -250,6 +332,9 @@ const CompanionPet3D: React.FC<{
       : Math.abs(Math.sin(live.animPhase)) * 0.14;
     groupRef.current.position.set(live.x, hover, live.z);
     groupRef.current.rotation.y = live.angle;
+    if (hpBarRef.current) {
+      hpBarRef.current.rotation.y = -live.angle;
+    }
     if (bodyRef.current) {
       const lunge = live.lungeTimer > 0 ? 1.16 : 1.0;
       const hurtPulse = 1 + live.hitFlash * 0.18;
@@ -547,6 +632,202 @@ const CompanionPet3D: React.FC<{
           </group>
         )}
 
+        {/* 7. Bengal Tiger */}
+        {id === 'tiger' && (
+          <group>
+            <mesh position={[0, 0.4, 0]} castShadow>
+              <boxGeometry args={[0.46, 0.4, 0.92]} />
+              <meshStandardMaterial color="#f97316" roughness={0.62} />
+            </mesh>
+            {/* Dark Tiger Stripes */}
+            {[-0.22, 0.02, 0.24].map((sz, i) => (
+              <mesh key={i} position={[0, 0.42, sz]}>
+                <boxGeometry args={[0.48, 0.36, 0.08]} />
+                <meshStandardMaterial color="#1c1917" roughness={0.8} />
+              </mesh>
+            ))}
+            <mesh position={[0, 0.56, 0.5]} castShadow>
+              <boxGeometry args={[0.36, 0.32, 0.38]} />
+              <meshStandardMaterial color="#fb923c" roughness={0.58} />
+            </mesh>
+            <mesh position={[-0.14, 0.76, 0.46]}>
+              <coneGeometry args={[0.07, 0.16, 5]} />
+              <meshStandardMaterial color="#1c1917" />
+            </mesh>
+            <mesh position={[0.14, 0.76, 0.46]}>
+              <coneGeometry args={[0.07, 0.16, 5]} />
+              <meshStandardMaterial color="#1c1917" />
+            </mesh>
+            <mesh position={[0, 0.48, -0.58]} rotation={[0.7, 0, 0]}>
+              <cylinderGeometry args={[0.04, 0.055, 0.56, 6]} />
+              <meshStandardMaterial color="#f97316" />
+            </mesh>
+            <mesh position={[-0.1, 0.6, 0.7]}>
+              <sphereGeometry args={[0.048, 8, 8]} />
+              <meshStandardMaterial color="#fef08a" emissive="#facc15" emissiveIntensity={1.9} />
+            </mesh>
+            <mesh position={[0.1, 0.6, 0.7]}>
+              <sphereGeometry args={[0.048, 8, 8]} />
+              <meshStandardMaterial color="#fef08a" emissive="#facc15" emissiveIntensity={1.9} />
+            </mesh>
+          </group>
+        )}
+
+        {/* 8. Armored Rhino */}
+        {id === 'rhino' && (
+          <group>
+            <mesh position={[0, 0.48, 0]} castShadow>
+              <boxGeometry args={[0.68, 0.62, 1.02]} />
+              <meshStandardMaterial color="#475569" roughness={0.62} metalness={0.35} />
+            </mesh>
+            {/* Armored Saddle Plates */}
+            <mesh position={[0, 0.62, 0.02]}>
+              <boxGeometry args={[0.74, 0.34, 0.58]} />
+              <meshStandardMaterial color="#94a3b8" roughness={0.32} metalness={0.78} />
+            </mesh>
+            <mesh position={[0, 0.58, 0.6]} castShadow>
+              <boxGeometry args={[0.42, 0.4, 0.46]} />
+              <meshStandardMaterial color="#334155" roughness={0.55} metalness={0.4} />
+            </mesh>
+            {/* Main Curved Ivory Horn + Secondary Horn */}
+            <mesh position={[0, 0.84, 0.84]} rotation={[0.42, 0, 0]}>
+              <coneGeometry args={[0.1, 0.48, 7]} />
+              <meshStandardMaterial color="#f8fafc" roughness={0.28} metalness={0.2} />
+            </mesh>
+            <mesh position={[0, 0.78, 0.66]} rotation={[0.25, 0, 0]}>
+              <coneGeometry args={[0.065, 0.24, 6]} />
+              <meshStandardMaterial color="#e2e8f0" roughness={0.32} />
+            </mesh>
+            <mesh position={[-0.14, 0.64, 0.82]}>
+              <sphereGeometry args={[0.05, 8, 8]} />
+              <meshStandardMaterial color="#e0f2fe" emissive="#38bdf8" emissiveIntensity={1.7} />
+            </mesh>
+            <mesh position={[0.14, 0.64, 0.82]}>
+              <sphereGeometry args={[0.05, 8, 8]} />
+              <meshStandardMaterial color="#e0f2fe" emissive="#38bdf8" emissiveIntensity={1.7} />
+            </mesh>
+          </group>
+        )}
+
+        {/* 9. Titan Gorilla */}
+        {id === 'gorilla' && (
+          <group>
+            {/* Muscular Silverback Torso */}
+            <mesh position={[0, 0.6, 0]} castShadow>
+              <boxGeometry args={[0.78, 0.76, 0.62]} />
+              <meshStandardMaterial color="#1e293b" roughness={0.78} />
+            </mesh>
+            <mesh position={[0, 0.68, -0.18]}>
+              <boxGeometry args={[0.68, 0.56, 0.34]} />
+              <meshStandardMaterial color="#94a3b8" roughness={0.65} />
+            </mesh>
+            {/* Heavy Brawler Arms / Fists */}
+            <mesh position={[-0.52, 0.44, 0.16]} castShadow>
+              <boxGeometry args={[0.28, 0.68, 0.32]} />
+              <meshStandardMaterial color="#0f172a" roughness={0.72} />
+            </mesh>
+            <mesh position={[0.52, 0.44, 0.16]} castShadow>
+              <boxGeometry args={[0.28, 0.68, 0.32]} />
+              <meshStandardMaterial color="#0f172a" roughness={0.72} />
+            </mesh>
+            {/* Crested Gorilla Head */}
+            <mesh position={[0, 1.12, 0.16]} castShadow>
+              <dodecahedronGeometry args={[0.3, 0]} />
+              <meshStandardMaterial color="#1e293b" roughness={0.7} />
+            </mesh>
+            <mesh position={[-0.1, 1.16, 0.43]}>
+              <sphereGeometry args={[0.055, 8, 8]} />
+              <meshStandardMaterial color="#f5d0fe" emissive="#c084fc" emissiveIntensity={2.0} />
+            </mesh>
+            <mesh position={[0.1, 1.16, 0.43]}>
+              <sphereGeometry args={[0.055, 8, 8]} />
+              <meshStandardMaterial color="#f5d0fe" emissive="#c084fc" emissiveIntensity={2.0} />
+            </mesh>
+          </group>
+        )}
+
+        {/* 10. Sky Cyber Shark (Flying) */}
+        {id === 'shark' && (
+          <group>
+            {/* Torpedo Fuselage */}
+            <mesh rotation={[Math.PI / 2, 0, 0]} castShadow>
+              <capsuleGeometry args={[0.26, 0.68, 8, 12]} />
+              <meshStandardMaterial color="#0284c7" roughness={0.32} metalness={0.55} />
+            </mesh>
+            {/* Underbelly */}
+            <mesh position={[0, -0.14, 0.04]}>
+              <boxGeometry args={[0.36, 0.14, 0.72]} />
+              <meshStandardMaterial color="#e0f2fe" roughness={0.4} />
+            </mesh>
+            {/* Sharp Dorsal Fin */}
+            <mesh position={[0, 0.38, -0.04]} rotation={[-0.35, 0, 0]} castShadow>
+              <coneGeometry args={[0.12, 0.42, 4]} />
+              <meshStandardMaterial color="#0369a1" roughness={0.35} metalness={0.6} />
+            </mesh>
+            {/* Animated Hover Pectoral Fins */}
+            <mesh ref={leftWingRef} position={[-0.48, -0.02, 0.06]} castShadow>
+              <boxGeometry args={[0.64, 0.06, 0.34]} />
+              <meshStandardMaterial color="#0ea5e9" roughness={0.35} metalness={0.5} />
+            </mesh>
+            <mesh ref={rightWingRef} position={[0.48, -0.02, 0.06]} castShadow>
+              <boxGeometry args={[0.64, 0.06, 0.34]} />
+              <meshStandardMaterial color="#0ea5e9" roughness={0.35} metalness={0.5} />
+            </mesh>
+            {/* Tail Fin */}
+            <mesh position={[0, 0.06, -0.66]} rotation={[0.25, 0, 0]}>
+              <boxGeometry args={[0.08, 0.46, 0.28]} />
+              <meshStandardMaterial color="#0369a1" roughness={0.35} />
+            </mesh>
+            {/* Glowing Cyber Visor */}
+            <mesh position={[0, 0.08, 0.46]}>
+              <boxGeometry args={[0.34, 0.1, 0.16]} />
+              <meshStandardMaterial color="#cffafe" emissive="#22d3ee" emissiveIntensity={2.1} />
+            </mesh>
+          </group>
+        )}
+
+        {/* 11. Royal T-Rex */}
+        {id === 'trex' && (
+          <group>
+            {/* Upright Muscular Body */}
+            <mesh position={[0, 0.64, 0]} rotation={[0.22, 0, 0]} castShadow>
+              <boxGeometry args={[0.62, 0.82, 0.86]} />
+              <meshStandardMaterial color="#15803d" roughness={0.58} metalness={0.2} />
+            </mesh>
+            {/* Golden Belly Armor */}
+            <mesh position={[0, 0.58, 0.38]}>
+              <boxGeometry args={[0.46, 0.6, 0.18]} />
+              <meshStandardMaterial color="#eab308" roughness={0.35} metalness={0.65} />
+            </mesh>
+            {/* Muscular Tail */}
+            <mesh position={[0, 0.48, -0.74]} rotation={[-1.25, 0, 0]} castShadow>
+              <coneGeometry args={[0.24, 0.96, 7]} />
+              <meshStandardMaterial color="#166534" roughness={0.6} />
+            </mesh>
+            {/* Massive T-Rex Jawed Head */}
+            <mesh position={[0, 1.24, 0.42]} castShadow>
+              <boxGeometry args={[0.48, 0.42, 0.68]} />
+              <meshStandardMaterial color="#15803d" roughness={0.52} />
+            </mesh>
+            {/* Golden Royal Dorsal Spines */}
+            {[0.88, 0.56, 0.24].map((sy, i) => (
+              <mesh key={i} position={[0, sy + 0.24, -0.24 - i * 0.18]} rotation={[-0.45, 0, 0]}>
+                <coneGeometry args={[0.08, 0.26, 5]} />
+                <meshStandardMaterial color="#fde047" emissive="#f59e0b" emissiveIntensity={1.1} />
+              </mesh>
+            ))}
+            {/* Fierce Glowing Eyes */}
+            <mesh position={[-0.18, 1.32, 0.66]}>
+              <sphereGeometry args={[0.06, 8, 8]} />
+              <meshStandardMaterial color="#fef08a" emissive="#facc15" emissiveIntensity={2.1} />
+            </mesh>
+            <mesh position={[0.18, 1.32, 0.66]}>
+              <sphereGeometry args={[0.06, 8, 8]} />
+              <meshStandardMaterial color="#fef08a" emissive="#facc15" emissiveIntensity={2.1} />
+            </mesh>
+          </group>
+        )}
+
         {/* Glowing Merge Tier Halos for Merged Pets (Lv.2 .. Lv.5) */}
         {pet.level >= 2 && (
           <group position={[0, spec.flying ? 0.56 : 1.18, 0]}>
@@ -588,15 +869,15 @@ const CompanionPet3D: React.FC<{
         )}
       </group>
 
-      {/* Floating 3D Companion Pet HP Bar */}
-      <group position={[0, spec.flying ? 0.92 : 1.52 + (pet.level - 1) * 0.16, 0]}>
+      {/* Floating 3D Companion Pet HP Bar (counter-rotated & double-sided so always visible) */}
+      <group ref={hpBarRef} position={[0, spec.flying ? 0.92 : 1.52 + (pet.level - 1) * 0.16, 0]}>
         <mesh>
           <planeGeometry args={[0.94, 0.12]} />
-          <meshBasicMaterial color="#0f172a" />
+          <meshBasicMaterial color="#0f172a" side={THREE.DoubleSide} />
         </mesh>
         <mesh ref={hpFillRef} position={[0, 0, 0.01]}>
           <planeGeometry args={[0.88, 0.075]} />
-          <meshBasicMaterial ref={hpMatRef} color="#22c55e" />
+          <meshBasicMaterial ref={hpMatRef} color="#22c55e" side={THREE.DoubleSide} />
         </mesh>
       </group>
     </group>
@@ -612,6 +893,7 @@ const ArenaMonster3D: React.FC<{
 }> = ({ monster, worldRef }) => {
   const groupRef = useRef<THREE.Group>(null);
   const bodyRef = useRef<THREE.Group>(null);
+  const hpBarRef = useRef<THREE.Group>(null);
   const hpFillRef = useRef<THREE.Mesh>(null);
   const frostRef = useRef<THREE.Mesh>(null);
   const poisonRef = useRef<THREE.Mesh>(null);
@@ -626,6 +908,9 @@ const ArenaMonster3D: React.FC<{
       : Math.abs(Math.sin(live.walkPhase)) * 0.12;
     groupRef.current.position.set(live.x, bob, live.z);
     groupRef.current.rotation.y = live.angle;
+    if (hpBarRef.current) {
+      hpBarRef.current.rotation.y = -live.angle;
+    }
 
     if (bodyRef.current) {
       const pulse = 1 + live.hitFlash * 0.16;
@@ -950,13 +1235,13 @@ const ArenaMonster3D: React.FC<{
         )}
       </group>
 
-      {/* Floating 3D Monster HP Bar */}
-      <group position={[0, hpY, 0]}>
+      {/* Floating 3D Monster HP Bar (counter-rotated & double-sided so always visible) */}
+      <group ref={hpBarRef} position={[0, hpY, 0]}>
         <mesh>
           <planeGeometry
             args={[k === 'titanBoss' ? 1.92 : k === 'warlordBoss' ? 1.5 : 1.02, 0.14]}
           />
-          <meshBasicMaterial color="#0f172a" />
+          <meshBasicMaterial color="#0f172a" side={THREE.DoubleSide} />
         </mesh>
         <mesh ref={hpFillRef} position={[0, 0, 0.01]}>
           <planeGeometry
@@ -970,6 +1255,7 @@ const ArenaMonster3D: React.FC<{
                 ? '#f97316'
                 : '#ef4444'
             }
+            side={THREE.DoubleSide}
           />
         </mesh>
       </group>

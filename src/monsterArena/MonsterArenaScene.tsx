@@ -21,6 +21,44 @@ interface MonsterArenaSceneProps {
   onFloorClick: (x: number, z: number) => void;
 }
 
+class MonsterArenaErrorBoundary extends React.Component<
+  { lang: 'ar' | 'en'; children: React.ReactNode },
+  { hasError: boolean }
+> {
+  constructor(props: { lang: 'ar' | 'en'; children: React.ReactNode }) {
+    super(props);
+    this.state = { hasError: false };
+  }
+
+  static getDerivedStateFromError(): { hasError: boolean } {
+    return { hasError: true };
+  }
+
+  render() {
+    if (this.state.hasError) {
+      const isAr = this.props.lang === 'ar';
+      return (
+        <div className="w-full h-full flex flex-col items-center justify-center gap-3 bg-[#0a1929] text-cyan-100 text-center p-6">
+          <div className="text-4xl">🏟️</div>
+          <p className="text-base sm:text-lg font-extrabold">
+            {isAr
+              ? 'تعذّر تحميل العرض ثلاثي الأبعاد حالياً'
+              : 'Unable to initialize the 3D Arena renderer'}
+          </p>
+          <button
+            type="button"
+            onClick={() => this.setState({ hasError: false })}
+            className="px-4 py-2 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-black text-sm cursor-pointer"
+          >
+            {isAr ? 'إعادة المحاولة' : 'Retry 3D View'}
+          </button>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
+
 function detectSoftwareGl(): boolean {
   if (typeof document === 'undefined') return false;
   try {
@@ -131,42 +169,44 @@ export const MonsterArenaScene: React.FC<MonsterArenaSceneProps> = ({
           </p>
         </div>
       ) : (
-        <Canvas
-          shadows={!isSoftwareGl}
-          dpr={isSoftwareGl ? 1 : [1, 2]}
-          camera={{ position: [0, 14.5, 14.2], fov: 46, near: 0.2, far: 130 }}
-          gl={{
-            antialias: !isSoftwareGl,
-            powerPreference: 'high-performance',
-            toneMapping: THREE.ACESFilmicToneMapping,
-            toneMappingExposure: 1.08,
-            outputColorSpace: THREE.SRGBColorSpace,
-          }}
-          onCreated={({ gl }) => {
-            const canvas = gl.domElement;
-            const onLost = (ev: Event) => {
-              ev.preventDefault();
-              setContextLost(true);
-            };
-            const onRestored = () => setContextLost(false);
-            canvas.addEventListener('webglcontextlost', onLost, false);
-            canvas.addEventListener('webglcontextrestored', onRestored, false);
-          }}
-        >
-          <ArenaEnvironment isSoftwareGl={isSoftwareGl} onFloorClick={onFloorClick} />
-          <ArenaEntities3D
-            worldRef={worldRef}
-            renderTick={renderTick}
-            onPetClick={onPetClick}
-          />
-          <ArenaLoopController
-            worldRef={worldRef}
-            inputRef={inputRef}
-            audioRef={audioRef}
-            onHudUpdate={onHudUpdate}
-            onSyncEntities={() => setRenderTick((v) => v + 1)}
-          />
-        </Canvas>
+        <MonsterArenaErrorBoundary lang={worldRef.current.lang}>
+          <Canvas
+            shadows={!isSoftwareGl}
+            dpr={isSoftwareGl ? 1 : [1, 2]}
+            camera={{ position: [0, 14.5, 14.2], fov: 46, near: 0.2, far: 130 }}
+            gl={{
+              antialias: !isSoftwareGl,
+              powerPreference: 'high-performance',
+              toneMapping: THREE.ACESFilmicToneMapping,
+              toneMappingExposure: 1.08,
+              outputColorSpace: THREE.SRGBColorSpace,
+            }}
+            onCreated={({ gl }) => {
+              const canvas = gl.domElement;
+              const onLost = (ev: Event) => {
+                ev.preventDefault();
+                setContextLost(true);
+              };
+              const onRestored = () => setContextLost(false);
+              canvas.addEventListener('webglcontextlost', onLost, false);
+              canvas.addEventListener('webglcontextrestored', onRestored, false);
+            }}
+          >
+            <ArenaEnvironment isSoftwareGl={isSoftwareGl} onFloorClick={onFloorClick} />
+            <ArenaEntities3D
+              worldRef={worldRef}
+              renderTick={renderTick}
+              onPetClick={onPetClick}
+            />
+            <ArenaLoopController
+              worldRef={worldRef}
+              inputRef={inputRef}
+              audioRef={audioRef}
+              onHudUpdate={onHudUpdate}
+              onSyncEntities={() => setRenderTick((v) => v + 1)}
+            />
+          </Canvas>
+        </MonsterArenaErrorBoundary>
       )}
     </div>
   );

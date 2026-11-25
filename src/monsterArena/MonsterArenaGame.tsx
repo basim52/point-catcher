@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { MonsterArenaAudio } from './audio';
 import {
   actionBuyFruit,
+  actionBuyMeat,
   actionBuyOrEquipWeapon,
   actionBuyPet,
   actionClearPetSelection,
@@ -24,6 +25,7 @@ import { MonsterArenaScene } from './MonsterArenaScene';
 import { ArenaShopTab, MonsterArenaUI } from './MonsterArenaUI';
 import {
   FruitId,
+  MeatId,
   MonsterArenaHudSnapshot,
   PetId,
   readMonsterArenaSoundEnabled,
@@ -45,38 +47,38 @@ export const MonsterArenaPreviewArt: React.FC = () => (
   >
     <defs>
       <linearGradient id="maSky" x1="0" y1="0" x2="0" y2="1">
-        <stop offset="0%" stopColor="#190e2e" />
-        <stop offset="55%" stopColor="#3c1b3a" />
-        <stop offset="100%" stopColor="#6b272d" />
+        <stop offset="0%" stopColor="#071526" />
+        <stop offset="55%" stopColor="#0e2c48" />
+        <stop offset="100%" stopColor="#134e6f" />
       </linearGradient>
       <radialGradient id="maFloor" cx="50%" cy="68%" r="55%">
-        <stop offset="0%" stopColor="#5b435c" />
-        <stop offset="68%" stopColor="#35253a" />
-        <stop offset="100%" stopColor="#1e1526" />
+        <stop offset="0%" stopColor="#28506e" />
+        <stop offset="68%" stopColor="#16324a" />
+        <stop offset="100%" stopColor="#0a1c2d" />
       </radialGradient>
       <linearGradient id="maBeam" x1="0" y1="0" x2="1" y2="0">
-        <stop offset="0%" stopColor="#38bdf8" />
-        <stop offset="100%" stopColor="#e879f9" />
+        <stop offset="0%" stopColor="#2dd4bf" />
+        <stop offset="100%" stopColor="#38bdf8" />
       </linearGradient>
     </defs>
 
-    {/* Volcanic Dusk Sky */}
+    {/* Glacial Sapphire Sky */}
     <rect width="320" height="180" fill="url(#maSky)" />
     {/* Distant Colosseum Rim & Pillars */}
     <path
       d="M0 102 Q160 66 320 102 L320 180 L0 180 Z"
       fill="url(#maFloor)"
-      stroke="#fb923c"
-      strokeOpacity="0.65"
+      stroke="#22d3ee"
+      strokeOpacity="0.72"
       strokeWidth="2.5"
     />
-    {/* Torch Pillars */}
-    <rect x="24" y="48" width="16" height="58" rx="3" fill="#3b2c44" />
-    <circle cx="32" cy="44" r="9" fill="#f97316" />
-    <circle cx="32" cy="44" r="4.5" fill="#fef08a" />
-    <rect x="280" y="48" width="16" height="58" rx="3" fill="#3b2c44" />
-    <circle cx="288" cy="44" r="9" fill="#f97316" />
-    <circle cx="288" cy="44" r="4.5" fill="#fef08a" />
+    {/* Crystal Plasma Pillars */}
+    <rect x="24" y="48" width="16" height="58" rx="3" fill="#1e3a52" />
+    <circle cx="32" cy="44" r="9" fill="#06b6d4" />
+    <circle cx="32" cy="44" r="4.5" fill="#cffafe" />
+    <rect x="280" y="48" width="16" height="58" rx="3" fill="#1e3a52" />
+    <circle cx="288" cy="44" r="9" fill="#06b6d4" />
+    <circle cx="288" cy="44" r="4.5" fill="#cffafe" />
 
     {/* Arena Floor Ring */}
     <ellipse
@@ -85,8 +87,8 @@ export const MonsterArenaPreviewArt: React.FC = () => (
       rx="116"
       ry="34"
       fill="none"
-      stroke="#f59e0b"
-      strokeOpacity="0.45"
+      stroke="#38bdf8"
+      strokeOpacity="0.55"
       strokeWidth="2"
       strokeDasharray="8 6"
     />
@@ -94,23 +96,23 @@ export const MonsterArenaPreviewArt: React.FC = () => (
     {/* Hero Warrior (left-center) */}
     <g transform="translate(88, 108)">
       <ellipse cx="0" cy="30" rx="16" ry="5" fill="#000" fillOpacity="0.38" />
-      <rect x="-9" y="2" width="18" height="22" rx="4" fill="#2563eb" />
-      <circle cx="0" cy="-7" r="9" fill="#1e293b" />
-      <rect x="-6" y="-10" width="12" height="4.5" rx="2" fill="#38bdf8" />
-      <rect x="8" y="4" width="18" height="6" rx="2" fill="#e879f9" />
+      <rect x="-9" y="2" width="18" height="22" rx="4" fill="#0d9488" />
+      <circle cx="0" cy="-7" r="9" fill="#0f172a" />
+      <rect x="-6" y="-10" width="12" height="4.5" rx="2" fill="#67e8f9" />
+      <rect x="8" y="4" width="18" height="6" rx="2" fill="#38bdf8" />
     </g>
 
     {/* Companion Wolf + Flying Baby Dragon */}
     <g transform="translate(56, 128)">
       <ellipse cx="0" cy="14" rx="11" ry="3.5" fill="#000" fillOpacity="0.35" />
       <rect x="-10" y="-2" width="18" height="10" rx="4" fill="#64748b" />
-      <circle cx="8" cy="-4" r="6" fill="#94a3b8" />
-      <circle cx="10" cy="-5" r="1.5" fill="#38bdf8" />
+      <circle cx="8" cy="-4" r="6" fill="#cbd5e1" />
+      <circle cx="10" cy="-5" r="1.5" fill="#22d3ee" />
     </g>
     <g transform="translate(110, 62)">
-      <path d="M-16 0 L0 -10 L16 0 L0 6 Z" fill="#be123c" />
-      <circle cx="0" cy="-1" r="6.5" fill="#fb923c" />
-      <circle cx="3" cy="-2" r="1.5" fill="#fef08a" />
+      <path d="M-16 0 L0 -10 L16 0 L0 6 Z" fill="#0284c7" />
+      <circle cx="0" cy="-1" r="6.5" fill="#38bdf8" />
+      <circle cx="3" cy="-2" r="1.5" fill="#e0f2fe" />
     </g>
 
     {/* Energy Plasma Beam */}
@@ -123,25 +125,25 @@ export const MonsterArenaPreviewArt: React.FC = () => (
       strokeWidth="4.5"
       strokeLinecap="round"
     />
-    <circle cx="212" cy="104" r="9" fill="#e879f9" fillOpacity="0.6" />
+    <circle cx="212" cy="104" r="9" fill="#22d3ee" fillOpacity="0.65" />
 
     {/* 10-Min Horned Dread Titan Boss (right) */}
     <g transform="translate(232, 92)">
       <ellipse cx="0" cy="48" rx="30" ry="9" fill="#000" fillOpacity="0.45" />
-      <rect x="-22" y="-6" width="44" height="44" rx="10" fill="#230733" stroke="#f43f5e" strokeWidth="2" />
-      <circle cx="0" cy="-18" r="15" fill="#180524" stroke="#f43f5e" strokeWidth="1.5" />
+      <rect x="-22" y="-6" width="44" height="44" rx="10" fill="#0f172a" stroke="#22d3ee" strokeWidth="2" />
+      <circle cx="0" cy="-18" r="15" fill="#091322" stroke="#38bdf8" strokeWidth="1.5" />
       {/* Crown Horns */}
-      <path d="M-11 -28 L-24 -46 L-6 -33 Z" fill="#f59e0b" />
-      <path d="M11 -28 L24 -46 L6 -33 Z" fill="#f59e0b" />
+      <path d="M-11 -28 L-24 -46 L-6 -33 Z" fill="#38bdf8" />
+      <path d="M11 -28 L24 -46 L6 -33 Z" fill="#38bdf8" />
       {/* Glowing Eyes & Core */}
-      <circle cx="-5" cy="-19" r="2.8" fill="#fb7185" />
-      <circle cx="5" cy="-19" r="2.8" fill="#fb7185" />
-      <circle cx="0" cy="14" r="8" fill="#f43f5e" />
+      <circle cx="-5" cy="-19" r="2.8" fill="#67e8f9" />
+      <circle cx="5" cy="-19" r="2.8" fill="#67e8f9" />
+      <circle cx="0" cy="14" r="8" fill="#06b6d4" />
     </g>
 
     {/* Fruit & 10:00 Badge Accents */}
-    <rect x="10" y="10" width="66" height="20" rx="6" fill="#2c0b1a" stroke="#f43f5e" strokeWidth="1.2" />
-    <text x="43" y="24" textAnchor="middle" fill="#fecdd3" fontSize="10" fontWeight="800">
+    <rect x="10" y="10" width="66" height="20" rx="6" fill="#08243a" stroke="#22d3ee" strokeWidth="1.2" />
+    <text x="43" y="24" textAnchor="middle" fill="#cffafe" fontSize="10" fontWeight="800">
       10:00 BOSS
     </text>
     <circle cx="292" cy="158" r="11" fill="#166534" stroke="#4ade80" strokeWidth="1.5" />
@@ -279,6 +281,14 @@ export const MonsterArenaGame: React.FC<MonsterArenaGameProps> = ({
     [syncHud]
   );
 
+  const handleBuyMeat = useCallback(
+    (meatId: MeatId) => {
+      actionBuyMeat(worldRef.current, meatId, audioRef.current);
+      syncHud();
+    },
+    [syncHud]
+  );
+
   const handleBuyOrEquipWeapon = useCallback(
     (weaponId: WeaponId) => {
       if (actionBuyOrEquipWeapon(worldRef.current, weaponId, audioRef.current)) {
@@ -404,6 +414,11 @@ export const MonsterArenaGame: React.FC<MonsterArenaGameProps> = ({
         handleOpenShopTab('fruits');
         return;
       }
+      if (code === 'KeyT' && (worldRef.current.status === 'PLAYING' || shopTab)) {
+        e.preventDefault();
+        handleOpenShopTab('meats');
+        return;
+      }
       if (code === 'KeyB' && (worldRef.current.status === 'PLAYING' || shopTab)) {
         e.preventDefault();
         handleOpenShopTab('weapons');
@@ -483,7 +498,7 @@ export const MonsterArenaGame: React.FC<MonsterArenaGameProps> = ({
   }, []);
 
   return (
-    <div className="fixed inset-0 z-50 bg-[#140d1d] overflow-hidden">
+    <div className="fixed inset-0 z-50 bg-[#071626] overflow-hidden">
       <MonsterArenaScene
         worldRef={worldRef}
         inputRef={inputRef}
@@ -505,6 +520,7 @@ export const MonsterArenaGame: React.FC<MonsterArenaGameProps> = ({
         onResume={handleResume}
         onToggleSound={handleToggleSound}
         onBuyFruit={handleBuyFruit}
+        onBuyMeat={handleBuyMeat}
         onBuyOrEquipWeapon={handleBuyOrEquipWeapon}
         onBuyPet={handleBuyPet}
         onMergePetPair={handleMergePetPair}

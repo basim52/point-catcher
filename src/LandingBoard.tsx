@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { AdminLongPressTitle, StatsAdminButton } from './stats/InGameStats';
+import { formatVisitLabel, useGameVisitCounts } from './analytics/visits';
 import { GameMode } from './fruitWorld';
 import heroArcadeImg from './assets/images/landing_hero_arcade_1795342078886.jpg';
 
@@ -47,12 +48,12 @@ const LANDING_COPY = {
     navShop: 'المتجر',
     navIndex: 'الاندكس',
     topCta: 'ابدأ اللعب',
-    heroKicker: '5 عوالم · 235 مرحلة · 13 لعبة مصغرة',
+    heroKicker: '5 عوالم · 235 مرحلة · 15 لعبة مصغرة',
     heroTitle: 'التقط النقاط النادرة، طوّر أدواتك، وتحدَّ صالة الألعاب',
     heroSubtitle:
-      'انطلق عبر 5 عوالم مليئة بالمراحل والتحديات، طوّر أدواتك من المتجر، أو افتح صالة الألعاب المصغرة لاكتشاف 13 لعبة متنوعة!',
+      'انطلق عبر 5 عوالم مليئة بالمراحل والتحديات، طوّر أدواتك من المتجر، أو افتح صالة الألعاب المصغرة لاكتشاف 15 لعبة متنوعة!',
     primaryCta: 'ابدأ اللعب',
-    secondaryHubCta: 'صالة الألعاب (13)',
+    secondaryHubCta: 'صالة الألعاب (15)',
     statBestScore: 'أعلى نتيجة',
     statCurrency: 'رصيد العملات',
     statCurrencySub: (pink: number, space: number) =>
@@ -79,7 +80,7 @@ const LANDING_COPY = {
     enterWorldBtn: 'دخول العالم',
     sectionArcadeNum: '02.',
     sectionArcadeTitle: 'صالة الألعاب المصغرة',
-    sectionArcadeMeta: '13 لعبة متنوعة جاهزة للعب',
+    sectionArcadeMeta: '15 لعبة متنوعة جاهزة للعب',
     sectionArcadeDesc:
       'تشكيلة واسعة من ألعاب 2D و 3D للذكاء والسرعة والمنصات والقتال — افتح صالة الألعاب واختر اللعبة التي تناسبك.',
     openArcadeBtn: 'فتح صالة الألعاب',
@@ -110,12 +111,12 @@ const LANDING_COPY = {
     navShop: 'Shop',
     navIndex: 'Index',
     topCta: 'Start Playing',
-    heroKicker: '5 Worlds · 235 Stages · 13 Mini-Games',
+    heroKicker: '5 Worlds · 235 Stages · 15 Mini-Games',
     heroTitle: 'Catch Rare Gems, Upgrade Your Gear, and Master the Arcade',
     heroSubtitle:
-      'Explore 5 worlds packed with stages and upgrades, or open the Mini-Games Hub to play 13 diverse 2D and 3D games!',
+      'Explore 5 worlds packed with stages and upgrades, or open the Mini-Games Hub to play 15 diverse 2D and 3D games!',
     primaryCta: 'Start Playing',
-    secondaryHubCta: 'Games Hub (13)',
+    secondaryHubCta: 'Games Hub (15)',
     statBestScore: 'Best Score',
     statCurrency: 'Coin Balance',
     statCurrencySub: (pink: number, space: number) =>
@@ -142,7 +143,7 @@ const LANDING_COPY = {
     enterWorldBtn: 'Enter World',
     sectionArcadeNum: '02.',
     sectionArcadeTitle: 'Mini-Games Hub',
-    sectionArcadeMeta: '13 diverse games ready to play',
+    sectionArcadeMeta: '15 diverse games ready to play',
     sectionArcadeDesc:
       'A full collection of 2D & 3D arcade, puzzle, platformer, racing, and action games — open the Games Hub to pick any game.',
     openArcadeBtn: 'Open Games Hub',
@@ -199,6 +200,26 @@ export const LandingBoard: React.FC<LandingBoardProps> = ({
 }) => {
   const t = LANDING_COPY[lang];
   const [heroImgFailed, setHeroImgFailed] = useState(false);
+  const visitCounts = useGameVisitCounts();
+
+  const renderWorldVisits = (gameId: string) => (
+    <span className="inline-flex items-center gap-1 font-num text-[11px] font-semibold text-slate-300 whitespace-nowrap">
+      <svg
+        viewBox="0 0 24 24"
+        className="w-3.5 h-3.5 text-slate-400 shrink-0"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        aria-hidden="true"
+      >
+        <path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7z" />
+        <circle cx="12" cy="12" r="3" />
+      </svg>
+      <span>{formatVisitLabel(visitCounts[gameId] ?? 0, lang)}</span>
+    </span>
+  );
 
   const totalCleared =
     completedNormalCount +
@@ -394,8 +415,11 @@ export const LandingBoard: React.FC<LandingBoardProps> = ({
                   className="text-start rounded-xl border border-sky-400/25 bg-[#0a1324] hover:border-sky-300/60 hover:bg-[#101e36] p-4 flex flex-col justify-between gap-3 transition-colors cursor-pointer"
                 >
                   <div>
-                    <div className="text-sm font-bold text-white">
-                      {t.worldNormalTitle}
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="text-sm font-bold text-white">
+                        {t.worldNormalTitle}
+                      </div>
+                      {renderWorldVisits('world-normal')}
                     </div>
                     <div className="font-num text-xs text-sky-300 mt-0.5">
                       {completedNormalCount}/{totalNormalStages}
@@ -415,8 +439,11 @@ export const LandingBoard: React.FC<LandingBoardProps> = ({
                   className="text-start rounded-xl border border-emerald-400/25 bg-[#0a1324] hover:border-emerald-300/60 hover:bg-[#102424] p-4 flex flex-col justify-between gap-3 transition-colors cursor-pointer"
                 >
                   <div>
-                    <div className="text-sm font-bold text-white">
-                      {t.worldFruitTitle}
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="text-sm font-bold text-white">
+                        {t.worldFruitTitle}
+                      </div>
+                      {renderWorldVisits('world-fruit')}
                     </div>
                     <div className="font-num text-xs text-emerald-300 mt-0.5">
                       {completedFruitCount}/{totalFruitStages}
@@ -436,8 +463,11 @@ export const LandingBoard: React.FC<LandingBoardProps> = ({
                   className="text-start rounded-xl border border-amber-400/25 bg-[#0a1324] hover:border-amber-300/60 hover:bg-[#221c12] p-4 flex flex-col justify-between gap-3 transition-colors cursor-pointer"
                 >
                   <div>
-                    <div className="text-sm font-bold text-white">
-                      {t.worldGoldTitle}
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="text-sm font-bold text-white">
+                        {t.worldGoldTitle}
+                      </div>
+                      {renderWorldVisits('world-gold')}
                     </div>
                     <div className="font-num text-xs text-amber-300 mt-0.5">
                       {completedGoldCount}/{totalGoldStages}
@@ -457,8 +487,11 @@ export const LandingBoard: React.FC<LandingBoardProps> = ({
                   className="text-start rounded-xl border border-violet-400/35 bg-[#120b29] hover:border-violet-300/75 hover:bg-[#1d1242] p-4 flex flex-col justify-between gap-3 transition-colors cursor-pointer"
                 >
                   <div>
-                    <div className="text-sm font-bold text-white">
-                      {t.worldSpaceTitle}
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="text-sm font-bold text-white">
+                        {t.worldSpaceTitle}
+                      </div>
+                      {renderWorldVisits('world-space')}
                     </div>
                     <div className="font-num text-xs text-violet-300 mt-0.5">
                       {completedSpaceCount}/{totalSpaceStages}
@@ -477,9 +510,12 @@ export const LandingBoard: React.FC<LandingBoardProps> = ({
                   onClick={() => onStartMainGame('monster')}
                   className="sm:col-span-2 text-start rounded-xl border border-rose-500/45 bg-gradient-to-br from-[#230914] via-[#1c0816] to-[#2c120d] hover:border-amber-400/75 hover:from-[#2f0c1b] hover:to-[#3b170e] p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 transition-all cursor-pointer"
                 >
-                  <div>
-                    <div className="text-sm sm:text-base font-extrabold text-amber-100">
-                      {t.worldMonsterTitle}
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="text-sm sm:text-base font-extrabold text-amber-100">
+                        {t.worldMonsterTitle}
+                      </div>
+                      {renderWorldVisits('world-monster')}
                     </div>
                     <div className="font-num text-xs text-rose-300 mt-0.5">
                       {completedMonsterCount}/{totalMonsterStages}

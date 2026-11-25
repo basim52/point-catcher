@@ -2,7 +2,14 @@ import React, { useEffect, useMemo, useState } from 'react';
 import type { User } from 'firebase/auth';
 import { isAnalyticsConfigured, STATS_ADMIN_EMAILS } from '../analytics/config';
 import { periodStart, summarize, type Period, type SessionRecord } from './aggregate';
-import { completeRedirectSignIn, fetchSessions, signInWithGoogle, signOutUser, watchUser } from './firebaseClient';
+import {
+  completeRedirectSignIn,
+  fetchSessions,
+  signInWithGoogle,
+  signOutUser,
+  syncPublicVisitCounts,
+  watchUser,
+} from './firebaseClient';
 import { consumeStatsRedirectPending, setStatsAdminFlag } from './adminAccess';
 import { makeDemoSessions } from './demoData';
 
@@ -158,7 +165,13 @@ const StatsPage: React.FC<StatsPageProps> = ({ variant = 'page', onClose }) => {
     setLoading(true);
     setError(null);
     fetchSessions(periodStart(period))
-      .then((r) => !cancelled && setRecords(r))
+      .then((r) => {
+        if (cancelled) return;
+        setRecords(r);
+        if (period === 'all') {
+          void syncPublicVisitCounts(r);
+        }
+      })
       .catch(() => !cancelled && setError('تعذّر تحميل البيانات. تأكد من نشر قواعد Firestore ثم أعد المحاولة.'))
       .finally(() => !cancelled && setLoading(false));
     return () => {
@@ -298,13 +311,13 @@ const StatsPage: React.FC<StatsPageProps> = ({ variant = 'page', onClose }) => {
 
         <div className="mt-3 grid grid-cols-1 gap-3 lg:grid-cols-2">
           <section className="min-w-0 rounded-3xl border border-white/10 bg-white/5 p-4">
-            <h2 className="mb-3 text-base font-extrabold">الدقائق لكل لعبة</h2>
+            <h2 className="mb-3 text-base font-extrabold">الدقائق والزيارات لكل لعبة</h2>
             {summary.rows.length === 0 ? (
               <p className="text-sm text-slate-400">لا توجد جلسات في هذه الفترة.</p>
             ) : (
               <ul className="space-y-2">
                 {summary.rows.map((r, i) => (
-                  <li key={r.gameId} className="grid grid-cols-[7.5rem_1fr_3.5rem] items-center gap-2 text-xs sm:grid-cols-[9rem_1fr_4rem] sm:text-sm">
+                  <li key={r.gameId} className="grid grid-cols-[7.5rem_1fr_auto] items-center gap-2 text-xs sm:grid-cols-[9rem_1fr_auto] sm:text-sm">
                     <span className="truncate font-bold" title={r.gameName}>{r.gameName}</span>
                     <span className="h-4 overflow-hidden rounded-full bg-white/10">
                       <span
@@ -312,7 +325,11 @@ const StatsPage: React.FC<StatsPageProps> = ({ variant = 'page', onClose }) => {
                         style={{ width: `${Math.max(2, (r.totalSeconds / maxSeconds) * 100)}%` }}
                       />
                     </span>
-                    <span className="text-left tabular-nums text-slate-300">{fmt(r.totalMinutes)}</span>
+                    <span className="text-left tabular-nums whitespace-nowrap text-slate-300">
+                      <span className="text-cyan-300 font-bold">{fmt(r.visits)} زيارة</span>
+                      <span className="mx-1 text-slate-500">·</span>
+                      <span>{fmt(r.totalMinutes)} د</span>
+                    </span>
                   </li>
                 ))}
               </ul>

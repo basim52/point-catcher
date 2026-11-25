@@ -25,7 +25,6 @@ interface PlantMergeUIProps {
   onToggleSound: () => void;
   onQuickBuyPlant: () => void;
   onBuySpecificPlant: (tier: PlantTier) => void;
-  onSelectShopTier: (tier: PlantTier) => void;
   onSellSelectedPlant: () => void;
   onWaterBoost: () => void;
   onUpgradePower: () => void;
@@ -88,8 +87,6 @@ const COPY = {
     shopModalTitle: 'متجر النباتات الجديد',
     shopModalSub: 'اشترِ النباتات بفلوس قتل الوحوش وضعها في مزرعتك — كل نبتة مع سعرها وفائدتها:',
     buyAndPlantBtn: 'اشترِ وازرع',
-    selectBrushBtn: 'تحديد للزراعة',
-    selectedBrushLabel: 'مختار للزراعة ✓',
     newBadge: 'جديد',
     benefitLabel: 'الفائدة:',
     indexModalTitle: 'الإندكس — فهرس النباتات والوحوش',
@@ -150,8 +147,6 @@ const COPY = {
     shopModalTitle: 'New Plant Shop',
     shopModalSub: 'Buy plants with Coins earned from monster kills — prices & abilities listed below:',
     buyAndPlantBtn: 'Buy & Plant',
-    selectBrushBtn: 'Select',
-    selectedBrushLabel: 'Selected ✓',
     newBadge: 'NEW',
     benefitLabel: 'Benefit:',
     indexModalTitle: 'Game Index — Plants & Monsters',
@@ -184,7 +179,6 @@ export const PlantMergeUI: React.FC<PlantMergeUIProps> = ({
   onToggleSound,
   onQuickBuyPlant,
   onBuySpecificPlant,
-  onSelectShopTier,
   onSellSelectedPlant,
   onWaterBoost,
   onUpgradePower,
@@ -607,15 +601,12 @@ export const PlantMergeUI: React.FC<PlantMergeUIProps> = ({
                 const spec = PLANT_SPECS[tier];
                 const affordable = hud.coins >= spec.cost;
                 const hasSpace = hud.plantCount < hud.maxPlots;
-                const isSelectedBrush = hud.selectedShopTier === tier;
 
                 return (
                   <div
                     key={tier}
                     className={`rounded-xl border p-3 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 ${
-                      isSelectedBrush
-                        ? 'border-emerald-300/80 bg-[#10291c]'
-                        : spec.isNew
+                      spec.isNew
                         ? 'border-amber-400/45 bg-[#121f17]'
                         : 'border-white/12 bg-[#07130d]'
                     }`}
@@ -660,29 +651,18 @@ export const PlantMergeUI: React.FC<PlantMergeUIProps> = ({
                       </div>
                     </div>
 
-                    <div className="flex sm:flex-col gap-1.5 shrink-0">
+                    <div className="flex shrink-0">
                       <button
                         type="button"
                         disabled={!affordable || !hasSpace}
                         onClick={() => onBuySpecificPlant(tier)}
-                        className={`flex-1 sm:flex-none h-9 px-3 rounded-lg border text-xs font-extrabold whitespace-nowrap cursor-pointer ${
+                        className={`flex-1 sm:flex-none h-9 px-4 rounded-lg border text-xs font-extrabold whitespace-nowrap cursor-pointer ${
                           affordable && hasSpace
                             ? 'border-emerald-300 bg-emerald-400 hover:bg-emerald-300 text-slate-950'
                             : 'border-white/10 bg-slate-900 text-slate-500 cursor-not-allowed'
                         }`}
                       >
                         {t.buyAndPlantBtn}
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => onSelectShopTier(tier)}
-                        className={`flex-1 sm:flex-none h-8 px-3 rounded-lg border text-[11px] font-bold whitespace-nowrap cursor-pointer ${
-                          isSelectedBrush
-                            ? 'border-amber-300 bg-amber-400/20 text-amber-200'
-                            : 'border-white/15 bg-slate-900 hover:bg-slate-800 text-slate-200'
-                        }`}
-                      >
-                        {isSelectedBrush ? t.selectedBrushLabel : t.selectBrushBtn}
                       </button>
                     </div>
                   </div>

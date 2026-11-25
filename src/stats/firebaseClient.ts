@@ -11,14 +11,21 @@ import {
 } from 'firebase/auth';
 import {
   collection,
+  doc,
   getDocs,
   getFirestore,
   query,
+  setDoc,
   Timestamp,
   where,
   type QueryConstraint,
 } from 'firebase/firestore';
-import { firebaseWebConfig, SESSIONS_COLLECTION } from '../analytics/config';
+import {
+  firebaseWebConfig,
+  GAME_STATS_COLLECTION,
+  SESSIONS_COLLECTION,
+} from '../analytics/config';
+import { TRACKED_GAMES } from '../analytics/games';
 import { markStatsRedirectPending } from './adminAccess';
 import type { SessionRecord } from './aggregate';
 
@@ -88,4 +95,41 @@ export async function fetchSessions(since: Date | null): Promise<SessionRecord[]
       visit: v.visit !== false,
     };
   });
+}
+
+/**
+ * Admin-only: sync historical all-time visit totals from analytics_sessions
+ * into public game_stats/{gameId} whenever analytics_sessions has a higher count.
+ */
+export async function syncPublicVisitCounts(records: SessionRecord[]): Promise<void> {
+  const db = getFirestore(getApp());
+  const totals = new Map<string, number>();
+  for (const r of records) {
+    if (!r.visit || !(r.gameId in TRACKED_GAMES)) continue;
+    totals.set(r.gameId, (totals.get(r.gameId) ?? 0) + 1);
+  }
+  if (totals.size === 0) return;
+
+  const existing = new Map<string, number>();
+  try {
+    const snap = await getDocs(collection(db, GAME_STATS_COLLECTION));
+    for (const d of snap.docs) {
+      const val = Number(d.data().visits ?? 0);
+      if (Number.isFinite(val) && val >= 0) existing.set(d.id, Math.floor(val));
+    }
+  } catch {
+    return;
+  }
+
+  const writes: Promise<void>[] = [];
+  for (const [gameId, count] of totals.entries()) {
+    if (count > (existing.get(gameId) ?? 0)) {
+      writes.push(
+        setDoc(doc(db, GAME_STATS_COLLECTION, gameId), { visits: count }).catch(() => undefined)
+      );
+    }
+  }
+  if (writes.length > 0) {
+    await Promise.all(writes);
+  }
 }
