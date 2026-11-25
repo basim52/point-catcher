@@ -69,3 +69,38 @@ export function summarize(
     topGame: rows.length > 0 && rows[0].totalSeconds > 0 ? rows[0] : null,
   };
 }
+
+/** Raise all-time visit totals to at least the durable game_stats counters. Never lowers a row. */
+export function applyAllTimeVisitFloor(
+  summary: StatsSummary,
+  floors: Record<string, number>,
+  names: Record<string, string> = {}
+): StatsSummary {
+  const byId = new Map(summary.rows.map((r) => [r.gameId, { ...r }]));
+  for (const [id, raw] of Object.entries(floors)) {
+    const floor = Math.max(0, Math.floor(Number(raw) || 0));
+    if (floor <= 0) continue;
+    const row = byId.get(id) ?? {
+      gameId: id,
+      gameName: names[id] ?? id,
+      visits: 0,
+      totalSeconds: 0,
+      totalMinutes: 0,
+      avgMinutesPerVisit: 0,
+    };
+    if (floor > row.visits) {
+      row.visits = floor;
+      row.avgMinutesPerVisit = floor > 0 ? round1(row.totalSeconds / 60 / floor) : 0;
+    }
+    byId.set(id, row);
+  }
+  const rows = [...byId.values()].sort(
+    (a, b) => b.totalSeconds - a.totalSeconds || b.visits - a.visits
+  );
+  return {
+    totalVisits: rows.reduce((n, r) => n + r.visits, 0),
+    totalMinutes: summary.totalMinutes,
+    rows,
+    topGame: rows.length > 0 && rows[0].totalSeconds > 0 ? rows[0] : null,
+  };
+}

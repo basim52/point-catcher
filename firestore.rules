@@ -63,9 +63,10 @@ service cloud.firestore {
       allow update: if isValidGameId(gameId)
         && request.resource.data.keys().hasOnly(['visits'])
         && request.resource.data.visits is int
+        && request.resource.data.visits >= 0
         && (
           (resource.data.visits is int && request.resource.data.visits == resource.data.visits + 1)
-          || (isStatsAdmin() && request.resource.data.visits >= 0)
+          || (isStatsAdmin() && resource.data.visits is int && request.resource.data.visits >= resource.data.visits)
         );
       allow delete: if false;
     }
