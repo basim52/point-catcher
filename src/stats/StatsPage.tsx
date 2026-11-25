@@ -1,15 +1,17 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import type { User } from 'firebase/auth';
 import { isAnalyticsConfigured, STATS_ADMIN_EMAILS } from '../analytics/config';
-import { periodStart, summarize, type Period, type SessionRecord } from './aggregate';
+import { applyAllTimeVisitFloor, periodStart, summarize, type Period, type SessionRecord } from './aggregate';
 import {
   completeRedirectSignIn,
+  fetchGameStats,
   fetchSessions,
   signInWithGoogle,
   signOutUser,
   syncPublicVisitCounts,
   watchUser,
 } from './firebaseClient';
+import { TRACKED_GAMES } from '../analytics/games';
 import { consumeStatsRedirectPending, setStatsAdminFlag } from './adminAccess';
 import { makeDemoSessions } from './demoData';
 
@@ -103,6 +105,7 @@ const StatsPage: React.FC<StatsPageProps> = ({ variant = 'page', onClose }) => {
   const [authReady, setAuthReady] = useState(demoMode !== null);
   const [period, setPeriod] = useState<Period>('7d');
   const [records, setRecords] = useState<SessionRecord[] | null>(null);
+  const [visitFloors, setVisitFloors] = useState<Record<string, number>>({});
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [signingIn, setSigningIn] = useState(false);
@@ -170,6 +173,11 @@ const StatsPage: React.FC<StatsPageProps> = ({ variant = 'page', onClose }) => {
         setRecords(r);
         if (period === 'all') {
           void syncPublicVisitCounts(r);
+          void fetchGameStats()
+            .then((floors) => !cancelled && setVisitFloors(floors))
+            .catch(() => undefined);
+        } else {
+          setVisitFloors({});
         }
       })
       .catch(() => !cancelled && setError('تعذّر تحميل البيانات. تأكد من نشر قواعد Firestore ثم أعد المحاولة.'))
@@ -179,7 +187,12 @@ const StatsPage: React.FC<StatsPageProps> = ({ variant = 'page', onClose }) => {
     };
   }, [admin, period]);
 
-  const summary = useMemo(() => summarize(records ?? [], period), [records, period]);
+  const summary = useMemo(() => {
+    const base = summarize(records ?? [], period);
+    return period === 'all'
+      ? applyAllTimeVisitFloor(base, visitFloors, TRACKED_GAMES)
+      : base;
+  }, [records, period, visitFloors]);
 
   if (!demoMode && !isAnalyticsConfigured) {
     return (

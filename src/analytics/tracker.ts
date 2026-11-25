@@ -48,12 +48,23 @@ function sendSession(p: SessionPayload): void {
   }
 }
 
+function recordVisitAtStart(gameId: TrackedGameId): void {
+  const now = new Date();
+  sendSession({
+    gameId,
+    gameName: gameNameFor(gameId),
+    startedAt: now,
+    endedAt: now,
+    durationSeconds: 0,
+    visit: true,
+  });
+}
+
 class PlaySession {
   private startedAt = new Date();
   private activeMs = 0;
   private activeSince: number | null = null;
   private wantActive = false;
-  private isVisit = true;
   private suspended = false;
 
   constructor(private readonly gameId: TrackedGameId) {}
@@ -92,7 +103,6 @@ class PlaySession {
     this.suspended = false;
     this.startedAt = new Date();
     this.activeMs = 0;
-    this.isVisit = false;
     this.applyClock();
   }
 
@@ -114,10 +124,9 @@ class PlaySession {
       startedAt: this.startedAt,
       endedAt: new Date(),
       durationSeconds,
-      visit: this.isVisit,
+      visit: false,
     });
     this.activeMs = 0;
-    this.isVisit = false;
   }
 }
 
@@ -151,7 +160,10 @@ export function useGamePlayTracking(gameId: TrackedGameId | null, active: boolea
 
   useEffect(() => {
     if (!gameId) return;
+    // Count the visit immediately (counter + session doc) so a killed tab
+    // still leaves a durable visit even if play-time is never flushed.
     recordGameVisit(gameId);
+    recordVisitAtStart(gameId);
     if (!isAnalyticsConfigured) return;
     installPageListeners();
     const session = new PlaySession(gameId);

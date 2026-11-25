@@ -97,6 +97,19 @@ export async function fetchSessions(since: Date | null): Promise<SessionRecord[]
   });
 }
 
+
+export async function fetchGameStats(): Promise<Record<string, number>> {
+  const db = getFirestore(getApp());
+  const snap = await getDocs(collection(db, GAME_STATS_COLLECTION));
+  const out: Record<string, number> = {};
+  for (const d of snap.docs) {
+    if (!(d.id in TRACKED_GAMES)) continue;
+    const val = Number(d.data().visits ?? 0);
+    if (Number.isFinite(val) && val > 0) out[d.id] = Math.floor(val);
+  }
+  return out;
+}
+
 /**
  * Admin-only: sync historical all-time visit totals from analytics_sessions
  * into public game_stats/{gameId} whenever analytics_sessions has a higher count.
@@ -123,7 +136,9 @@ export async function syncPublicVisitCounts(records: SessionRecord[]): Promise<v
 
   const writes: Promise<void>[] = [];
   for (const [gameId, count] of totals.entries()) {
-    if (count > (existing.get(gameId) ?? 0)) {
+    const current = existing.get(gameId) ?? 0;
+    // Never lower a stored total; only fill in if sessions show a higher all-time count.
+    if (count > current) {
       writes.push(
         setDoc(doc(db, GAME_STATS_COLLECTION, gameId), { visits: count }).catch(() => undefined)
       );
