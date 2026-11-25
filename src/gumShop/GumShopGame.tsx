@@ -1,17 +1,29 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { GumShopAudio } from './audio';
 import {
+  actionAutoStockFromStorage,
+  actionBuyAdCampaign,
   actionBuyShelf,
+  actionBuyStorageRoom,
   actionBuyUpgrade,
   actionCheckoutCustomers,
+  actionDepositCrateToStorage,
   actionEmergencyGrant,
+  actionExpandShop,
   actionInteractNearest,
+  actionMoveCashier,
+  actionMoveShelf,
   actionOrderCrate,
   actionPayRentAndNextDay,
+  actionRecordSolvedPuzzle,
   actionResetShop,
+  actionRotateShelf,
   actionSetPrice,
+  actionSleepInHouse,
   actionStartOrResume,
-  CHECKOUT_POS,
+  actionSweepCratesToStorage,
+  actionUnlockHouseDoor,
+  actionWithdrawFromStorage,
   createGumShopWorld,
   extractGumShopHud,
   saveGumShopWorldNow,
@@ -20,9 +32,12 @@ import {
 } from './gameLogic';
 import { GumShopScene } from './GumShopScene';
 import { GumShopUI } from './GumShopUI';
+import { pickNextDoorPuzzleId } from './puzzlesData';
 import {
+  getShopBounds,
   readGumShopSoundEnabled,
   saveGumShopSoundEnabled,
+  type AdCampaignId,
   type GumFlavorId,
   type GumShopHudSnapshot,
   type GumShopModalTab,
@@ -62,66 +77,68 @@ export const GumShopPreviewArt: React.FC = () => (
     <line x1="0" y1="146" x2="400" y2="146" stroke="#c4b89f" strokeWidth="3" />
 
     {/* Cozy 3D Gum Shop Building */}
-    <rect x="64" y="34" width="272" height="114" rx="6" fill="url(#gumWall)" stroke="#b45309" strokeWidth="3" />
+    <rect x="30" y="34" width="240" height="114" rx="6" fill="url(#gumWall)" stroke="#b45309" strokeWidth="3" />
 
     {/* Striped Candy Awning */}
-    {[0, 1, 2, 3, 4, 5, 6, 7, 8, 9].map((i) => (
+    {[0, 1, 2, 3, 4, 5, 6, 7, 8].map((i) => (
       <rect
         key={i}
-        x={60 + i * 28}
+        x={27 + i * 27.5}
         y="52"
-        width="28"
-        height="22"
+        width="27.5"
+        height="20"
         fill={i % 2 === 0 ? '#f43f5e' : '#fffbeb'}
       />
     ))}
 
     {/* Signboard with Gumball Dots */}
-    <rect x="118" y="16" width="164" height="30" rx="8" fill="#134e4a" stroke="#fde047" strokeWidth="2.5" />
-    <circle cx="138" cy="31" r="6" fill="#14b8a6" />
-    <circle cx="154" cy="31" r="6" fill="#f43f5e" />
-    <circle cx="246" cy="31" r="6" fill="#fbbf24" />
-    <circle cx="262" cy="31" r="6" fill="#a855f7" />
-    <rect x="168" y="27" width="64" height="8" rx="4" fill="#fef08a" />
+    <rect x="74" y="16" width="152" height="28" rx="8" fill="#134e4a" stroke="#fde047" strokeWidth="2.5" />
+    <circle cx="92" cy="30" r="5.5" fill="#14b8a6" />
+    <circle cx="106" cy="30" r="5.5" fill="#f43f5e" />
+    <circle cx="194" cy="30" r="5.5" fill="#fbbf24" />
+    <circle cx="208" cy="30" r="5.5" fill="#a855f7" />
+    <rect x="120" y="26" width="60" height="8" rx="4" fill="#fef08a" />
 
     {/* Left Window showing Colorful 3D Gum Shelves Inside */}
-    <rect x="80" y="84" width="84" height="54" rx="4" fill="#0f2940" stroke="#0d9488" strokeWidth="3" />
-    {/* Shelf rows */}
-    <rect x="86" y="102" width="72" height="4" fill="#d6a461" />
-    <rect x="86" y="122" width="72" height="4" fill="#d6a461" />
-    {/* Gum packs */}
-    <rect x="90" y="91" width="14" height="11" rx="2" fill="#14b8a6" />
-    <rect x="108" y="91" width="14" height="11" rx="2" fill="#14b8a6" />
-    <rect x="126" y="91" width="14" height="11" rx="2" fill="#f43f5e" />
-    <rect x="142" y="91" width="14" height="11" rx="2" fill="#f43f5e" />
-    <rect x="90" y="111" width="14" height="11" rx="2" fill="#22c55e" />
-    <rect x="108" y="111" width="14" height="11" rx="2" fill="#f59e0b" />
-    <rect x="126" y="111" width="14" height="11" rx="2" fill="#8b5cf6" />
-    <rect x="142" y="111" width="14" height="11" rx="2" fill="#fbbf24" />
+    <rect x="44" y="84" width="76" height="52" rx="4" fill="#0f2940" stroke="#0d9488" strokeWidth="3" />
+    <rect x="50" y="102" width="64" height="4" fill="#d6a461" />
+    <rect x="50" y="120" width="64" height="4" fill="#d6a461" />
+    <rect x="54" y="91" width="12" height="10" rx="2" fill="#14b8a6" />
+    <rect x="70" y="91" width="12" height="10" rx="2" fill="#f43f5e" />
+    <rect x="86" y="91" width="12" height="10" rx="2" fill="#22c55e" />
+    <rect x="54" y="110" width="12" height="10" rx="2" fill="#f59e0b" />
+    <rect x="70" y="110" width="12" height="10" rx="2" fill="#8b5cf6" />
+    <rect x="86" y="110" width="12" height="10" rx="2" fill="#fbbf24" />
 
     {/* Open Glass Center Door */}
-    <rect x="176" y="84" width="48" height="64" fill="#1e3a5f" stroke="#0f766e" strokeWidth="3" />
-    <rect x="172" y="148" width="56" height="8" rx="3" fill="#0d9488" />
+    <rect x="130" y="84" width="42" height="64" fill="#1e3a5f" stroke="#0f766e" strokeWidth="3" />
+    <rect x="126" y="148" width="50" height="8" rx="3" fill="#0d9488" />
 
-    {/* Right Window + Price Tag */}
-    <rect x="236" y="84" width="84" height="54" rx="4" fill="#0f2940" stroke="#0d9488" strokeWidth="3" />
-    <rect x="246" y="94" width="32" height="34" rx="4" fill="#fef08a" />
-    <rect x="252" y="103" width="20" height="5" rx="2" fill="#0f172a" />
-    <rect x="252" y="113" width="14" height="5" rx="2" fill="#10b981" />
-    <circle cx="298" cy="112" r="14" fill="#f43f5e" stroke="#fecdd3" strokeWidth="2.5" />
+    {/* Right Window */}
+    <rect x="182" y="84" width="76" height="52" rx="4" fill="#0f2940" stroke="#0d9488" strokeWidth="3" />
+    <rect x="192" y="94" width="28" height="32" rx="4" fill="#fef08a" />
+    <circle cx="238" cy="110" r="12" fill="#f43f5e" stroke="#fecdd3" strokeWidth="2.5" />
 
-    {/* Outdoor Delivery Gum Crate Waiting on Sidewalk! */}
-    <rect x="86" y="152" width="44" height="32" rx="3" fill="#d4a373" stroke="#78350f" strokeWidth="2.5" />
-    <rect x="86" y="164" width="44" height="8" fill="#14b8a6" />
-    {/* Pickup Arrow above Crate */}
-    <polygon points="108,146 98,134 118,134" fill="#facc15" stroke="#b45309" strokeWidth="1.5" />
+    {/* Cozy Sleep House Next to the Shop! */}
+    <rect x="286" y="74" width="94" height="74" rx="4" fill="#fde8d7" stroke="#9a3412" strokeWidth="2.5" />
+    <polygon points="278,76 333,38 388,76" fill="#c2410c" stroke="#7c2d12" strokeWidth="2.5" />
+    <rect x="352" y="42" width="12" height="22" fill="#991b1b" />
+    <rect x="321" y="108" width="24" height="40" rx="2" fill="#92400e" />
+    <circle cx="340" cy="128" r="2.5" fill="#facc15" />
+    <rect x="296" y="92" width="18" height="18" rx="2" fill="#fef08a" stroke="#78350f" strokeWidth="2" />
+    <rect x="352" y="92" width="18" height="18" rx="2" fill="#fef08a" stroke="#78350f" strokeWidth="2" />
 
-    {/* Shopkeeper Character Walking Outside */}
-    <circle cx="282" cy="140" r="10" fill="#f5cba7" />
-    <rect x="272" y="129" width="20" height="6" rx="3" fill="#f43f5e" />
-    <rect x="271" y="151" width="22" height="24" rx="5" fill="#14b8a6" />
-    <rect x="274" y="175" width="7" height="14" rx="2" fill="#1e293b" />
-    <rect x="283" y="175" width="7" height="14" rx="2" fill="#1e293b" />
+    {/* Outdoor Delivery Gum Crate Waiting on Sidewalk */}
+    <rect x="58" y="152" width="42" height="30" rx="3" fill="#d4a373" stroke="#78350f" strokeWidth="2.5" />
+    <rect x="58" y="163" width="42" height="8" fill="#14b8a6" />
+    <polygon points="79,146 70,135 88,135" fill="#facc15" stroke="#b45309" strokeWidth="1.5" />
+
+    {/* Shopkeeper Character */}
+    <circle cx="230" cy="140" r="10" fill="#f5cba7" />
+    <rect x="220" y="129" width="20" height="6" rx="3" fill="#f43f5e" />
+    <rect x="219" y="151" width="22" height="24" rx="5" fill="#14b8a6" />
+    <rect x="222" y="175" width="7" height="14" rx="2" fill="#1e293b" />
+    <rect x="231" y="175" width="7" height="14" rx="2" fill="#1e293b" />
   </svg>
 );
 
@@ -140,6 +157,14 @@ export const GumShopGame: React.FC<GumShopGameProps> = ({ lang, onExit }) => {
     return saved;
   });
   const [activeTab, setActiveTab] = useState<GumShopModalTab>('none');
+  const [moveCashierMode, setMoveCashierMode] = useState<boolean>(false);
+  const [moveShelfMode, setMoveShelfMode] = useState<boolean>(false);
+  const [selectedShelfSlot, setSelectedShelfSlot] = useState<number | null>(null);
+  const [housePuzzleOpen, setHousePuzzleOpen] = useState<boolean>(false);
+  const [activePuzzleId, setActivePuzzleId] = useState<number>(() =>
+    pickNextDoorPuzzleId(worldRef.current.solvedPuzzleIds)
+  );
+  const [puzzleForDoor, setPuzzleForDoor] = useState<boolean>(true);
   const [hud, setHud] = useState<GumShopHudSnapshot>(() =>
     extractGumShopHud(worldRef.current)
   );
@@ -177,6 +202,10 @@ export const GumShopGame: React.FC<GumShopGameProps> = ({ lang, onExit }) => {
   const handleResetShop = useCallback(() => {
     actionResetShop(worldRef.current);
     setActiveTab('none');
+    setMoveCashierMode(false);
+    setMoveShelfMode(false);
+    setSelectedShelfSlot(null);
+    setHousePuzzleOpen(false);
     syncNow();
   }, [syncNow]);
 
@@ -196,6 +225,11 @@ export const GumShopGame: React.FC<GumShopGameProps> = ({ lang, onExit }) => {
     [syncNow]
   );
 
+  const handleExpandShop = useCallback(() => {
+    actionExpandShop(worldRef.current, audioRef.current);
+    syncNow();
+  }, [syncNow]);
+
   const handleBuyShelf = useCallback(
     (slotIndex: number) => {
       actionBuyShelf(worldRef.current, slotIndex, audioRef.current);
@@ -212,9 +246,101 @@ export const GumShopGame: React.FC<GumShopGameProps> = ({ lang, onExit }) => {
     [syncNow]
   );
 
+  const handleBuyStorageRoom = useCallback(() => {
+    actionBuyStorageRoom(worldRef.current, audioRef.current);
+    syncNow();
+  }, [syncNow]);
+
+  const handleDepositToStorage = useCallback(() => {
+    actionDepositCrateToStorage(worldRef.current, audioRef.current);
+    syncNow();
+  }, [syncNow]);
+
+  const handleWithdrawFromStorage = useCallback(
+    (flavor: GumFlavorId) => {
+      actionWithdrawFromStorage(worldRef.current, flavor, audioRef.current);
+      syncNow();
+    },
+    [syncNow]
+  );
+
+  const handleSweepCratesToStorage = useCallback(() => {
+    actionSweepCratesToStorage(worldRef.current, audioRef.current);
+    syncNow();
+  }, [syncNow]);
+
+  const handleAutoStockFromStorage = useCallback(() => {
+    actionAutoStockFromStorage(worldRef.current, audioRef.current);
+    syncNow();
+  }, [syncNow]);
+
+  const handleBuyAdCampaign = useCallback(
+    (adId: AdCampaignId) => {
+      actionBuyAdCampaign(worldRef.current, adId, audioRef.current);
+      syncNow();
+    },
+    [syncNow]
+  );
+
+  const handleOpenStorageModal = useCallback(() => {
+    worldRef.current.pendingOpenStorage = false;
+    setMoveCashierMode(false);
+    setMoveShelfMode(false);
+    setSelectedShelfSlot(null);
+    setHousePuzzleOpen(false);
+    setActiveTab('storage');
+  }, []);
+
+  const handleAdScreenClick = useCallback(() => {
+    if (worldRef.current.status !== 'PLAYING') return;
+    setMoveCashierMode(false);
+    setMoveShelfMode(false);
+    setSelectedShelfSlot(null);
+    setHousePuzzleOpen(false);
+    setActiveTab('ads');
+  }, []);
+
+  const handleStorageClick = useCallback(() => {
+    const world = worldRef.current;
+    if (world.status !== 'PLAYING') return;
+    setMoveCashierMode(false);
+    setMoveShelfMode(false);
+    setSelectedShelfSlot(null);
+    setHousePuzzleOpen(false);
+
+    if (!world.hasStorageRoom) {
+      setActiveTab('storage');
+      return;
+    }
+
+    const bounds = getShopBounds(world.shopLevel);
+    const dist = Math.hypot(
+      world.playerX - bounds.storageDoorX,
+      world.playerZ - bounds.storageDoorZ
+    );
+    if (dist <= 2.5) {
+      if (world.carriedCrate) {
+        actionDepositCrateToStorage(world, audioRef.current);
+        syncNow();
+      } else {
+        setActiveTab('storage');
+      }
+    } else {
+      world.walkTarget = {
+        x: bounds.storageDoorX,
+        z: bounds.storageDoorZ,
+        action: { kind: 'storage_interact' },
+      };
+    }
+  }, [syncNow]);
+
   const handlePayRent = useCallback(() => {
     actionPayRentAndNextDay(worldRef.current, audioRef.current);
     setActiveTab('none');
+    setMoveCashierMode(false);
+    setMoveShelfMode(false);
+    setSelectedShelfSlot(null);
+    setHousePuzzleOpen(false);
     syncNow();
   }, [syncNow]);
 
@@ -224,9 +350,78 @@ export const GumShopGame: React.FC<GumShopGameProps> = ({ lang, onExit }) => {
   }, [syncNow]);
 
   const handleInteractNearest = useCallback(() => {
-    actionInteractNearest(worldRef.current, audioRef.current);
+    const world = worldRef.current;
+    actionInteractNearest(world, audioRef.current);
+    if (world.pendingHousePuzzle) {
+      world.pendingHousePuzzle = false;
+      setActiveTab('none');
+      setMoveCashierMode(false);
+      setMoveShelfMode(false);
+      setSelectedShelfSlot(null);
+      setActivePuzzleId(pickNextDoorPuzzleId(world.solvedPuzzleIds));
+      setPuzzleForDoor(true);
+      setHousePuzzleOpen(true);
+    } else if (world.pendingOpenStorage) {
+      world.pendingOpenStorage = false;
+      setMoveCashierMode(false);
+      setMoveShelfMode(false);
+      setSelectedShelfSlot(null);
+      setHousePuzzleOpen(false);
+      setActiveTab('storage');
+    }
     syncNow();
   }, [syncNow]);
+
+  const handleToggleMoveCashier = useCallback(() => {
+    setActiveTab('none');
+    setMoveShelfMode(false);
+    setSelectedShelfSlot(null);
+    setHousePuzzleOpen(false);
+    setMoveCashierMode((prev) => !prev);
+  }, []);
+
+  const handleToggleMoveShelf = useCallback(() => {
+    setActiveTab('none');
+    setMoveCashierMode(false);
+    setHousePuzzleOpen(false);
+    setSelectedShelfSlot(null);
+    setMoveShelfMode((prev) => !prev);
+  }, []);
+
+  const handleMoveCashierTo = useCallback(
+    (x: number, z: number) => {
+      const world = worldRef.current;
+      if (world.status !== 'PLAYING') return;
+      const moved = actionMoveCashier(world, x, z, audioRef.current);
+      if (moved) {
+        setMoveCashierMode(false);
+      }
+      syncNow();
+    },
+    [syncNow]
+  );
+
+  const handleMoveShelfTo = useCallback(
+    (x: number, z: number) => {
+      const world = worldRef.current;
+      if (world.status !== 'PLAYING' || selectedShelfSlot === null) return;
+      const shelf = world.shelves.find((s) => s.slotIndex === selectedShelfSlot);
+      if (!shelf) return;
+      const moved = actionMoveShelf(world, selectedShelfSlot, x, z, shelf.rotY, audioRef.current);
+      if (moved) {
+        setSelectedShelfSlot(null);
+      }
+      syncNow();
+    },
+    [selectedShelfSlot, syncNow]
+  );
+
+  const handleRotateSelectedShelf = useCallback(() => {
+    const world = worldRef.current;
+    if (world.status !== 'PLAYING' || selectedShelfSlot === null) return;
+    actionRotateShelf(world, selectedShelfSlot, audioRef.current);
+    syncNow();
+  }, [selectedShelfSlot, syncNow]);
 
   const handleFloorClick = useCallback((x: number, z: number) => {
     const world = worldRef.current;
@@ -244,34 +439,189 @@ export const GumShopGame: React.FC<GumShopGameProps> = ({ lang, onExit }) => {
     };
   }, []);
 
-  const handleShelfClick = useCallback((slotIndex: number, x: number, z: number) => {
-    const world = worldRef.current;
-    if (world.status !== 'PLAYING') return;
-    world.walkTarget = {
-      x,
-      z: z < -2.5 ? z + 1.1 : z + 1.0,
-      action: world.carriedCrate ? { kind: 'stock_shelf', slotIndex } : undefined,
-    };
-  }, []);
+  const handleShelfClick = useCallback(
+    (slotIndex: number) => {
+      const world = worldRef.current;
+      if (world.status !== 'PLAYING') return;
+      if (moveShelfMode) {
+        setSelectedShelfSlot((prev) => (prev === slotIndex ? null : slotIndex));
+        return;
+      }
+      const shelf = world.shelves.find((s) => s.slotIndex === slotIndex);
+      if (!shelf) return;
+      const frontX = shelf.x + Math.sin(shelf.rotY) * 1.15;
+      const frontZ = shelf.z + Math.cos(shelf.rotY) * 1.15;
+      world.walkTarget = {
+        x: frontX,
+        z: frontZ,
+        action: world.carriedCrate ? { kind: 'stock_shelf', slotIndex } : undefined,
+      };
+    },
+    [moveShelfMode]
+  );
 
   const handleCheckoutClick = useCallback(() => {
     const world = worldRef.current;
     if (world.status !== 'PLAYING') return;
     const dist = Math.hypot(
-      world.playerX - CHECKOUT_POS.x,
-      world.playerZ - CHECKOUT_POS.z
+      world.playerX - world.cashierX,
+      world.playerZ - world.cashierZ
     );
     if (dist <= 2.4) {
       actionCheckoutCustomers(world, audioRef.current, true);
       syncNow();
     } else {
+      const standX = world.cashierX >= 0 ? world.cashierX - 1.15 : world.cashierX + 1.15;
       world.walkTarget = {
-        x: CHECKOUT_POS.x - 1.1,
-        z: CHECKOUT_POS.z,
+        x: standX,
+        z: world.cashierZ,
         action: { kind: 'checkout' },
       };
     }
   }, [syncNow]);
+
+  const handleOpenHousePuzzle = useCallback(() => {
+    const world = worldRef.current;
+    world.pendingHousePuzzle = false;
+    setActiveTab('none');
+    setMoveCashierMode(false);
+    setMoveShelfMode(false);
+    setSelectedShelfSlot(null);
+    setActivePuzzleId(pickNextDoorPuzzleId(world.solvedPuzzleIds));
+    setPuzzleForDoor(true);
+    setHousePuzzleOpen(true);
+  }, []);
+
+  const handleOpenPuzzleIndex = useCallback(() => {
+    worldRef.current.pendingHousePuzzle = false;
+    setHousePuzzleOpen(false);
+    setMoveCashierMode(false);
+    setMoveShelfMode(false);
+    setSelectedShelfSlot(null);
+    setActiveTab((prev) => (prev === 'puzzles' ? 'none' : 'puzzles'));
+  }, []);
+
+  const handlePlayPuzzleFromIndex = useCallback((puzzleId: number) => {
+    const world = worldRef.current;
+    world.pendingHousePuzzle = false;
+    setActiveTab('none');
+    setMoveCashierMode(false);
+    setMoveShelfMode(false);
+    setSelectedShelfSlot(null);
+    setActivePuzzleId(puzzleId);
+    setPuzzleForDoor(!world.houseDoorUnlocked);
+    setHousePuzzleOpen(true);
+  }, []);
+
+  const handleCloseHousePuzzle = useCallback(() => {
+    worldRef.current.pendingHousePuzzle = false;
+    setHousePuzzleOpen(false);
+  }, []);
+
+  const handlePuzzleBeep = useCallback((good: boolean) => {
+    if (good) {
+      audioRef.current.playPickup();
+    } else {
+      audioRef.current.playWarn();
+    }
+  }, []);
+
+  const handleHouseDoorClick = useCallback(() => {
+    const world = worldRef.current;
+    if (world.status !== 'PLAYING') return;
+    setActiveTab('none');
+    setMoveCashierMode(false);
+    setMoveShelfMode(false);
+    setSelectedShelfSlot(null);
+    const bounds = getShopBounds(world.shopLevel);
+
+    if (!world.houseDoorUnlocked) {
+      const dist = Math.hypot(
+        world.playerX - bounds.houseDoorX,
+        world.playerZ - bounds.houseDoorZ
+      );
+      if (dist <= 2.3) {
+        setActivePuzzleId(pickNextDoorPuzzleId(world.solvedPuzzleIds));
+        setPuzzleForDoor(true);
+        setHousePuzzleOpen(true);
+      } else {
+        world.walkTarget = {
+          x: bounds.houseDoorX,
+          z: bounds.houseDoorZ,
+          action: { kind: 'open_house_puzzle' },
+        };
+      }
+      return;
+    }
+
+    // Door already unlocked -> walk right inside the house bedroom!
+    world.walkTarget = {
+      x: bounds.houseX,
+      z: bounds.houseZ + 0.65,
+    };
+  }, []);
+
+  const handleBedClick = useCallback(() => {
+    const world = worldRef.current;
+    if (world.status !== 'PLAYING') return;
+    setActiveTab('none');
+    setMoveCashierMode(false);
+    setMoveShelfMode(false);
+    setSelectedShelfSlot(null);
+    const bounds = getShopBounds(world.shopLevel);
+
+    if (!world.houseDoorUnlocked) {
+      handleHouseDoorClick();
+      return;
+    }
+
+    if (!world.isNight) {
+      actionSleepInHouse(world, audioRef.current);
+      syncNow();
+      return;
+    }
+
+    const dist = Math.hypot(world.playerX - bounds.bedX, world.playerZ - bounds.bedZ);
+    if (dist <= 2.0) {
+      actionSleepInHouse(world, audioRef.current);
+      syncNow();
+    } else {
+      world.walkTarget = {
+        x: bounds.bedX - 0.9,
+        z: bounds.bedZ + 0.45,
+        action: { kind: 'sleep_bed' },
+      };
+    }
+  }, [handleHouseDoorClick, syncNow]);
+
+  const handleGoToHouse = useCallback(() => {
+    if (worldRef.current.houseDoorUnlocked) {
+      handleBedClick();
+    } else {
+      handleHouseDoorClick();
+    }
+  }, [handleBedClick, handleHouseDoorClick]);
+
+  const handleSolveHousePuzzle = useCallback(
+    (solvedPuzzleId: number) => {
+      const world = worldRef.current;
+      setHousePuzzleOpen(false);
+      if (puzzleForDoor || !world.houseDoorUnlocked) {
+        actionUnlockHouseDoor(world, audioRef.current, solvedPuzzleId);
+        const bounds = getShopBounds(world.shopLevel);
+        // Automatically step through the freshly opened door into the bedroom!
+        world.walkTarget = {
+          x: bounds.houseX,
+          z: bounds.houseZ + 0.7,
+        };
+      } else {
+        actionRecordSolvedPuzzle(world, solvedPuzzleId, audioRef.current);
+        setActiveTab('puzzles');
+      }
+      syncNow();
+    },
+    [puzzleForDoor, syncNow]
+  );
 
   const handleGoOutsideToCrates = useCallback(() => {
     const world = worldRef.current;
@@ -298,22 +648,33 @@ export const GumShopGame: React.FC<GumShopGameProps> = ({ lang, onExit }) => {
     onExit();
   }, [onExit]);
 
-  // Keyboard controls (WASD / Arrows / E to interact / Escape to close modal or exit)
+  // Keyboard controls (WASD / Arrows / E to interact / Escape to close modal or cancel move)
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.code === 'Escape') {
         e.preventDefault();
-        if (activeTab !== 'none') {
+        if (housePuzzleOpen) {
+          setHousePuzzleOpen(false);
+        } else if (moveShelfMode) {
+          setMoveShelfMode(false);
+          setSelectedShelfSlot(null);
+        } else if (moveCashierMode) {
+          setMoveCashierMode(false);
+        } else if (activeTab !== 'none') {
           setActiveTab('none');
         } else {
           handleExit();
         }
         return;
       }
-      if (e.code === 'KeyE' && worldRef.current.status === 'PLAYING' && activeTab === 'none') {
+      if (
+        e.code === 'KeyE' &&
+        worldRef.current.status === 'PLAYING' &&
+        activeTab === 'none' &&
+        !housePuzzleOpen
+      ) {
         e.preventDefault();
-        actionInteractNearest(worldRef.current, audioRef.current);
-        syncNow();
+        handleInteractNearest();
         return;
       }
       if (
@@ -352,7 +713,15 @@ export const GumShopGame: React.FC<GumShopGameProps> = ({ lang, onExit }) => {
       window.removeEventListener('keyup', onKeyUp);
       window.removeEventListener('blur', onBlur);
     };
-  }, [activeTab, handleExit, recomputeInput, syncNow]);
+  }, [
+    activeTab,
+    housePuzzleOpen,
+    moveCashierMode,
+    moveShelfMode,
+    handleExit,
+    handleInteractNearest,
+    recomputeInput,
+  ]);
 
   // Guaranteed auto-save on tab switch, reload, close, or unmount!
   useEffect(() => {
@@ -378,11 +747,22 @@ export const GumShopGame: React.FC<GumShopGameProps> = ({ lang, onExit }) => {
         worldRef={worldRef}
         inputRef={inputRef}
         audioRef={audioRef}
+        moveCashierMode={moveCashierMode}
+        moveShelfMode={moveShelfMode}
+        selectedShelfSlot={selectedShelfSlot}
         onHudUpdate={setHud}
         onFloorClick={handleFloorClick}
+        onMoveCashierTo={handleMoveCashierTo}
+        onMoveShelfTo={handleMoveShelfTo}
         onCrateClick={handleCrateClick}
         onShelfClick={handleShelfClick}
         onCheckoutClick={handleCheckoutClick}
+        onHouseDoorClick={handleHouseDoorClick}
+        onBedClick={handleBedClick}
+        onStorageClick={handleStorageClick}
+        onAdScreenClick={handleAdScreenClick}
+        onOpenHousePuzzle={handleOpenHousePuzzle}
+        onOpenStorageModal={handleOpenStorageModal}
       />
 
       <GumShopUI
@@ -391,17 +771,46 @@ export const GumShopGame: React.FC<GumShopGameProps> = ({ lang, onExit }) => {
         hasExistingSave={worldRef.current.hasExistingSave}
         soundEnabled={soundEnabled}
         activeTab={activeTab}
-        onSetTab={setActiveTab}
+        moveCashierMode={moveCashierMode}
+        moveShelfMode={moveShelfMode}
+        selectedShelfSlot={selectedShelfSlot}
+        housePuzzleOpen={housePuzzleOpen}
+        activePuzzleId={activePuzzleId}
+        puzzleForDoor={puzzleForDoor}
+        onSetTab={(tab) => {
+          setMoveCashierMode(false);
+          setMoveShelfMode(false);
+          setSelectedShelfSlot(null);
+          setHousePuzzleOpen(false);
+          setActiveTab(tab);
+        }}
+        onToggleMoveCashier={handleToggleMoveCashier}
+        onToggleMoveShelf={handleToggleMoveShelf}
+        onRotateSelectedShelf={handleRotateSelectedShelf}
+        onSelectPuzzle={setActivePuzzleId}
+        onPlayPuzzleFromIndex={handlePlayPuzzleFromIndex}
+        onOpenPuzzleIndex={handleOpenPuzzleIndex}
+        onCloseHousePuzzle={handleCloseHousePuzzle}
+        onSolveHousePuzzle={handleSolveHousePuzzle}
+        onPuzzleBeep={handlePuzzleBeep}
         onStartOrResume={handleStartOrResume}
         onResetShop={handleResetShop}
         onOrderCrate={handleOrderCrate}
         onSetPrice={handleSetPrice}
+        onExpandShop={handleExpandShop}
         onBuyShelf={handleBuyShelf}
         onBuyUpgrade={handleBuyUpgrade}
+        onBuyStorageRoom={handleBuyStorageRoom}
+        onDepositToStorage={handleDepositToStorage}
+        onWithdrawFromStorage={handleWithdrawFromStorage}
+        onSweepCratesToStorage={handleSweepCratesToStorage}
+        onAutoStockFromStorage={handleAutoStockFromStorage}
+        onBuyAdCampaign={handleBuyAdCampaign}
         onPayRent={handlePayRent}
         onEmergencyGrant={handleEmergencyGrant}
         onInteractNearest={handleInteractNearest}
         onGoOutsideToCrates={handleGoOutsideToCrates}
+        onGoToHouse={handleGoToHouse}
         onCheckoutNow={handleCheckoutClick}
         onJoystickMove={handleJoystickMove}
         onToggleSound={handleToggleSound}

@@ -1438,10 +1438,10 @@ const HUB_COPY = {
     brickBreakerTitle: 'تكسير النيون',
     brickBreakerDesc:
       'كسّر طوب النيون والفولاذ والقنابل المتفجرة مع قدرات الكرة النارية وتعدد الكرات ×3 عبر 15 مرحلة مشوقة.',
-    gumShopTag: '3D · طلب · تسعير · رفوف · إيجار',
+    gumShopTag: '3D · توسعة · كاشير · بيت نوم · إيجار كل 5 أيام',
     gumShopTitle: 'بياع العلك 3D',
     gumShopDesc:
-      'اطلب كراتين العلك واخرج لأخذها من خارج المحل، اشترِ رفوف 3D، سعّر كل نكهة بنفسك، وادفع الإيجار اليومي مع حفظ تلقائي دائم!',
+      'كبّر محلك وحرّك الكاشير وعبّئ الرفوف تلقائياً بدون ضغط زر، ادفع الإيجار كل 5 أيام، ونم في بيت النوم بجانب المحل لبدء اليوم التالي!',
     fruitSlashTag: '2D · كلاسيك و Zen',
     fruitSlashTitle: 'سيف الفواكه 2D',
     fruitSlashDesc:
@@ -1509,10 +1509,10 @@ const HUB_COPY = {
     brickBreakerTitle: 'Neon Brick Breaker',
     brickBreakerDesc:
       'Shatter neon, armored steel, and chain-exploding bomb bricks with ×3 Multi-Ball & Fireball across 15 stages.',
-    gumShopTag: '3D · Order · Price · Shelves · Rent',
+    gumShopTag: '3D · Expand · Cashier · Sleep House · 5-Day Rent',
     gumShopTitle: 'Gum Shop 3D',
     gumShopDesc:
-      'Order gum cartons and walk outside to haul them in, buy 3D shelves, set your own prices, and pay daily rent with automatic permanent saving!',
+      'Expand your 3D shop, move the cashier anywhere, auto-stock shelves on approach, pay rent every 5 days, and sleep in the cozy house next door!',
     fruitSlashTag: '2D · Classic & Zen',
     fruitSlashTitle: 'Fruit Slash 2D',
     fruitSlashDesc:
