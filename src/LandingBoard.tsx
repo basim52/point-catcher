@@ -200,7 +200,7 @@ export const LandingBoard: React.FC<LandingBoardProps> = ({
 }) => {
   const t = LANDING_COPY[lang];
   const [heroImgFailed, setHeroImgFailed] = useState(false);
-  const visitCounts = useGameVisitCounts();
+  const { counts: visitCounts, ready: visitCountsReady } = useGameVisitCounts();
 
   const renderWorldVisits = (gameId: string) => (
     <span className="inline-flex items-center gap-1 font-num text-[11px] font-semibold text-slate-300 whitespace-nowrap">
@@ -217,7 +217,11 @@ export const LandingBoard: React.FC<LandingBoardProps> = ({
         <path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7z" />
         <circle cx="12" cy="12" r="3" />
       </svg>
-      <span>{formatVisitLabel(visitCounts[gameId] ?? 0, lang)}</span>
+      <span>
+        {visitCountsReady || (visitCounts[gameId] ?? 0) > 0
+          ? formatVisitLabel(visitCounts[gameId] ?? 0, lang)
+          : '…'}
+      </span>
     </span>
   );
 

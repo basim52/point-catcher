@@ -2540,7 +2540,7 @@ export const GamesModal: React.FC<GamesModalProps> = ({
 
   // Private analytics: visit + active minutes for the open mini game.
   useGamePlayTracking(miniGameId(activeGame), activeGame !== null);
-  const visitCounts = useGameVisitCounts();
+  const { counts: visitCounts, ready: visitCountsReady } = useGameVisitCounts();
 
   // Play soft arcade lounge music while browsing the Games Hub
   useGameMusic('hub', musicEnabled && activeGame === null);
@@ -2725,7 +2725,7 @@ export const GamesModal: React.FC<GamesModalProps> = ({
         <span>{lang === 'ar' ? 'الزيارات' : 'Visits'}</span>
       </span>
       <span className="font-num font-bold text-slate-200 whitespace-nowrap">
-        {formatVisitLabel(visitCounts[gameId] ?? 0, lang)}
+        {visitCountsReady || (visitCounts[gameId] ?? 0) > 0 ? formatVisitLabel(visitCounts[gameId] ?? 0, lang) : '…'}
       </span>
     </div>
   );
