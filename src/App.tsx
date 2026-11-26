@@ -4829,6 +4829,20 @@ export default function App() {
     }
   }, [openGamesModal]);
 
+  // Auto-open Mario Party Online if arriving via a friend's ?partyRoom=XXXXXX invite link
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const params = new URLSearchParams(window.location.search);
+    const roomParam = params.get('partyRoom');
+    if (roomParam && /^[A-Za-z0-9]{6,8}$/.test(roomParam.trim())) {
+      setShowIntro(false);
+      setInitialMiniGame('mario-party');
+      if (!gamesModalOpenRef.current) {
+        openGamesModal();
+      }
+    }
+  }, [openGamesModal]);
+
   const togglePause = useCallback(() => {
     if (
       stagesModalOpenRef.current ||

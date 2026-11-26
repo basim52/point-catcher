@@ -1,35 +1,74 @@
 rules_version = '2';
 
-// Point Catcher private analytics.
-// - Players (signed-in or not) may only CREATE anonymous session docs.
-// - Only the two admin Google accounts may READ them.
-// - Nobody may update or delete.
 service cloud.firestore {
   match /databases/{database}/documents {
 
+    // Global Safety Net (Default-Deny)
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // --- Reusable Hardened Helpers ---
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isVerified() {
+      return isSignedIn() && request.auth.token.email_verified == true;
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() >= 1 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function isValidCode(code) {
+      return code is string && code.size() >= 6 && code.size() <= 8 && code.matches('^[A-Z0-9]+$');
+    }
+
+    function isValidDisplayName(name) {
+      return name is string && name.size() >= 2 && name.size() <= 24;
+    }
+
+    function isValidCharacter(c) {
+      return c in ['marco', 'lugo', 'rosa', 'toady', 'yosho', 'koopa', 'wario', 'rosy'];
+    }
+
+    function isValidMiniGameId(id) {
+      return id is string && id.size() >= 2 && id.size() <= 40 && id.matches('^[a-z0-9_]+$');
+    }
+
+    // --- Existing Analytics Helpers (Preserved) ---
     function isStatsAdmin() {
-      return request.auth != null
-        && request.auth.token.email_verified == true
+      return isVerified()
         && request.auth.token.email in [
           'aboodalkhalil73@gmail.com',
-          'ab3256792@gmail.com'
+          'ab3256792@gmail.com',
+          'basim5252@gmail.com'
         ];
     }
 
-    function isValidGameId(id) {
+    function isValidTrackedGameId(id) {
       return id in [
         'world-normal', 'world-fruit', 'world-gold', 'world-space', 'world-monster',
         'mini-devil-trap', 'mini-monster-arena', 'mini-plant-merge', 'mini-shawarma-shop',
         'mini-desert-rally', 'mini-date-catcher', 'mini-arrow-escape', 'mini-arrow-mosaic',
         'mini-fruit-merge', 'mini-neon-2048', 'mini-neon-snake', 'mini-apple-catch',
-        'mini-brick-breaker', 'mini-gum-shop', 'mini-fruit-slash'
+        'mini-brick-breaker', 'mini-gum-shop', 'mini-fruit-slash', 'mini-mario-party'
       ];
     }
 
     function isValidSession(d) {
       return d.keys().hasOnly(['gameId', 'gameName', 'startedAt', 'endedAt', 'durationSeconds', 'visit'])
         && d.keys().hasAll(['gameId', 'gameName', 'startedAt', 'endedAt', 'durationSeconds', 'visit'])
-        && isValidGameId(d.gameId)
+        && isValidTrackedGameId(d.gameId)
         && d.gameName is string && d.gameName.size() > 0 && d.gameName.size() <= 60
         && d.startedAt is timestamp
         && d.endedAt is timestamp
@@ -43,24 +82,189 @@ service cloud.firestore {
         && d.visit is bool;
     }
 
+    // --- Validation Blueprints (Anti-Update-Gap) ---
+    function isValidPartyProfile(d) {
+      return d.keys().hasAll([
+          'uid', 'displayName', 'nameKey', 'friendCode', 'favoriteCharacter',
+          'wins', 'starsTotal', 'gamesPlayed', 'lastSeenAt', 'createdAt', 'updatedAt'
+        ])
+        && d.keys().hasOnly([
+          'uid', 'displayName', 'nameKey', 'friendCode', 'favoriteCharacter',
+          'wins', 'starsTotal', 'gamesPlayed', 'lastSeenAt', 'createdAt', 'updatedAt'
+        ])
+        && isValidId(d.uid)
+        && d.uid == request.auth.uid
+        && isValidDisplayName(d.displayName)
+        && isValidId(d.nameKey) && d.nameKey.size() >= 2 && d.nameKey.size() <= 120
+        && isValidCode(d.friendCode)
+        && isValidCharacter(d.favoriteCharacter)
+        && d.wins is int && d.wins >= 0 && d.wins <= 100000
+        && d.starsTotal is int && d.starsTotal >= 0 && d.starsTotal <= 1000000
+        && d.gamesPlayed is int && d.gamesPlayed >= 0 && d.gamesPlayed <= 100000
+        && d.lastSeenAt is timestamp
+        && d.createdAt is timestamp
+        && d.updatedAt is timestamp;
+    }
+
+    function isValidDirectoryEntry(d) {
+      return d.keys().hasAll([
+          'uid', 'displayName', 'friendCode', 'favoriteCharacter', 'createdAt', 'updatedAt'
+        ])
+        && d.keys().hasOnly([
+          'uid', 'displayName', 'friendCode', 'favoriteCharacter', 'createdAt', 'updatedAt'
+        ])
+        && isValidId(d.uid)
+        && d.uid == request.auth.uid
+        && isValidDisplayName(d.displayName)
+        && isValidCode(d.friendCode)
+        && isValidCharacter(d.favoriteCharacter)
+        && d.createdAt is timestamp
+        && d.updatedAt is timestamp;
+    }
+
+    function isValidFriendRequest(d) {
+      return d.keys().hasAll([
+          'fromUid', 'fromName', 'fromCode', 'fromCharacter',
+          'toUid', 'toName', 'toCode', 'status', 'createdAt', 'updatedAt'
+        ])
+        && d.keys().hasOnly([
+          'fromUid', 'fromName', 'fromCode', 'fromCharacter',
+          'toUid', 'toName', 'toCode', 'status', 'createdAt', 'updatedAt'
+        ])
+        && isValidId(d.fromUid)
+        && isValidId(d.toUid)
+        && d.fromUid != d.toUid
+        && isValidDisplayName(d.fromName)
+        && isValidDisplayName(d.toName)
+        && isValidCode(d.fromCode)
+        && isValidCode(d.toCode)
+        && isValidCharacter(d.fromCharacter)
+        && d.status in ['pending', 'accepted', 'declined']
+        && d.createdAt is timestamp
+        && d.updatedAt is timestamp;
+    }
+
+    function isValidFriendship(d) {
+      return d.keys().hasAll([
+          'uidA', 'uidB', 'nameA', 'nameB', 'codeA', 'codeB', 'charA', 'charB',
+          'createdAt', 'updatedAt'
+        ])
+        && d.keys().hasOnly([
+          'uidA', 'uidB', 'nameA', 'nameB', 'codeA', 'codeB', 'charA', 'charB',
+          'createdAt', 'updatedAt'
+        ])
+        && isValidId(d.uidA)
+        && isValidId(d.uidB)
+        && d.uidA != d.uidB
+        && isValidDisplayName(d.nameA)
+        && isValidDisplayName(d.nameB)
+        && isValidCode(d.codeA)
+        && isValidCode(d.codeB)
+        && isValidCharacter(d.charA)
+        && isValidCharacter(d.charB)
+        && d.createdAt is timestamp
+        && d.updatedAt is timestamp;
+    }
+
+    function isValidInvite(d) {
+      return d.keys().hasAll([
+          'fromUid', 'fromName', 'fromCharacter', 'toUid',
+          'roomCode', 'mode', 'gameId', 'status', 'createdAt', 'updatedAt'
+        ])
+        && d.keys().hasOnly([
+          'fromUid', 'fromName', 'fromCharacter', 'toUid',
+          'roomCode', 'mode', 'gameId', 'status', 'createdAt', 'updatedAt'
+        ])
+        && isValidId(d.fromUid)
+        && isValidId(d.toUid)
+        && d.fromUid != d.toUid
+        && isValidDisplayName(d.fromName)
+        && isValidCharacter(d.fromCharacter)
+        && isValidCode(d.roomCode)
+        && d.mode in ['cup', 'single']
+        && isValidMiniGameId(d.gameId)
+        && d.status in ['pending', 'accepted', 'declined', 'expired']
+        && d.createdAt is timestamp
+        && d.updatedAt is timestamp;
+    }
+
+    function isValidCupQueue(q) {
+      return q is list && q.size() >= 1 && q.size() <= 10 && isValidMiniGameId(q[0]);
+    }
+
+    function isValidPartyRoom(d) {
+      return d.keys().hasAll([
+          'roomCode', 'hostUid', 'hostName', 'status', 'mode', 'currentGameId',
+          'roundIndex', 'totalRounds', 'roundSeed', 'roundStartedAtMs', 'roundDurationSec',
+          'cupQueue', 'winnerUid', 'winnerName', 'createdAt', 'updatedAt'
+        ])
+        && d.keys().hasOnly([
+          'roomCode', 'hostUid', 'hostName', 'status', 'mode', 'currentGameId',
+          'roundIndex', 'totalRounds', 'roundSeed', 'roundStartedAtMs', 'roundDurationSec',
+          'cupQueue', 'winnerUid', 'winnerName', 'createdAt', 'updatedAt'
+        ])
+        && isValidCode(d.roomCode)
+        && isValidId(d.hostUid)
+        && isValidDisplayName(d.hostName)
+        && d.status in ['lobby', 'playing', 'round_result', 'podium', 'closed']
+        && d.mode in ['cup', 'single']
+        && isValidMiniGameId(d.currentGameId)
+        && d.roundIndex is int && d.roundIndex >= 0 && d.roundIndex <= 25
+        && d.totalRounds is int && d.totalRounds >= 1 && d.totalRounds <= 10
+        && d.roundSeed is int && d.roundSeed >= 0 && d.roundSeed <= 2147483647
+        && d.roundStartedAtMs is int && d.roundStartedAtMs >= 0
+        && d.roundDurationSec is int && d.roundDurationSec >= 10 && d.roundDurationSec <= 60
+        && isValidCupQueue(d.cupQueue)
+        && d.winnerUid is string && d.winnerUid.size() <= 128
+        && d.winnerName is string && d.winnerName.size() <= 24
+        && d.createdAt is timestamp
+        && d.updatedAt is timestamp;
+    }
+
+    function isValidRoomPlayer(d, roomCode, uid) {
+      return d.keys().hasAll([
+          'uid', 'roomCode', 'displayName', 'characterId', 'ready',
+          'stars', 'coins', 'roundScore', 'roundProgress', 'roundDone',
+          'joinedAt', 'updatedAt'
+        ])
+        && d.keys().hasOnly([
+          'uid', 'roomCode', 'displayName', 'characterId', 'ready',
+          'stars', 'coins', 'roundScore', 'roundProgress', 'roundDone',
+          'joinedAt', 'updatedAt'
+        ])
+        && d.uid == uid
+        && d.uid == request.auth.uid
+        && d.roomCode == roomCode
+        && isValidCode(d.roomCode)
+        && isValidDisplayName(d.displayName)
+        && isValidCharacter(d.characterId)
+        && d.ready is bool
+        && d.stars is int && d.stars >= 0 && d.stars <= 100
+        && d.coins is int && d.coins >= 0 && d.coins <= 10000
+        && d.roundScore is int && d.roundScore >= 0 && d.roundScore <= 100000
+        && d.roundProgress is int && d.roundProgress >= 0 && d.roundProgress <= 100
+        && d.roundDone is bool
+        && d.joinedAt is timestamp
+        && d.updatedAt is timestamp;
+    }
+
+    // --- Existing Collections (Preserved) ---
     match /analytics_sessions/{sessionId} {
       allow read: if isStatsAdmin();
-      allow create: if isValidSession(request.resource.data);
+      allow create: if isValidId(sessionId) && isValidSession(request.resource.data);
       allow update, delete: if false;
     }
 
-    // Public per-game visit counters shown next to each game card.
-    // Anyone may read or atomically increment by +1; admins may sync counts.
     match /game_stats/{gameId} {
       allow read: if true;
-      allow create: if isValidGameId(gameId)
+      allow create: if isValidTrackedGameId(gameId)
         && request.resource.data.keys().hasOnly(['visits'])
         && request.resource.data.visits is int
         && (
           request.resource.data.visits == 1
           || (isStatsAdmin() && request.resource.data.visits >= 0)
         );
-      allow update: if isValidGameId(gameId)
+      allow update: if isValidTrackedGameId(gameId)
         && request.resource.data.keys().hasOnly(['visits'])
         && request.resource.data.visits is int
         && request.resource.data.visits >= 0
@@ -71,8 +275,276 @@ service cloud.firestore {
       allow delete: if false;
     }
 
-    match /{document=**} {
-      allow read, write: if false;
+    // --- Mario Party Online: Player Profiles (No PII) ---
+    match /party_profiles/{uid} {
+      allow get: if isSignedIn() && isValidId(uid);
+      allow list: if isSignedIn() && existing().uid == request.auth.uid;
+      allow create: if isVerified()
+        && isValidId(uid)
+        && uid == request.auth.uid
+        && isValidPartyProfile(incoming())
+        && incoming().wins == 0
+        && incoming().starsTotal == 0
+        && incoming().gamesPlayed == 0
+        && incoming().createdAt == request.time
+        && incoming().updatedAt == request.time
+        && incoming().lastSeenAt == request.time;
+      allow update: if isVerified()
+        && isValidId(uid)
+        && uid == request.auth.uid
+        && isValidPartyProfile(incoming())
+        && incoming().uid == existing().uid
+        && incoming().friendCode == existing().friendCode
+        && incoming().createdAt == existing().createdAt
+        && incoming().updatedAt == request.time
+        && (
+          (incoming().diff(existing()).affectedKeys().hasOnly(['displayName', 'nameKey', 'favoriteCharacter', 'lastSeenAt', 'updatedAt'])
+            && incoming().lastSeenAt == request.time)
+          || (incoming().diff(existing()).affectedKeys().hasOnly(['lastSeenAt', 'updatedAt'])
+            && incoming().lastSeenAt == request.time)
+          || (incoming().diff(existing()).affectedKeys().hasOnly(['wins', 'starsTotal', 'gamesPlayed', 'lastSeenAt', 'updatedAt'])
+            && incoming().wins >= existing().wins && incoming().wins <= existing().wins + 1
+            && incoming().starsTotal >= existing().starsTotal && incoming().starsTotal <= existing().starsTotal + 15
+            && incoming().gamesPlayed >= existing().gamesPlayed && incoming().gamesPlayed <= existing().gamesPlayed + 1
+            && incoming().lastSeenAt == request.time)
+        );
+      allow delete: if false;
+    }
+
+    // --- Exact Friend Code Lookup Directory ---
+    match /party_codes/{code} {
+      allow get: if isSignedIn() && isValidCode(code);
+      allow list: if isSignedIn() && existing().uid == request.auth.uid;
+      allow create: if isVerified()
+        && isValidCode(code)
+        && isValidDirectoryEntry(incoming())
+        && incoming().friendCode == code
+        && incoming().createdAt == request.time
+        && incoming().updatedAt == request.time;
+      allow update: if isVerified()
+        && isValidCode(code)
+        && existing().uid == request.auth.uid
+        && isValidDirectoryEntry(incoming())
+        && incoming().uid == existing().uid
+        && incoming().friendCode == existing().friendCode
+        && incoming().createdAt == existing().createdAt
+        && incoming().updatedAt == request.time
+        && incoming().diff(existing()).affectedKeys().hasOnly(['displayName', 'favoriteCharacter', 'updatedAt']);
+      allow delete: if false;
+    }
+
+    // --- Exact Encoded Display Name Lookup Directory ---
+    match /party_names/{nameKey} {
+      allow get: if isSignedIn() && isValidId(nameKey);
+      allow list: if isSignedIn() && existing().uid == request.auth.uid;
+      allow create: if isVerified()
+        && isValidId(nameKey)
+        && isValidDirectoryEntry(incoming())
+        && incoming().createdAt == request.time
+        && incoming().updatedAt == request.time;
+      allow update: if isVerified()
+        && isValidId(nameKey)
+        && existing().uid == request.auth.uid
+        && isValidDirectoryEntry(incoming())
+        && incoming().uid == existing().uid
+        && incoming().friendCode == existing().friendCode
+        && incoming().createdAt == existing().createdAt
+        && incoming().updatedAt == request.time
+        && incoming().diff(existing()).affectedKeys().hasOnly(['displayName', 'favoriteCharacter', 'updatedAt']);
+      allow delete: if isVerified()
+        && isValidId(nameKey)
+        && existing().uid == request.auth.uid;
+    }
+
+    // --- Real-Time Friend Requests ---
+    match /party_friend_requests/{requestId} {
+      allow get: if isSignedIn() && isValidId(requestId)
+        && (existing().fromUid == request.auth.uid || existing().toUid == request.auth.uid);
+      allow list: if isSignedIn()
+        && (existing().fromUid == request.auth.uid || existing().toUid == request.auth.uid);
+      allow create: if isVerified()
+        && isValidId(requestId)
+        && isValidFriendRequest(incoming())
+        && incoming().fromUid == request.auth.uid
+        && incoming().status == 'pending'
+        && incoming().createdAt == request.time
+        && incoming().updatedAt == request.time
+        && exists(/databases/$(database)/documents/party_profiles/$(incoming().toUid));
+      allow update: if isVerified()
+        && isValidId(requestId)
+        && isValidFriendRequest(incoming())
+        && existing().status == 'pending'
+        && existing().toUid == request.auth.uid
+        && incoming().fromUid == existing().fromUid
+        && incoming().toUid == existing().toUid
+        && incoming().createdAt == existing().createdAt
+        && incoming().updatedAt == request.time
+        && incoming().status in ['accepted', 'declined']
+        && incoming().diff(existing()).affectedKeys().hasOnly(['status', 'updatedAt']);
+      allow delete: if isVerified()
+        && isValidId(requestId)
+        && (existing().fromUid == request.auth.uid || existing().toUid == request.auth.uid);
+    }
+
+    // --- Mutual Friendships ---
+    match /party_friendships/{friendshipId} {
+      allow get: if isSignedIn() && isValidId(friendshipId)
+        && (existing().uidA == request.auth.uid || existing().uidB == request.auth.uid);
+      allow list: if isSignedIn()
+        && (existing().uidA == request.auth.uid || existing().uidB == request.auth.uid);
+      allow create: if isVerified()
+        && isValidId(friendshipId)
+        && isValidFriendship(incoming())
+        && (incoming().uidA == request.auth.uid || incoming().uidB == request.auth.uid)
+        && incoming().createdAt == request.time
+        && incoming().updatedAt == request.time
+        && exists(/databases/$(database)/documents/party_profiles/$(incoming().uidA))
+        && exists(/databases/$(database)/documents/party_profiles/$(incoming().uidB));
+      allow update: if isVerified()
+        && isValidId(friendshipId)
+        && isValidFriendship(incoming())
+        && (existing().uidA == request.auth.uid || existing().uidB == request.auth.uid)
+        && incoming().uidA == existing().uidA
+        && incoming().uidB == existing().uidB
+        && incoming().createdAt == existing().createdAt
+        && incoming().updatedAt == request.time
+        && (
+          (existing().uidA == request.auth.uid && incoming().diff(existing()).affectedKeys().hasOnly(['nameA', 'charA', 'updatedAt']))
+          || (existing().uidB == request.auth.uid && incoming().diff(existing()).affectedKeys().hasOnly(['nameB', 'charB', 'updatedAt']))
+        );
+      allow delete: if isVerified()
+        && isValidId(friendshipId)
+        && (existing().uidA == request.auth.uid || existing().uidB == request.auth.uid);
+    }
+
+    // --- Live Match Invitations ---
+    match /party_invites/{inviteId} {
+      allow get: if isSignedIn() && isValidId(inviteId)
+        && (existing().fromUid == request.auth.uid || existing().toUid == request.auth.uid);
+      allow list: if isSignedIn()
+        && (existing().fromUid == request.auth.uid || existing().toUid == request.auth.uid);
+      allow create: if isVerified()
+        && isValidId(inviteId)
+        && isValidInvite(incoming())
+        && incoming().fromUid == request.auth.uid
+        && incoming().status == 'pending'
+        && incoming().createdAt == request.time
+        && incoming().updatedAt == request.time
+        && exists(/databases/$(database)/documents/party_profiles/$(incoming().toUid))
+        && exists(/databases/$(database)/documents/party_rooms/$(incoming().roomCode));
+      allow update: if isVerified()
+        && isValidId(inviteId)
+        && isValidInvite(incoming())
+        && existing().status == 'pending'
+        && incoming().fromUid == existing().fromUid
+        && incoming().toUid == existing().toUid
+        && incoming().roomCode == existing().roomCode
+        && incoming().createdAt == existing().createdAt
+        && incoming().updatedAt == request.time
+        && incoming().diff(existing()).affectedKeys().hasOnly(['status', 'updatedAt'])
+        && (
+          (existing().toUid == request.auth.uid && incoming().status in ['accepted', 'declined'])
+          || (existing().fromUid == request.auth.uid && incoming().status == 'expired')
+        );
+      allow delete: if isVerified()
+        && isValidId(inviteId)
+        && (existing().fromUid == request.auth.uid || existing().toUid == request.auth.uid);
+    }
+
+    // --- Real-Time Multiplayer Party Rooms ---
+    match /party_rooms/{roomCode} {
+      allow get: if isSignedIn() && isValidCode(roomCode);
+      allow list: if isSignedIn() && existing().hostUid == request.auth.uid;
+      allow create: if isVerified()
+        && isValidCode(roomCode)
+        && isValidPartyRoom(incoming())
+        && incoming().roomCode == roomCode
+        && incoming().hostUid == request.auth.uid
+        && incoming().status == 'lobby'
+        && incoming().createdAt == request.time
+        && incoming().updatedAt == request.time;
+      allow update: if isVerified()
+        && isValidCode(roomCode)
+        && isValidPartyRoom(incoming())
+        && existing().status != 'closed'
+        && existing().hostUid == request.auth.uid
+        && incoming().roomCode == existing().roomCode
+        && incoming().hostUid == existing().hostUid
+        && incoming().createdAt == existing().createdAt
+        && incoming().updatedAt == request.time
+        && (
+          // Action 1: Host configures mode/game/queue in lobby
+          (existing().status == 'lobby'
+            && incoming().status == 'lobby'
+            && incoming().diff(existing()).affectedKeys().hasOnly(['mode', 'currentGameId', 'totalRounds', 'cupQueue', 'updatedAt']))
+          // Action 2: Host starts a round (from lobby, round_result, or podium)
+          || (existing().status in ['lobby', 'round_result', 'podium']
+            && incoming().status == 'playing'
+            && incoming().diff(existing()).affectedKeys().hasOnly([
+              'status', 'mode', 'currentGameId', 'roundIndex', 'totalRounds',
+              'roundSeed', 'roundStartedAtMs', 'roundDurationSec', 'cupQueue',
+              'winnerUid', 'winnerName', 'updatedAt'
+            ]))
+          // Action 3: Host finishes round -> round_result or podium
+          || (existing().status == 'playing'
+            && incoming().status in ['round_result', 'podium']
+            && incoming().diff(existing()).affectedKeys().hasOnly(['status', 'winnerUid', 'winnerName', 'updatedAt']))
+          // Action 4: Host returns from round_result/podium back to lobby for character/game change
+          || (existing().status in ['round_result', 'podium']
+            && incoming().status == 'lobby'
+            && incoming().diff(existing()).affectedKeys().hasOnly(['status', 'roundIndex', 'winnerUid', 'winnerName', 'updatedAt']))
+          // Action 5: Host closes room (terminal locked state)
+          || (incoming().status == 'closed'
+            && incoming().diff(existing()).affectedKeys().hasOnly(['status', 'updatedAt']))
+        );
+      allow delete: if false;
+
+      // --- Room Players Subcollection (Master Gate Protected) ---
+      match /players/{uid} {
+        allow get: if isSignedIn() && isValidCode(roomCode) && isValidId(uid);
+        allow list: if isSignedIn() && existing().roomCode == roomCode;
+        allow create: if isVerified()
+          && isValidCode(roomCode)
+          && isValidId(uid)
+          && uid == request.auth.uid
+          && isValidRoomPlayer(incoming(), roomCode, uid)
+          && incoming().stars == 0
+          && incoming().coins == 0
+          && incoming().roundScore == 0
+          && incoming().roundProgress == 0
+          && incoming().roundDone == false
+          && incoming().joinedAt == request.time
+          && incoming().updatedAt == request.time
+          && exists(/databases/$(database)/documents/party_rooms/$(roomCode));
+        allow update: if isVerified()
+          && isValidCode(roomCode)
+          && isValidId(uid)
+          && uid == request.auth.uid
+          && isValidRoomPlayer(incoming(), roomCode, uid)
+          && incoming().uid == existing().uid
+          && incoming().roomCode == existing().roomCode
+          && incoming().joinedAt == existing().joinedAt
+          && incoming().updatedAt == request.time
+          && exists(/databases/$(database)/documents/party_rooms/$(roomCode))
+          && (
+            // Action 1: Pick character / toggle ready in lobby
+            incoming().diff(existing()).affectedKeys().hasOnly(['displayName', 'characterId', 'ready', 'updatedAt'])
+            // Action 2: Reset round score at start of a new round
+            || (incoming().diff(existing()).affectedKeys().hasOnly(['roundScore', 'roundProgress', 'roundDone', 'updatedAt'])
+              && incoming().roundScore >= 0)
+            // Action 3: Award stars/coins at round completion (bounded increment)
+            || (incoming().diff(existing()).affectedKeys().hasOnly(['stars', 'coins', 'roundScore', 'roundProgress', 'roundDone', 'updatedAt'])
+              && incoming().stars >= existing().stars && incoming().stars <= existing().stars + 3
+              && incoming().coins >= existing().coins && incoming().coins <= existing().coins + 50)
+            // Action 4: Reset tournament scores when returning to lobby for a fresh cup
+            || (incoming().diff(existing()).affectedKeys().hasOnly(['stars', 'coins', 'roundScore', 'roundProgress', 'roundDone', 'ready', 'updatedAt'])
+              && incoming().stars == 0 && incoming().coins == 0 && incoming().roundScore == 0 && incoming().roundProgress == 0 && incoming().roundDone == false)
+          );
+        allow delete: if isVerified()
+          && isValidCode(roomCode)
+          && isValidId(uid)
+          && uid == request.auth.uid;
+      }
     }
   }
 }

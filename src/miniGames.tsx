@@ -74,6 +74,10 @@ import {
   readFruitSlashStats,
   type FruitSlashStats,
 } from './gameFruitSlash';
+import {
+  MarioPartyGame,
+  MarioPartyPreviewArt,
+} from './marioParty/MarioPartyGame';
 
 type Dir = 'UP' | 'DOWN' | 'LEFT' | 'RIGHT';
 type TierKey = 'intro' | 'curved' | 'woven' | 'hard' | 'master' | 'legend';
@@ -1361,6 +1365,7 @@ function HeartIcon({ filled, pulse }: { filled: boolean; pulse: boolean }) {
 }
 
 export type MiniGameId =
+  | 'mario-party'
   | 'gum-shop'
   | 'fruit-slash'
   | 'devil-trap'
@@ -1446,6 +1451,11 @@ const HUB_COPY = {
     fruitSlashTitle: 'سيف الفواكه 2D',
     fruitSlashDesc:
       'قطّع الفواكه المتطايرة بسيف الكاتانا وحقق سلاسل الكومبو مع فاكهة التجميد والفاكهة الذهبية وتفادَ القنابل في وضع كلاسيك أو Zen!',
+    marioPartyTag: 'أونلاين · 25 ميني قيم + 5 ألعاب 3D · 8 شخصيات',
+    marioPartyTitle: 'حفلة ماريو أونلاين',
+    marioPartyDesc:
+      'اكتب اسمك، أضف أصدقاءك وادعهم للعب عليك مباشرة! اختر شخصيتك من 8 أبطال قبل البدء وتنافسوا في 25 ميني قيم + 5 ألعاب 3D بأسلوب ماريو!',
+    marioPartyMeta: 'لعب جماعي حقيقي + تدريب ضد البوت',
     comingSoonTitle: 'ألعاب جديدة قريباً',
     comingSoonDesc: 'هذه المساحة جاهزة لإضافة المزيد من الألعاب الممتعة.',
   },
@@ -1517,6 +1527,11 @@ const HUB_COPY = {
     fruitSlashTitle: 'Fruit Slash 2D',
     fruitSlashDesc:
       'Slice flying fruit with a calligraphic katana blade, chain multi-slice combos with Freeze & Golden Frenzy fruits, and dodge bombs in Classic or Zen!',
+    marioPartyTag: 'Online · 25 Mini-Games + 5 3D · 8 Heroes',
+    marioPartyTitle: 'Mario Party Online',
+    marioPartyDesc:
+      'Set your name, add & invite real friends, choose from 8 Mario-style heroes before starting, and compete across 25 mini-games + 5 3D games!',
+    marioPartyMeta: 'Real Multiplayer + Practice vs Bot',
     comingSoonTitle: 'More Games Soon',
     comingSoonDesc: 'Space ready for adding new mini-games anytime.',
   },
@@ -2579,6 +2594,16 @@ export const GamesModal: React.FC<GamesModalProps> = ({
     setActiveGame(null);
   }, []);
 
+  if (activeGame === 'mario-party') {
+    return (
+      <MarioPartyGame
+        lang={lang}
+        sfxEnabled={sfxEnabled}
+        onExit={handleExitGameToHub}
+      />
+    );
+  }
+
   if (activeGame === 'gum-shop') {
     return <GumShopGame lang={lang} onExit={handleExitGameToHub} />;
   }
@@ -2771,7 +2796,7 @@ export const GamesModal: React.FC<GamesModalProps> = ({
           {/* Available Games Count + Music Toggle */}
           <div className="flex items-center gap-2.5 shrink-0">
             <div className="text-xs sm:text-sm font-semibold text-sky-300 whitespace-nowrap">
-              {ht.gamesCount(15)}
+              {ht.gamesCount(16)}
             </div>
             <MusicToggleButton
               enabled={musicEnabled}
@@ -2790,6 +2815,45 @@ export const GamesModal: React.FC<GamesModalProps> = ({
           </p>
 
           <div className="grid grid-cols-2 lg:grid-cols-3 gap-2.5 sm:gap-4">
+            {/* Featured Card: Mario Party Online (25 Mini-Games + Real Multiplayer) */}
+            <div className="col-span-2 lg:col-span-3 group rounded-xl sm:rounded-2xl border-2 border-amber-300/70 bg-gradient-to-br from-[#122652] via-[#0d1c3d] to-[#132245] hover:border-amber-200 transition-colors overflow-hidden shadow-2xl grid grid-cols-1 md:grid-cols-12">
+              <div className="md:col-span-5 aspect-[2/1] md:aspect-auto w-full border-b md:border-b-0 md:border-e border-white/10 overflow-hidden bg-[#1d4ed8]">
+                <MarioPartyPreviewArt />
+              </div>
+              <div className="md:col-span-7 p-3.5 sm:p-5 flex flex-col justify-between gap-3">
+                <div>
+                  <div className="flex flex-wrap items-center justify-between gap-2 mb-1.5">
+                    <h2 className="text-base sm:text-xl font-black text-amber-200 leading-snug">
+                      {ht.marioPartyTitle}
+                    </h2>
+                    <span className="font-num text-[11px] sm:text-xs font-black px-2.5 py-0.5 rounded-md bg-amber-400 text-slate-950 whitespace-nowrap">
+                      {ht.marioPartyTag}
+                    </span>
+                  </div>
+                  <p className="text-xs sm:text-sm text-slate-200 leading-relaxed">
+                    {ht.marioPartyDesc}
+                  </p>
+                </div>
+                <div className="space-y-2 pt-2 border-t border-white/10">
+                  <div className="flex items-center justify-between gap-2 text-xs text-sky-200 font-bold">
+                    <span>{ht.marioPartyMeta}</span>
+                    <span className="font-num text-amber-300">
+                      {visitCountsReady || (visitCounts['mini-mario-party'] ?? 0) > 0
+                        ? formatVisitLabel(visitCounts['mini-mario-party'] ?? 0, lang)
+                        : '…'}
+                    </span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setActiveGame('mario-party')}
+                    className="w-full h-10 sm:h-11 rounded-xl bg-gradient-to-b from-amber-300 to-amber-500 hover:from-amber-200 hover:to-amber-400 active:scale-[0.99] text-slate-950 font-black text-sm sm:text-base transition-all cursor-pointer shadow-lg"
+                  >
+                    {ht.playBtn}
+                  </button>
+                </div>
+              </div>
+            </div>
+
             {/* Game Card 1: Arrow Escape */}
             <div className="group rounded-xl sm:rounded-2xl border border-amber-400/30 bg-[#0d182d] hover:border-amber-300/60 transition-colors overflow-hidden shadow-xl flex flex-col">
               <div className="aspect-[2/1] w-full border-b border-white/10 overflow-hidden bg-[#071123]">

@@ -20,6 +20,7 @@ export const TRACKED_GAMES = {
   'mini-brick-breaker': 'تكسير النيون',
   'mini-gum-shop': 'بياع العلك 3D',
   'mini-fruit-slash': 'سيف الفواكه 2D',
+  'mini-mario-party': 'حفلة ماريو أونلاين 25',
 } as const;
 
 export type TrackedGameId = keyof typeof TRACKED_GAMES;

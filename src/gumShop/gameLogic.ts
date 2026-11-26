@@ -146,15 +146,15 @@ function getActiveAdBonuses(activeAds: ActiveAdState[]): {
       extraMaxCustomers += 2;
     } else if (ad.id === 'super_offers') {
       extraBuyPacks += 1;
-      revenueBonus += 0.12;
+      revenueBonus += 0.02;
     } else if (ad.id === 'vip_crown') {
       extraMaxCustomers += 2;
-      revenueBonus += 0.15;
+      revenueBonus += 0.02;
     } else if (ad.id === 'viral_festival') {
       spawnDelayMult *= 0.68;
       extraMaxCustomers += 3;
       extraBuyPacks += 1;
-      revenueBonus += 0.18;
+      revenueBonus += 0.03;
     }
   }
 
@@ -162,7 +162,7 @@ function getActiveAdBonuses(activeAds: ActiveAdState[]): {
     spawnDelayMult: Math.max(0.45, spawnDelayMult),
     extraMaxCustomers: Math.min(6, extraMaxCustomers),
     extraBuyPacks: Math.min(2, extraBuyPacks),
-    revenueBonus: Math.min(0.45, revenueBonus),
+    revenueBonus: Math.min(0.04, revenueBonus),
   };
 }
 
@@ -1140,16 +1140,21 @@ export function actionCheckoutCustomers(
 
   const adBonuses = getActiveAdBonuses(world.activeAds);
   let earnedTotal = 0;
+  let tipTotal = 0;
   let packsTotal = 0;
   for (const c of waiting) {
-    const baseMult = manualBonus
-      ? 1.15
+    const baseTipRate = manualBonus
+      ? 0.03
       : world.upgrades.includes('auto_cashier')
-      ? 1.1
-      : 1.0;
-    const bonusMult = baseMult + adBonuses.revenueBonus;
-    const paid = Math.max(1, Math.round(c.willPayAmount * bonusMult));
+      ? 0.02
+      : 0;
+    const tipRate = baseTipRate + adBonuses.revenueBonus;
+    // Small, realistic tip capped at +3 SAR per customer so a 22 SAR pack stays ~23 SAR
+    const tip =
+      tipRate > 0 ? Math.min(3, Math.max(1, Math.round(c.willPayAmount * tipRate))) : 0;
+    const paid = Math.max(1, c.willPayAmount + tip);
     earnedTotal += paid;
+    tipTotal += tip;
     packsTotal += c.carriedQty;
     c.stage = 'LEAVING';
     c.mood = 'happy';
@@ -1163,14 +1168,16 @@ export function actionCheckoutCustomers(
   world.todayPacksSold += packsTotal;
   world.version += 1;
   audio.playCash();
+  const arPacks = packsTotal === 1 ? 'علبة' : 'علب';
+  const enPacks = packsTotal === 1 ? 'pack' : 'packs';
   pushNotice(
     world,
-    manualBonus
-      ? `+${earnedTotal} ريال (مع إكرامية المحاسبة!)`
-      : `+${earnedTotal} ريال من بيع العلك`,
-    manualBonus
-      ? `+${earnedTotal} SAR (with checkout tip!)`
-      : `+${earnedTotal} SAR from gum sale`,
+    tipTotal > 0
+      ? `+${earnedTotal} ريال (${packsTotal} ${arPacks} · إكرامية +${tipTotal})`
+      : `+${earnedTotal} ريال (${packsTotal} ${arPacks})`,
+    tipTotal > 0
+      ? `+${earnedTotal} SAR (${packsTotal} ${enPacks} · tip +${tipTotal})`
+      : `+${earnedTotal} SAR (${packsTotal} ${enPacks})`,
     'good'
   );
   saveGumShopWorldNow(world);

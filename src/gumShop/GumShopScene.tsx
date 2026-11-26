@@ -1174,6 +1174,761 @@ const OutdoorAdScreens3D: React.FC<{
   );
 };
 
+interface NeighborHouseSpec {
+  id: string;
+  x: number;
+  z: number;
+  rotY: number;
+  wallColor: string;
+  trimColor: string;
+  roofColor: string;
+  doorColor: string;
+  scale?: number;
+}
+
+/**
+ * Composite procedural 3D neighborhood house (foundation, stucco walls, trim,
+ * pitched hip roof, brick chimney, porch awning, warm night-lit windows, hedges).
+ */
+const NeighborHouseUnit3D: React.FC<{
+  spec: NeighborHouseSpec;
+  isNight: boolean;
+  isSoftwareGl: boolean;
+}> = ({ spec, isNight, isSoftwareGl }) => {
+  const s = spec.scale ?? 1;
+  return (
+    <group position={[spec.x, 0, spec.z]} rotation={[0, spec.rotY, 0]} scale={[s, s, s]}>
+      {/* Concrete Foundation Plinth */}
+      <mesh position={[0, 0.09, 0]} receiveShadow={!isSoftwareGl}>
+        <boxGeometry args={[5.15, 0.18, 4.35]} />
+        <meshStandardMaterial color="#94a3b8" roughness={0.9} />
+      </mesh>
+
+      {/* Main Painted Stucco Walls */}
+      <mesh position={[0, 1.65, 0]} castShadow={!isSoftwareGl} receiveShadow={!isSoftwareGl}>
+        <boxGeometry args={[4.75, 2.95, 3.95]} />
+        <meshStandardMaterial color={spec.wallColor} roughness={0.85} />
+      </mesh>
+
+      {/* Lower Exterior Wainscoting Band */}
+      <mesh position={[0, 0.44, 0]}>
+        <boxGeometry args={[4.85, 0.52, 4.05]} />
+        <meshStandardMaterial color={spec.trimColor} roughness={0.82} />
+      </mesh>
+
+      {/* Pitched 4-Sided Hip Roof (aligned with X/Z walls via Math.PI/4 rotation) */}
+      <mesh
+        position={[0, 3.9, 0]}
+        rotation={[0, Math.PI / 4, 0]}
+        scale={[1, 1, 0.85]}
+        castShadow={!isSoftwareGl}
+      >
+        <coneGeometry args={[3.82, 1.56, 4]} />
+        <meshStandardMaterial color={spec.roofColor} roughness={0.72} metalness={0.08} />
+      </mesh>
+
+      {/* Brick Chimney */}
+      <mesh position={[1.38, 4.08, -0.58]} castShadow={!isSoftwareGl}>
+        <boxGeometry args={[0.56, 1.28, 0.56]} />
+        <meshStandardMaterial color="#9a3412" roughness={0.88} />
+      </mesh>
+      <mesh position={[1.38, 4.76, -0.58]}>
+        <boxGeometry args={[0.68, 0.12, 0.68]} />
+        <meshStandardMaterial color="#334155" roughness={0.7} metalness={0.25} />
+      </mesh>
+
+      {/* Front Door Frame + Wooden Door + Brass Doorknob */}
+      <mesh position={[0, 1.13, 1.99]}>
+        <boxGeometry args={[1.14, 1.96, 0.08]} />
+        <meshStandardMaterial color="#f8fafc" roughness={0.7} />
+      </mesh>
+      <mesh position={[0, 1.1, 2.04]}>
+        <boxGeometry args={[0.96, 1.84, 0.08]} />
+        <meshStandardMaterial color={spec.doorColor} roughness={0.65} />
+      </mesh>
+      <mesh position={[0.32, 1.06, 2.1]}>
+        <sphereGeometry args={[0.06, 8, 8]} />
+        <meshStandardMaterial color="#fbbf24" roughness={0.25} metalness={0.78} />
+      </mesh>
+
+      {/* Porch Canopy Awning + Stone Doorstep */}
+      <mesh position={[0, 2.26, 2.34]} rotation={[0.2, 0, 0]} castShadow={!isSoftwareGl}>
+        <boxGeometry args={[1.76, 0.12, 0.84]} />
+        <meshStandardMaterial color={spec.roofColor} roughness={0.68} />
+      </mesh>
+      <mesh position={[0, 0.07, 2.34]} receiveShadow={!isSoftwareGl}>
+        <boxGeometry args={[1.5, 0.14, 0.72]} />
+        <meshStandardMaterial color="#cbd5e1" roughness={0.88} />
+      </mesh>
+
+      {/* Porch Lamp */}
+      <mesh position={[0.74, 1.92, 2.08]}>
+        <sphereGeometry args={[0.1, 8, 8]} />
+        <meshStandardMaterial
+          color="#fef08a"
+          emissive="#fbbf24"
+          emissiveIntensity={isNight ? 1.55 : 0.25}
+          roughness={0.25}
+        />
+      </mesh>
+
+      {/* Two Framed Front Windows (Warm Interior Glow at Night) */}
+      {[-1.48, 1.48].map((wx) => (
+        <group key={wx} position={[wx, 1.68, 2.0]}>
+          <mesh>
+            <boxGeometry args={[0.96, 1.0, 0.09]} />
+            <meshStandardMaterial color="#f8fafc" roughness={0.7} />
+          </mesh>
+          <mesh position={[0, 0, 0.04]}>
+            <boxGeometry args={[0.78, 0.82, 0.05]} />
+            <meshStandardMaterial
+              color={isNight ? '#fde047' : '#bae6fd'}
+              emissive={isNight ? '#f59e0b' : '#000000'}
+              emissiveIntensity={isNight ? 0.92 : 0}
+              roughness={0.18}
+              metalness={0.25}
+            />
+          </mesh>
+          <mesh position={[0, -0.54, 0.08]}>
+            <boxGeometry args={[1.06, 0.12, 0.22]} />
+            <meshStandardMaterial color={spec.trimColor} roughness={0.75} />
+          </mesh>
+        </group>
+      ))}
+
+      {/* Cozy Front Yard Hedge Bushes + Entry Stepping Path */}
+      {[-1.85, 1.85].map((hx) => (
+        <mesh key={hx} position={[hx, 0.36, 2.42]} castShadow={!isSoftwareGl}>
+          <dodecahedronGeometry args={[0.42, 0]} />
+          <meshStandardMaterial color="#16a34a" roughness={0.88} />
+        </mesh>
+      ))}
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.015, 3.05]}>
+        <planeGeometry args={[1.22, 1.25]} />
+        <meshStandardMaterial color="#d6d3d1" roughness={0.9} />
+      </mesh>
+    </group>
+  );
+};
+
+/**
+ * Surrounding 3D Neighborhood Houses:
+ * - Flanking houses beside the Warehouse & Sleep House
+ * - Back neighborhood lane & cozy row of houses behind the shop
+ * - Across-the-street far sidewalk & facing row of neighborhood houses
+ */
+const NeighborhoodHouses3D: React.FC<{
+  storageX: number;
+  houseX: number;
+  backZ: number;
+  sidewalkTex: THREE.CanvasTexture;
+  isNight: boolean;
+  isSoftwareGl: boolean;
+}> = ({ storageX, houseX, backZ, sidewalkTex, isNight, isSoftwareGl }) => {
+  const houses = useMemo<NeighborHouseSpec[]>(
+    () => [
+      // Flanking left & right neighbor homes (visible immediately beside the shop!)
+      {
+        id: 'left-1',
+        x: storageX - 6.8,
+        z: -0.5,
+        rotY: 0,
+        wallColor: '#fef3c7',
+        trimColor: '#d97706',
+        roofColor: '#c2410c',
+        doorColor: '#78350f',
+        scale: 1.0,
+      },
+      {
+        id: 'left-2',
+        x: storageX - 13.6,
+        z: -0.8,
+        rotY: 0.06,
+        wallColor: '#dbeafe',
+        trimColor: '#3b82f6',
+        roofColor: '#1e3a8a',
+        doorColor: '#1e293b',
+        scale: 0.96,
+      },
+      {
+        id: 'right-1',
+        x: houseX + 7.2,
+        z: -0.5,
+        rotY: 0,
+        wallColor: '#d1fae5',
+        trimColor: '#10b981',
+        roofColor: '#15803d',
+        doorColor: '#7c2d12',
+        scale: 1.0,
+      },
+      {
+        id: 'right-2',
+        x: houseX + 14.0,
+        z: -0.8,
+        rotY: -0.06,
+        wallColor: '#ffedd5',
+        trimColor: '#f97316',
+        roofColor: '#9f1239',
+        doorColor: '#451a03',
+        scale: 0.96,
+      },
+
+      // Back neighborhood skyline row behind the back lane
+      {
+        id: 'back-1',
+        x: -21.5,
+        z: backZ - 8.6,
+        rotY: 0,
+        wallColor: '#fce7f3',
+        trimColor: '#ec4899',
+        roofColor: '#831843',
+        doorColor: '#78350f',
+        scale: 1.02,
+      },
+      {
+        id: 'back-2',
+        x: -14.0,
+        z: backZ - 8.6,
+        rotY: 0,
+        wallColor: '#e0f2fe',
+        trimColor: '#0284c7',
+        roofColor: '#0f766e',
+        doorColor: '#7c2d12',
+        scale: 1.04,
+      },
+      {
+        id: 'back-3',
+        x: -6.8,
+        z: backZ - 8.6,
+        rotY: 0,
+        wallColor: '#fef9c3',
+        trimColor: '#eab308',
+        roofColor: '#b45309',
+        doorColor: '#713f12',
+        scale: 0.98,
+      },
+      {
+        id: 'back-4',
+        x: 6.8,
+        z: backZ - 8.6,
+        rotY: 0,
+        wallColor: '#ede9fe',
+        trimColor: '#8b5cf6',
+        roofColor: '#4c1d95',
+        doorColor: '#431407',
+        scale: 1.0,
+      },
+      {
+        id: 'back-5',
+        x: 14.0,
+        z: backZ - 8.6,
+        rotY: 0,
+        wallColor: '#dcfce7',
+        trimColor: '#22c55e',
+        roofColor: '#166534',
+        doorColor: '#78350f',
+        scale: 1.04,
+      },
+      {
+        id: 'back-6',
+        x: 21.5,
+        z: backZ - 8.6,
+        rotY: 0,
+        wallColor: '#ffedd5',
+        trimColor: '#ea580c',
+        roofColor: '#9a3412',
+        doorColor: '#451a03',
+        scale: 1.0,
+      },
+
+      // Across-the-street row facing the Gum Shop
+      {
+        id: 'front-1',
+        x: -16.5,
+        z: 21.2,
+        rotY: Math.PI,
+        wallColor: '#fef3c7',
+        trimColor: '#f59e0b',
+        roofColor: '#b91c1c',
+        doorColor: '#78350f',
+        scale: 1.02,
+      },
+      {
+        id: 'front-2',
+        x: -8.2,
+        z: 21.2,
+        rotY: Math.PI,
+        wallColor: '#dbeafe',
+        trimColor: '#2563eb',
+        roofColor: '#1e3a8a',
+        doorColor: '#334155',
+        scale: 1.0,
+      },
+      {
+        id: 'front-3',
+        x: 0.0,
+        z: 21.2,
+        rotY: Math.PI,
+        wallColor: '#d1fae5',
+        trimColor: '#059669',
+        roofColor: '#065f46',
+        doorColor: '#7c2d12',
+        scale: 1.04,
+      },
+      {
+        id: 'front-4',
+        x: 8.2,
+        z: 21.2,
+        rotY: Math.PI,
+        wallColor: '#fce7f3',
+        trimColor: '#db2777',
+        roofColor: '#9d174d',
+        doorColor: '#78350f',
+        scale: 1.0,
+      },
+      {
+        id: 'front-5',
+        x: 16.5,
+        z: 21.2,
+        rotY: Math.PI,
+        wallColor: '#ede9fe',
+        trimColor: '#7c3aed',
+        roofColor: '#5b21b6',
+        doorColor: '#451a03',
+        scale: 1.02,
+      },
+    ],
+    [storageX, houseX, backZ]
+  );
+
+  return (
+    <group>
+      {/* Back Neighborhood Pedestrian Lane */}
+      <mesh
+        rotation={[-Math.PI / 2, 0, 0]}
+        position={[0, -0.02, backZ - 4.1]}
+        receiveShadow={!isSoftwareGl}
+      >
+        <planeGeometry args={[76, 2.7]} />
+        <meshStandardMaterial color="#cbd5e1" roughness={0.9} />
+      </mesh>
+
+      {/* Far Sidewalk & Curb Across the Asphalt Street */}
+      <mesh
+        rotation={[-Math.PI / 2, 0, 0]}
+        position={[3, -0.01, 16.95]}
+        receiveShadow={!isSoftwareGl}
+      >
+        <planeGeometry args={[88, 2.7]} />
+        <meshStandardMaterial map={sidewalkTex} roughness={0.9} />
+      </mesh>
+      <mesh position={[3, 0.04, 15.65]}>
+        <boxGeometry args={[88, 0.14, 0.28]} />
+        <meshStandardMaterial color="#cbd5e1" roughness={0.85} />
+      </mesh>
+
+      {/* Cozy Neighborhood Houses */}
+      {houses.map((spec) => (
+        <NeighborHouseUnit3D
+          key={spec.id}
+          spec={spec}
+          isNight={isNight}
+          isSoftwareGl={isSoftwareGl}
+        />
+      ))}
+
+      {/* Neighborhood Yard Trees along Back Row */}
+      {[-17.8, -10.4, 10.4, 17.8].map((tx) => (
+        <group key={tx} position={[tx, 0, backZ - 7.6]}>
+          <mesh position={[0, 1.05, 0]} castShadow={!isSoftwareGl}>
+            <cylinderGeometry args={[0.2, 0.28, 2.1, 8]} />
+            <meshStandardMaterial color="#78350f" roughness={0.9} />
+          </mesh>
+          <mesh position={[0, 2.7, 0]} castShadow={!isSoftwareGl}>
+            <dodecahedronGeometry args={[1.3, 0]} />
+            <meshStandardMaterial color="#22c55e" roughness={0.82} />
+          </mesh>
+        </group>
+      ))}
+    </group>
+  );
+};
+
+interface StrollerSpec {
+  id: number;
+  lane: 'front_window' | 'front_curb' | 'back_lane' | 'far_sidewalk';
+  zOffset: number;
+  startFrac: number;
+  initialDir: 1 | -1;
+  speed: number;
+  shirtColor: string;
+  pantsColor: string;
+  hairColor: string;
+  skinColor: string;
+  capColor: string | null;
+  bagColor: string | null;
+  pauseInterval: number;
+}
+
+const STROLLER_SPECS: StrollerSpec[] = [
+  // Front shop-window promenade (right past the Gum Shop & Sleep House!)
+  {
+    id: 0,
+    lane: 'front_window',
+    zOffset: 4.18,
+    startFrac: 0.2,
+    initialDir: 1,
+    speed: 1.45,
+    shirtColor: '#f43f5e',
+    pantsColor: '#1e293b',
+    hairColor: '#1c1917',
+    skinColor: '#f5cba7',
+    capColor: '#0d9488',
+    bagColor: '#fbbf24',
+    pauseInterval: 9.5,
+  },
+  {
+    id: 1,
+    lane: 'front_window',
+    zOffset: 4.44,
+    startFrac: 0.72,
+    initialDir: -1,
+    speed: 1.32,
+    shirtColor: '#3b82f6',
+    pantsColor: '#334155',
+    hairColor: '#78350f',
+    skinColor: '#eab68b',
+    capColor: null,
+    bagColor: '#ec4899',
+    pauseInterval: 11.2,
+  },
+  {
+    id: 2,
+    lane: 'front_window',
+    zOffset: 4.28,
+    startFrac: 0.48,
+    initialDir: 1,
+    speed: 1.62,
+    shirtColor: '#10b981',
+    pantsColor: '#1e3a8a',
+    hairColor: '#292524',
+    skinColor: '#f3d0b1',
+    capColor: '#f59e0b',
+    bagColor: null,
+    pauseInterval: 13.0,
+  },
+  // Front curb sidewalk promenade (along billboards & street edge)
+  {
+    id: 3,
+    lane: 'front_curb',
+    zOffset: 8.32,
+    startFrac: 0.14,
+    initialDir: 1,
+    speed: 1.55,
+    shirtColor: '#a855f7',
+    pantsColor: '#1e293b',
+    hairColor: '#0f172a',
+    skinColor: '#e2ab82',
+    capColor: null,
+    bagColor: '#38bdf8',
+    pauseInterval: 10.4,
+  },
+  {
+    id: 4,
+    lane: 'front_curb',
+    zOffset: 8.56,
+    startFrac: 0.62,
+    initialDir: -1,
+    speed: 1.72,
+    shirtColor: '#f97316',
+    pantsColor: '#3f3f46',
+    hairColor: '#451a03',
+    skinColor: '#f5cba7',
+    capColor: '#e11d48',
+    bagColor: null,
+    pauseInterval: 12.6,
+  },
+  {
+    id: 5,
+    lane: 'front_curb',
+    zOffset: 8.42,
+    startFrac: 0.88,
+    initialDir: -1,
+    speed: 1.38,
+    shirtColor: '#06b6d4',
+    pantsColor: '#0f172a',
+    hairColor: '#92400e',
+    skinColor: '#f1c29b',
+    capColor: null,
+    bagColor: '#22c55e',
+    pauseInterval: 14.2,
+  },
+  // Back neighborhood lane (strolling past the backyard houses)
+  {
+    id: 6,
+    lane: 'back_lane',
+    zOffset: -3.7,
+    startFrac: 0.28,
+    initialDir: 1,
+    speed: 1.48,
+    shirtColor: '#eab308',
+    pantsColor: '#1e293b',
+    hairColor: '#1c1917',
+    skinColor: '#f5cba7',
+    capColor: '#2563eb',
+    bagColor: null,
+    pauseInterval: 15.0,
+  },
+  {
+    id: 7,
+    lane: 'back_lane',
+    zOffset: -4.45,
+    startFrac: 0.78,
+    initialDir: -1,
+    speed: 1.34,
+    shirtColor: '#ec4899',
+    pantsColor: '#334155',
+    hairColor: '#57534e',
+    skinColor: '#e8b48a',
+    capColor: null,
+    bagColor: '#a855f7',
+    pauseInterval: 16.5,
+  },
+  // Far sidewalk across the street (strolling past the facing houses)
+  {
+    id: 8,
+    lane: 'far_sidewalk',
+    zOffset: 16.35,
+    startFrac: 0.35,
+    initialDir: 1,
+    speed: 1.5,
+    shirtColor: '#14b8a6',
+    pantsColor: '#1e293b',
+    hairColor: '#1c1917',
+    skinColor: '#f5cba7',
+    capColor: '#7c3aed',
+    bagColor: null,
+    pauseInterval: 14.0,
+  },
+  {
+    id: 9,
+    lane: 'far_sidewalk',
+    zOffset: 17.05,
+    startFrac: 0.82,
+    initialDir: -1,
+    speed: 1.4,
+    shirtColor: '#ef4444',
+    pantsColor: '#334155',
+    hairColor: '#713f12',
+    skinColor: '#ecc09a',
+    capColor: null,
+    bagColor: '#f59e0b',
+    pauseInterval: 15.5,
+  },
+];
+
+interface StrollerRuntimeState {
+  x: number;
+  dir: 1 | -1;
+  walkPhase: number;
+  pauseTimer: number;
+  nextPauseTimer: number;
+  rotY: number;
+}
+
+/**
+ * Animated 3D Neighborhood Townsfolk strolling outside along the sidewalks,
+ * shopfront promenade, and neighbor house lanes (zero GC allocations in useFrame).
+ */
+const NeighborhoodStrollers3D: React.FC<{
+  storageX: number;
+  houseX: number;
+  backZ: number;
+  isSoftwareGl: boolean;
+}> = ({ storageX, houseX, backZ, isSoftwareGl }) => {
+  const groupRefs = useRef<(THREE.Group | null)[]>([]);
+  const leftLegRefs = useRef<(THREE.Mesh | null)[]>([]);
+  const rightLegRefs = useRef<(THREE.Mesh | null)[]>([]);
+  const leftArmRefs = useRef<(THREE.Mesh | null)[]>([]);
+  const rightArmRefs = useRef<(THREE.Mesh | null)[]>([]);
+
+  const minFrontX = storageX - 10.5;
+  const maxFrontX = houseX + 10.5;
+
+  const statesRef = useRef<StrollerRuntimeState[]>(
+    STROLLER_SPECS.map((s) => {
+      const minX = s.lane === 'back_lane' || s.lane === 'far_sidewalk' ? -20 : minFrontX;
+      const maxX = s.lane === 'back_lane' || s.lane === 'far_sidewalk' ? 20 : maxFrontX;
+      return {
+        x: minX + (maxX - minX) * s.startFrac,
+        dir: s.initialDir,
+        walkPhase: s.id * 1.15,
+        pauseTimer: 0,
+        nextPauseTimer: 3.5 + (s.id % 4) * 2.2,
+        rotY: s.initialDir > 0 ? Math.PI / 2 : -Math.PI / 2,
+      };
+    })
+  );
+
+  useFrame((_, rawDt) => {
+    const dt = Math.min(rawDt, 0.05);
+    const states = statesRef.current;
+
+    for (let i = 0; i < STROLLER_SPECS.length; i++) {
+      const spec = STROLLER_SPECS[i];
+      const st = states[i];
+      const grp = groupRefs.current[i];
+      if (!grp || !st) continue;
+
+      const isFront = spec.lane === 'front_window' || spec.lane === 'front_curb';
+      const minX = isFront ? minFrontX : -20.5;
+      const maxX = isFront ? maxFrontX : 20.5;
+      const laneZ = spec.lane === 'back_lane' ? backZ + spec.zOffset : spec.zOffset;
+
+      let targetRotY = st.dir > 0 ? Math.PI / 2 : -Math.PI / 2;
+      let swing = 0;
+      let bobY = 0;
+
+      if (st.pauseTimer > 0) {
+        st.pauseTimer -= dt;
+        // Turn casually to admire the shop window / billboards / houses
+        targetRotY = isFront ? Math.PI : 0;
+      } else {
+        st.x += st.dir * spec.speed * dt;
+        if (st.x >= maxX) {
+          st.x = maxX;
+          st.dir = -1;
+        } else if (st.x <= minX) {
+          st.x = minX;
+          st.dir = 1;
+        }
+
+        st.nextPauseTimer -= dt;
+        if (st.nextPauseTimer <= 0 && Math.abs(st.x) < 10.5) {
+          st.pauseTimer = 1.6 + (spec.id % 3) * 0.55;
+          st.nextPauseTimer = spec.pauseInterval;
+        }
+
+        st.walkPhase += dt * spec.speed * 5.2;
+        swing = Math.sin(st.walkPhase) * 0.48;
+        bobY = Math.abs(Math.sin(st.walkPhase)) * 0.042;
+      }
+
+      // Shortest-angle smooth turn
+      let diff = targetRotY - st.rotY;
+      while (diff > Math.PI) diff -= Math.PI * 2;
+      while (diff < -Math.PI) diff += Math.PI * 2;
+      st.rotY += diff * Math.min(1, dt * 8);
+
+      grp.position.set(st.x, bobY, laneZ);
+      grp.rotation.y = st.rotY;
+
+      const lLeg = leftLegRefs.current[i];
+      const rLeg = rightLegRefs.current[i];
+      const lArm = leftArmRefs.current[i];
+      const rArm = rightArmRefs.current[i];
+      if (lLeg) lLeg.rotation.x = swing;
+      if (rLeg) rLeg.rotation.x = -swing;
+      if (lArm) lArm.rotation.x = -swing * 0.85;
+      if (rArm) rArm.rotation.x = swing * 0.85;
+    }
+  });
+
+  return (
+    <group>
+      {STROLLER_SPECS.map((s, idx) => (
+        <group
+          key={s.id}
+          ref={(el) => {
+            groupRefs.current[idx] = el;
+          }}
+        >
+          {/* Left & Right Legs */}
+          <mesh
+            ref={(el) => {
+              leftLegRefs.current[idx] = el;
+            }}
+            position={[-0.13, 0.34, 0]}
+            castShadow={!isSoftwareGl}
+          >
+            <boxGeometry args={[0.16, 0.68, 0.18]} />
+            <meshStandardMaterial color={s.pantsColor} roughness={0.8} />
+          </mesh>
+          <mesh
+            ref={(el) => {
+              rightLegRefs.current[idx] = el;
+            }}
+            position={[0.13, 0.34, 0]}
+            castShadow={!isSoftwareGl}
+          >
+            <boxGeometry args={[0.16, 0.68, 0.18]} />
+            <meshStandardMaterial color={s.pantsColor} roughness={0.8} />
+          </mesh>
+
+          {/* Torso / Shirt */}
+          <mesh position={[0, 0.98, 0]} castShadow={!isSoftwareGl}>
+            <boxGeometry args={[0.5, 0.66, 0.3]} />
+            <meshStandardMaterial color={s.shirtColor} roughness={0.68} />
+          </mesh>
+
+          {/* Left & Right Swinging Arms */}
+          <mesh
+            ref={(el) => {
+              leftArmRefs.current[idx] = el;
+            }}
+            position={[-0.33, 0.96, 0]}
+          >
+            <boxGeometry args={[0.13, 0.54, 0.14]} />
+            <meshStandardMaterial color={s.shirtColor} roughness={0.72} />
+          </mesh>
+          <mesh
+            ref={(el) => {
+              rightArmRefs.current[idx] = el;
+            }}
+            position={[0.33, 0.96, 0]}
+          >
+            <boxGeometry args={[0.13, 0.54, 0.14]} />
+            <meshStandardMaterial color={s.shirtColor} roughness={0.72} />
+          </mesh>
+
+          {/* Optional Handheld Shopping Tote Bag */}
+          {s.bagColor && (
+            <mesh position={[0.38, 0.64, 0.08]}>
+              <boxGeometry args={[0.14, 0.28, 0.24]} />
+              <meshStandardMaterial color={s.bagColor} roughness={0.55} />
+            </mesh>
+          )}
+
+          {/* Head */}
+          <mesh position={[0, 1.52, 0]} castShadow={!isSoftwareGl}>
+            <sphereGeometry args={[0.23, 12, 12]} />
+            <meshStandardMaterial color={s.skinColor} roughness={0.7} />
+          </mesh>
+
+          {/* Hair or Sun Cap */}
+          {s.capColor ? (
+            <group>
+              <mesh position={[0, 1.69, 0]}>
+                <cylinderGeometry args={[0.24, 0.24, 0.13, 12]} />
+                <meshStandardMaterial color={s.capColor} roughness={0.55} />
+              </mesh>
+              <mesh position={[0, 1.66, 0.19]}>
+                <boxGeometry args={[0.3, 0.04, 0.18]} />
+                <meshStandardMaterial color={s.capColor} roughness={0.55} />
+              </mesh>
+            </group>
+          ) : (
+            <mesh position={[0, 1.65, -0.02]}>
+              <sphereGeometry args={[0.21, 10, 10]} />
+              <meshStandardMaterial color={s.hairColor} roughness={0.85} />
+            </mesh>
+          )}
+        </group>
+      ))}
+    </group>
+  );
+};
+
 const ShopEnvironment: React.FC<{
   worldRef: React.MutableRefObject<GumShopWorld>;
   isSoftwareGl: boolean;
@@ -1583,6 +2338,24 @@ const ShopEnvironment: React.FC<{
         isNight={isNight}
         isSoftwareGl={isSoftwareGl}
         onAdScreenClick={onAdScreenClick}
+      />
+
+      {/* Surrounding 3D Neighborhood Houses & Lanes */}
+      <NeighborhoodHouses3D
+        storageX={bounds.storageX}
+        houseX={bounds.houseX}
+        backZ={bounds.backZ}
+        sidewalkTex={sidewalkTex}
+        isNight={isNight}
+        isSoftwareGl={isSoftwareGl}
+      />
+
+      {/* Animated 3D Neighborhood Townsfolk Strolling Outside */}
+      <NeighborhoodStrollers3D
+        storageX={bounds.storageX}
+        houseX={bounds.houseX}
+        backZ={bounds.backZ}
+        isSoftwareGl={isSoftwareGl}
       />
 
       {/* Outdoor Decorative Trees (outside Warehouse & Right Giant Screen) */}

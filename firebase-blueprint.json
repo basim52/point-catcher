@@ -1,0 +1,296 @@
+{
+  "entities": {
+    "AnalyticsSession": {
+      "title": "AnalyticsSession",
+      "description": "Anonymous game session tracking document.",
+      "type": "object",
+      "properties": {
+        "gameId": { "type": "string", "maxLength": 40 },
+        "gameName": { "type": "string", "minLength": 1, "maxLength": 60 },
+        "startedAt": { "type": "string", "format": "date-time" },
+        "endedAt": { "type": "string", "format": "date-time" },
+        "durationSeconds": { "type": "integer" },
+        "visit": { "type": "boolean" }
+      },
+      "required": ["gameId", "gameName", "startedAt", "endedAt", "durationSeconds", "visit"]
+    },
+    "GameStat": {
+      "title": "GameStat",
+      "description": "Public per-game visit counter.",
+      "type": "object",
+      "properties": {
+        "visits": { "type": "integer" }
+      },
+      "required": ["visits"]
+    },
+    "PartyProfile": {
+      "title": "PartyProfile",
+      "description": "Public Mario-style Party player profile (no PII).",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "displayName": { "type": "string", "minLength": 2, "maxLength": 24 },
+        "nameKey": { "type": "string", "minLength": 2, "maxLength": 120, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "friendCode": { "type": "string", "minLength": 6, "maxLength": 8, "pattern": "^[A-Z0-9]+$" },
+        "favoriteCharacter": {
+          "type": "string",
+          "enum": ["marco", "lugo", "rosa", "toady", "yosho", "koopa", "wario", "rosy"]
+        },
+        "wins": { "type": "integer" },
+        "starsTotal": { "type": "integer" },
+        "gamesPlayed": { "type": "integer" },
+        "lastSeenAt": { "type": "string", "format": "date-time" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": [
+        "uid",
+        "displayName",
+        "nameKey",
+        "friendCode",
+        "favoriteCharacter",
+        "wins",
+        "starsTotal",
+        "gamesPlayed",
+        "lastSeenAt",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "PartyDirectoryEntry": {
+      "title": "PartyDirectoryEntry",
+      "description": "Exact-key lookup entry mapping a friend code or encoded display name to a player profile (no PII).",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "displayName": { "type": "string", "minLength": 2, "maxLength": 24 },
+        "friendCode": { "type": "string", "minLength": 6, "maxLength": 8, "pattern": "^[A-Z0-9]+$" },
+        "favoriteCharacter": {
+          "type": "string",
+          "enum": ["marco", "lugo", "rosa", "toady", "yosho", "koopa", "wario", "rosy"]
+        },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["uid", "displayName", "friendCode", "favoriteCharacter", "createdAt", "updatedAt"]
+    },
+    "PartyFriendRequest": {
+      "title": "PartyFriendRequest",
+      "description": "Real-time friend request between two players.",
+      "type": "object",
+      "properties": {
+        "fromUid": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "fromName": { "type": "string", "minLength": 2, "maxLength": 24 },
+        "fromCode": { "type": "string", "minLength": 6, "maxLength": 8, "pattern": "^[A-Z0-9]+$" },
+        "fromCharacter": {
+          "type": "string",
+          "enum": ["marco", "lugo", "rosa", "toady", "yosho", "koopa", "wario", "rosy"]
+        },
+        "toUid": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "toName": { "type": "string", "minLength": 2, "maxLength": 24 },
+        "toCode": { "type": "string", "minLength": 6, "maxLength": 8, "pattern": "^[A-Z0-9]+$" },
+        "status": { "type": "string", "enum": ["pending", "accepted", "declined"] },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": [
+        "fromUid",
+        "fromName",
+        "fromCode",
+        "fromCharacter",
+        "toUid",
+        "toName",
+        "toCode",
+        "status",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "PartyFriendship": {
+      "title": "PartyFriendship",
+      "description": "Mutual friendship link between two players.",
+      "type": "object",
+      "properties": {
+        "uidA": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "uidB": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "nameA": { "type": "string", "minLength": 2, "maxLength": 24 },
+        "nameB": { "type": "string", "minLength": 2, "maxLength": 24 },
+        "codeA": { "type": "string", "minLength": 6, "maxLength": 8, "pattern": "^[A-Z0-9]+$" },
+        "codeB": { "type": "string", "minLength": 6, "maxLength": 8, "pattern": "^[A-Z0-9]+$" },
+        "charA": {
+          "type": "string",
+          "enum": ["marco", "lugo", "rosa", "toady", "yosho", "koopa", "wario", "rosy"]
+        },
+        "charB": {
+          "type": "string",
+          "enum": ["marco", "lugo", "rosa", "toady", "yosho", "koopa", "wario", "rosy"]
+        },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": [
+        "uidA",
+        "uidB",
+        "nameA",
+        "nameB",
+        "codeA",
+        "codeB",
+        "charA",
+        "charB",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "PartyInvite": {
+      "title": "PartyInvite",
+      "description": "Live game room invitation sent to a friend.",
+      "type": "object",
+      "properties": {
+        "fromUid": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "fromName": { "type": "string", "minLength": 2, "maxLength": 24 },
+        "fromCharacter": {
+          "type": "string",
+          "enum": ["marco", "lugo", "rosa", "toady", "yosho", "koopa", "wario", "rosy"]
+        },
+        "toUid": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "roomCode": { "type": "string", "minLength": 6, "maxLength": 8, "pattern": "^[A-Z0-9]+$" },
+        "mode": { "type": "string", "enum": ["cup", "single"] },
+        "gameId": { "type": "string", "minLength": 2, "maxLength": 40, "pattern": "^[a-z0-9_]+$" },
+        "status": { "type": "string", "enum": ["pending", "accepted", "declined", "expired"] },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": [
+        "fromUid",
+        "fromName",
+        "fromCharacter",
+        "toUid",
+        "roomCode",
+        "mode",
+        "gameId",
+        "status",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "PartyRoom": {
+      "title": "PartyRoom",
+      "description": "Real-time multiplayer Mario Party match room supporting 25 mini-games.",
+      "type": "object",
+      "properties": {
+        "roomCode": { "type": "string", "minLength": 6, "maxLength": 8, "pattern": "^[A-Z0-9]+$" },
+        "hostUid": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "hostName": { "type": "string", "minLength": 2, "maxLength": 24 },
+        "status": { "type": "string", "enum": ["lobby", "playing", "round_result", "podium", "closed"] },
+        "mode": { "type": "string", "enum": ["cup", "single"] },
+        "currentGameId": { "type": "string", "minLength": 2, "maxLength": 40, "pattern": "^[a-z0-9_]+$" },
+        "roundIndex": { "type": "integer" },
+        "totalRounds": { "type": "integer" },
+        "roundSeed": { "type": "integer" },
+        "roundStartedAtMs": { "type": "integer" },
+        "roundDurationSec": { "type": "integer" },
+        "cupQueue": { "type": "array" },
+        "winnerUid": { "type": "string", "maxLength": 128 },
+        "winnerName": { "type": "string", "maxLength": 24 },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": [
+        "roomCode",
+        "hostUid",
+        "hostName",
+        "status",
+        "mode",
+        "currentGameId",
+        "roundIndex",
+        "totalRounds",
+        "roundSeed",
+        "roundStartedAtMs",
+        "roundDurationSec",
+        "cupQueue",
+        "winnerUid",
+        "winnerName",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "PartyRoomPlayer": {
+      "title": "PartyRoomPlayer",
+      "description": "Live state for a single player inside a multiplayer party room.",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "roomCode": { "type": "string", "minLength": 6, "maxLength": 8, "pattern": "^[A-Z0-9]+$" },
+        "displayName": { "type": "string", "minLength": 2, "maxLength": 24 },
+        "characterId": {
+          "type": "string",
+          "enum": ["marco", "lugo", "rosa", "toady", "yosho", "koopa", "wario", "rosy"]
+        },
+        "ready": { "type": "boolean" },
+        "stars": { "type": "integer" },
+        "coins": { "type": "integer" },
+        "roundScore": { "type": "integer" },
+        "roundProgress": { "type": "integer" },
+        "roundDone": { "type": "boolean" },
+        "joinedAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": [
+        "uid",
+        "roomCode",
+        "displayName",
+        "characterId",
+        "ready",
+        "stars",
+        "coins",
+        "roundScore",
+        "roundProgress",
+        "roundDone",
+        "joinedAt",
+        "updatedAt"
+      ]
+    }
+  },
+  "firestore": {
+    "/analytics_sessions/{sessionId}": {
+      "schema": { "$ref": "#/entities/AnalyticsSession" },
+      "description": "Anonymous game session telemetry."
+    },
+    "/game_stats/{gameId}": {
+      "schema": { "$ref": "#/entities/GameStat" },
+      "description": "Public per-game visit counts."
+    },
+    "/party_profiles/{uid}": {
+      "schema": { "$ref": "#/entities/PartyProfile" },
+      "description": "Public player profile for Mario Party Online (zero PII)."
+    },
+    "/party_codes/{code}": {
+      "schema": { "$ref": "#/entities/PartyDirectoryEntry" },
+      "description": "Exact friend-code to player lookup directory."
+    },
+    "/party_names/{nameKey}": {
+      "schema": { "$ref": "#/entities/PartyDirectoryEntry" },
+      "description": "Exact encoded display-name to player lookup directory."
+    },
+    "/party_friend_requests/{requestId}": {
+      "schema": { "$ref": "#/entities/PartyFriendRequest" },
+      "description": "Pending/accepted/declined friend requests."
+    },
+    "/party_friendships/{friendshipId}": {
+      "schema": { "$ref": "#/entities/PartyFriendship" },
+      "description": "Mutual friendships between two players."
+    },
+    "/party_invites/{inviteId}": {
+      "schema": { "$ref": "#/entities/PartyInvite" },
+      "description": "Real-time invitations to join a multiplayer party room."
+    },
+    "/party_rooms/{roomCode}": {
+      "schema": { "$ref": "#/entities/PartyRoom" },
+      "description": "Active multiplayer party room state."
+    },
+    "/party_rooms/{roomCode}/players/{uid}": {
+      "schema": { "$ref": "#/entities/PartyRoomPlayer" },
+      "description": "Live per-player character choice, readiness, and real-time minigame scores."
+    }
+  }
+}

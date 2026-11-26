@@ -48,12 +48,12 @@ const LANDING_COPY = {
     navShop: 'المتجر',
     navIndex: 'الاندكس',
     topCta: 'ابدأ اللعب',
-    heroKicker: '5 عوالم · 235 مرحلة · 15 لعبة مصغرة',
+    heroKicker: '5 عوالم · 235 مرحلة · 16 لعبة مصغرة',
     heroTitle: 'التقط النقاط النادرة، طوّر أدواتك، وتحدَّ صالة الألعاب',
     heroSubtitle:
-      'انطلق عبر 5 عوالم مليئة بالمراحل والتحديات، طوّر أدواتك من المتجر، أو افتح صالة الألعاب المصغرة لاكتشاف 15 لعبة متنوعة!',
+      'انطلق عبر 5 عوالم مليئة بالمراحل والتحديات، طوّر أدواتك من المتجر، أو افتح صالة الألعاب المصغرة لاكتشاف 16 لعبة متنوعة!',
     primaryCta: 'ابدأ اللعب',
-    secondaryHubCta: 'صالة الألعاب (15)',
+    secondaryHubCta: 'صالة الألعاب (16)',
     statBestScore: 'أعلى نتيجة',
     statCurrency: 'رصيد العملات',
     statCurrencySub: (pink: number, space: number) =>
@@ -80,7 +80,7 @@ const LANDING_COPY = {
     enterWorldBtn: 'دخول العالم',
     sectionArcadeNum: '02.',
     sectionArcadeTitle: 'صالة الألعاب المصغرة',
-    sectionArcadeMeta: '15 لعبة متنوعة جاهزة للعب',
+    sectionArcadeMeta: '16 لعبة متنوعة جاهزة للعب',
     sectionArcadeDesc:
       'تشكيلة واسعة من ألعاب 2D و 3D للذكاء والسرعة والمنصات والقتال — افتح صالة الألعاب واختر اللعبة التي تناسبك.',
     openArcadeBtn: 'فتح صالة الألعاب',
@@ -111,12 +111,12 @@ const LANDING_COPY = {
     navShop: 'Shop',
     navIndex: 'Index',
     topCta: 'Start Playing',
-    heroKicker: '5 Worlds · 235 Stages · 15 Mini-Games',
+    heroKicker: '5 Worlds · 235 Stages · 16 Mini-Games',
     heroTitle: 'Catch Rare Gems, Upgrade Your Gear, and Master the Arcade',
     heroSubtitle:
-      'Explore 5 worlds packed with stages and upgrades, or open the Mini-Games Hub to play 15 diverse 2D and 3D games!',
+      'Explore 5 worlds packed with stages and upgrades, or open the Mini-Games Hub to play 16 diverse 2D and 3D games!',
     primaryCta: 'Start Playing',
-    secondaryHubCta: 'Games Hub (15)',
+    secondaryHubCta: 'Games Hub (16)',
     statBestScore: 'Best Score',
     statCurrency: 'Coin Balance',
     statCurrencySub: (pink: number, space: number) =>
@@ -143,7 +143,7 @@ const LANDING_COPY = {
     enterWorldBtn: 'Enter World',
     sectionArcadeNum: '02.',
     sectionArcadeTitle: 'Mini-Games Hub',
-    sectionArcadeMeta: '15 diverse games ready to play',
+    sectionArcadeMeta: '16 diverse games ready to play',
     sectionArcadeDesc:
       'A full collection of 2D & 3D arcade, puzzle, platformer, racing, and action games — open the Games Hub to pick any game.',
     openArcadeBtn: 'Open Games Hub',
