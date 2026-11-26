@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import * as THREE from 'three';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { partyAudio } from './audio';
+import { ArrowGlyphSvg } from './MiniGameArt';
 import type { MiniGamePlayProps } from './MiniGamesArcadeCanvas';
 import {
   MARIO_MINI_GAME_MAP,
@@ -804,6 +805,29 @@ export const MiniGames3DCanvas: React.FC<MiniGamePlayProps> = ({
 
   const keysRef = useRef<Record<string, boolean>>({});
   const jumpQueuedRef = useRef(false);
+  const touchDragRef = useRef<{
+    active: boolean;
+    pointerId: number | null;
+    startX: number;
+    startY: number;
+    dx: number;
+    dy: number;
+    moved: boolean;
+  }>({
+    active: false,
+    pointerId: null,
+    startX: 0,
+    startY: 0,
+    dx: 0,
+    dy: 0,
+    moved: false,
+  });
+  const [touchStickUi, setTouchStickUi] = useState<{
+    x: number;
+    y: number;
+    dx: number;
+    dy: number;
+  } | null>(null);
   const rivalProgressRef = useRef(rivalProgress);
   rivalProgressRef.current = rivalProgress;
   const onLiveUpdateRef = useRef(onLiveUpdate);
@@ -1029,7 +1053,7 @@ export const MiniGames3DCanvas: React.FC<MiniGamePlayProps> = ({
       if (announce) {
         partyAudio.playStar();
         setHudBanner(
-          ar ? `🌍 الدخول إلى ${theme.nameAr}!` : `🌍 Entering ${theme.nameEn}!`
+          ar ? `الدخول إلى ${theme.nameAr}!` : `Entering ${theme.nameEn}!`
         );
       }
     };
@@ -1555,10 +1579,13 @@ export const MiniGames3DCanvas: React.FC<MiniGamePlayProps> = ({
 
     const step = (dt: number, elapsed: number) => {
       const k = keysRef.current;
-      const moveX =
+      const td = touchDragRef.current;
+      const keyX =
         (k['ArrowRight'] || k['KeyD'] ? 1 : 0) - (k['ArrowLeft'] || k['KeyA'] ? 1 : 0);
-      const moveZ =
+      const keyZ =
         (k['ArrowDown'] || k['KeyS'] ? 1 : 0) - (k['ArrowUp'] || k['KeyW'] ? 1 : 0);
+      const moveX = THREE.MathUtils.clamp(keyX + (td.active ? td.dx : 0), -1, 1);
+      const moveZ = THREE.MathUtils.clamp(keyZ + (td.active ? td.dy : 0), -1, 1);
 
       if (boostTimer > 0) boostTimer = Math.max(0, boostTimer - dt);
       if (stunTimer > 0) stunTimer = Math.max(0, stunTimer - dt);
@@ -1724,7 +1751,7 @@ export const MiniGames3DCanvas: React.FC<MiniGamePlayProps> = ({
                 partyAudio.playHit();
                 addPoints(
                   -4,
-                  ar ? '🔥 النار أبطأتك! اقفز فوقها!' : '🔥 FIRE SLOWED YOU DOWN!'
+                  ar ? 'النار أبطأتك! اقفز فوقها!' : 'FIRE SLOWED YOU DOWN!'
                 );
               }
             } else if (stunTimer <= 0) {
@@ -2136,7 +2163,7 @@ export const MiniGames3DCanvas: React.FC<MiniGamePlayProps> = ({
           )}
           {gameId === 'bowser_tower_3d' && isFireSlowed && (
             <span className="text-[11px] font-black px-2 py-0.5 rounded-md bg-orange-500 text-white whitespace-nowrap shrink-0">
-              {ar ? '🔥 تباطؤ بسبب النار!' : '🔥 SLOWED BY FIRE!'}
+              {ar ? 'تباطؤ بسبب النار!' : 'SLOWED BY FIRE!'}
             </span>
           )}
         </div>
@@ -2195,70 +2222,204 @@ export const MiniGames3DCanvas: React.FC<MiniGamePlayProps> = ({
         </div>
       )}
 
-      {/* Dedicated Isolated WebGL Viewport Container */}
-      <div className="relative w-full aspect-[16/9] max-h-[450px] rounded-2xl overflow-hidden border-2 border-sky-400/40 bg-[#071126] shadow-2xl">
-        <div ref={mountRef} className="w-full h-full" />
+      {/* Dedicated Isolated WebGL Viewport Container with Direct Touch-Drag & Tap-to-Jump */}
+      <div
+        className="relative w-full aspect-[16/9] max-h-[450px] rounded-2xl overflow-hidden border-2 border-sky-400/40 bg-[#071126] shadow-2xl touch-none select-none cursor-grab active:cursor-grabbing"
+        onPointerDown={(e) => {
+          const rect = e.currentTarget.getBoundingClientRect();
+          const lx = e.clientX - rect.left;
+          const ly = e.clientY - rect.top;
+          e.currentTarget.setPointerCapture(e.pointerId);
+          touchDragRef.current = {
+            active: true,
+            pointerId: e.pointerId,
+            startX: e.clientX,
+            startY: e.clientY,
+            dx: 0,
+            dy: 0,
+            moved: false,
+          };
+          setTouchStickUi({ x: lx, y: ly, dx: 0, dy: 0 });
+        }}
+        onPointerMove={(e) => {
+          const td = touchDragRef.current;
+          if (!td.active || td.pointerId !== e.pointerId) return;
+          const rawX = e.clientX - td.startX;
+          const rawY = e.clientY - td.startY;
+          const dist = Math.hypot(rawX, rawY);
+          if (dist > 10) td.moved = true;
+          const maxR = 46;
+          const clampedX = Math.max(-maxR, Math.min(maxR, rawX));
+          const clampedY = Math.max(-maxR, Math.min(maxR, rawY));
+          td.dx = Math.abs(rawX) < 6 ? 0 : clampedX / maxR;
+          td.dy = Math.abs(rawY) < 6 ? 0 : clampedY / maxR;
+          setTouchStickUi((prev) =>
+            prev ? { ...prev, dx: clampedX, dy: clampedY } : null
+          );
+        }}
+        onPointerUp={(e) => {
+          const td = touchDragRef.current;
+          if (!td.active || td.pointerId !== e.pointerId) return;
+          if (!td.moved) {
+            jumpQueuedRef.current = true;
+          }
+          touchDragRef.current.active = false;
+          touchDragRef.current.pointerId = null;
+          touchDragRef.current.dx = 0;
+          touchDragRef.current.dy = 0;
+          setTouchStickUi(null);
+        }}
+        onPointerCancel={() => {
+          touchDragRef.current.active = false;
+          touchDragRef.current.pointerId = null;
+          touchDragRef.current.dx = 0;
+          touchDragRef.current.dy = 0;
+          setTouchStickUi(null);
+        }}
+      >
+        <div ref={mountRef} className="w-full h-full pointer-events-none" />
+        {/* Floating Touch Drag Joystick Indicator (no backdrop-filter over WebGL) */}
+        {touchStickUi && (
+          <div
+            style={{ left: touchStickUi.x, top: touchStickUi.y }}
+            className="pointer-events-none absolute -translate-x-1/2 -translate-y-1/2 w-24 h-24 rounded-full border-2 border-sky-300/80 bg-slate-950/35 flex items-center justify-center"
+          >
+            <div
+              style={{
+                transform: `translate(${touchStickUi.dx * 0.58}px, ${
+                  is4Way ? touchStickUi.dy * 0.58 : 0
+                }px)`,
+              }}
+              className="w-10 h-10 rounded-full bg-amber-400 border-2 border-white shadow-lg"
+            />
+          </div>
+        )}
       </div>
 
-      {/* Touch & Quick Action Control Dock Below Viewport */}
-      <div className="rounded-xl border border-white/10 bg-[#0b1933] p-2.5 flex flex-wrap items-center justify-between gap-2">
-        <div className="flex items-center gap-2">
-          <button
-            type="button"
-            onPointerDown={() => holdKey('ArrowLeft', true)}
-            onPointerUp={() => holdKey('ArrowLeft', false)}
-            onPointerLeave={() => holdKey('ArrowLeft', false)}
-            className="h-11 px-4 rounded-xl bg-slate-800 hover:bg-slate-700 active:bg-sky-500 active:text-slate-950 text-white font-black text-sm select-none cursor-pointer"
-          >
-            {ar ? 'يسار' : 'LEFT'}
-          </button>
-          {is4Way && (
-            <>
+      {/* Arrow Pad & Touch Action Control Dock Below Viewport */}
+      <div className="rounded-xl border border-white/10 bg-[#0b1933] p-2.5 flex flex-wrap items-center justify-between gap-3">
+        {/* Directional Arrow Pad (forced LTR so Left arrow is always Left and Right is always Right) */}
+        <div dir="ltr" className="flex items-center gap-2">
+          {is4Way ? (
+            <div className="flex flex-col items-center gap-1.5">
               <button
                 type="button"
-                onPointerDown={() => holdKey('ArrowUp', true)}
+                aria-label="Up"
+                onPointerDown={(e) => {
+                  e.preventDefault();
+                  holdKey('ArrowUp', true);
+                }}
                 onPointerUp={() => holdKey('ArrowUp', false)}
                 onPointerLeave={() => holdKey('ArrowUp', false)}
-                className="h-11 px-4 rounded-xl bg-slate-800 hover:bg-slate-700 active:bg-sky-500 active:text-slate-950 text-white font-black text-sm select-none cursor-pointer"
+                onPointerCancel={() => holdKey('ArrowUp', false)}
+                className="w-12 h-10 rounded-xl bg-slate-800 hover:bg-slate-700 active:bg-sky-400 active:text-slate-950 text-white border border-white/15 flex items-center justify-center touch-none select-none cursor-pointer shadow"
               >
-                {ar ? 'أمام' : 'UP'}
+                <ArrowGlyphSvg dir="up" size={20} />
+              </button>
+              <div className="flex items-center gap-1.5">
+                <button
+                  type="button"
+                  aria-label="Left"
+                  onPointerDown={(e) => {
+                    e.preventDefault();
+                    holdKey('ArrowLeft', true);
+                  }}
+                  onPointerUp={() => holdKey('ArrowLeft', false)}
+                  onPointerLeave={() => holdKey('ArrowLeft', false)}
+                  onPointerCancel={() => holdKey('ArrowLeft', false)}
+                  className="w-12 h-10 rounded-xl bg-slate-800 hover:bg-slate-700 active:bg-sky-400 active:text-slate-950 text-white border border-white/15 flex items-center justify-center touch-none select-none cursor-pointer shadow"
+                >
+                  <ArrowGlyphSvg dir="left" size={20} />
+                </button>
+                <button
+                  type="button"
+                  aria-label="Down"
+                  onPointerDown={(e) => {
+                    e.preventDefault();
+                    holdKey('ArrowDown', true);
+                  }}
+                  onPointerUp={() => holdKey('ArrowDown', false)}
+                  onPointerLeave={() => holdKey('ArrowDown', false)}
+                  onPointerCancel={() => holdKey('ArrowDown', false)}
+                  className="w-12 h-10 rounded-xl bg-slate-800 hover:bg-slate-700 active:bg-sky-400 active:text-slate-950 text-white border border-white/15 flex items-center justify-center touch-none select-none cursor-pointer shadow"
+                >
+                  <ArrowGlyphSvg dir="down" size={20} />
+                </button>
+                <button
+                  type="button"
+                  aria-label="Right"
+                  onPointerDown={(e) => {
+                    e.preventDefault();
+                    holdKey('ArrowRight', true);
+                  }}
+                  onPointerUp={() => holdKey('ArrowRight', false)}
+                  onPointerLeave={() => holdKey('ArrowRight', false)}
+                  onPointerCancel={() => holdKey('ArrowRight', false)}
+                  className="w-12 h-10 rounded-xl bg-slate-800 hover:bg-slate-700 active:bg-sky-400 active:text-slate-950 text-white border border-white/15 flex items-center justify-center touch-none select-none cursor-pointer shadow"
+                >
+                  <ArrowGlyphSvg dir="right" size={20} />
+                </button>
+              </div>
+            </div>
+          ) : (
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                aria-label="Left"
+                onPointerDown={(e) => {
+                  e.preventDefault();
+                  holdKey('ArrowLeft', true);
+                }}
+                onPointerUp={() => holdKey('ArrowLeft', false)}
+                onPointerLeave={() => holdKey('ArrowLeft', false)}
+                onPointerCancel={() => holdKey('ArrowLeft', false)}
+                className="w-14 h-12 rounded-xl bg-slate-800 hover:bg-slate-700 active:bg-sky-400 active:text-slate-950 text-white border border-white/15 flex items-center justify-center touch-none select-none cursor-pointer shadow"
+              >
+                <ArrowGlyphSvg dir="left" size={24} />
               </button>
               <button
                 type="button"
-                onPointerDown={() => holdKey('ArrowDown', true)}
-                onPointerUp={() => holdKey('ArrowDown', false)}
-                onPointerLeave={() => holdKey('ArrowDown', false)}
-                className="h-11 px-4 rounded-xl bg-slate-800 hover:bg-slate-700 active:bg-sky-500 active:text-slate-950 text-white font-black text-sm select-none cursor-pointer"
+                aria-label="Right"
+                onPointerDown={(e) => {
+                  e.preventDefault();
+                  holdKey('ArrowRight', true);
+                }}
+                onPointerUp={() => holdKey('ArrowRight', false)}
+                onPointerLeave={() => holdKey('ArrowRight', false)}
+                onPointerCancel={() => holdKey('ArrowRight', false)}
+                className="w-14 h-12 rounded-xl bg-slate-800 hover:bg-slate-700 active:bg-sky-400 active:text-slate-950 text-white border border-white/15 flex items-center justify-center touch-none select-none cursor-pointer shadow"
               >
-                {ar ? 'خلف' : 'DOWN'}
+                <ArrowGlyphSvg dir="right" size={24} />
               </button>
-            </>
+            </div>
           )}
-          <button
-            type="button"
-            onPointerDown={() => holdKey('ArrowRight', true)}
-            onPointerUp={() => holdKey('ArrowRight', false)}
-            onPointerLeave={() => holdKey('ArrowRight', false)}
-            className="h-11 px-4 rounded-xl bg-slate-800 hover:bg-slate-700 active:bg-sky-500 active:text-slate-950 text-white font-black text-sm select-none cursor-pointer"
-          >
-            {ar ? 'يمين' : 'RIGHT'}
-          </button>
         </div>
+
+        <span className="hidden sm:inline text-[11px] font-bold text-sky-200/80">
+          {ar ? 'اسحب بإصبعك على الشاشة للتحرك واضغط للقفز' : 'Drag on screen to steer · Tap to jump'}
+        </span>
 
         <button
           type="button"
-          onPointerDown={() => holdKey('Space', true)}
+          onPointerDown={(e) => {
+            e.preventDefault();
+            holdKey('Space', true);
+          }}
           onPointerUp={() => holdKey('Space', false)}
           onPointerLeave={() => holdKey('Space', false)}
-          className="h-11 px-6 rounded-xl bg-amber-400 hover:bg-amber-300 active:scale-[0.98] text-slate-950 font-black text-sm select-none cursor-pointer"
+          onPointerCancel={() => holdKey('Space', false)}
+          className="h-12 px-5 rounded-xl bg-amber-400 hover:bg-amber-300 active:scale-[0.97] text-slate-950 font-black text-sm touch-none select-none cursor-pointer flex items-center gap-1.5 shadow-lg"
         >
-          {gameId === 'bumper_arena_3d'
-            ? ar
-              ? 'اندفاع تيربو!'
-              : 'TURBO DASH!'
-            : ar
-            ? 'قفز!'
-            : 'JUMP!'}
+          <ArrowGlyphSvg dir="up" size={18} />
+          <span>
+            {gameId === 'bumper_arena_3d'
+              ? ar
+                ? 'اندفاع تيربو!'
+                : 'TURBO DASH!'
+              : ar
+              ? 'قفز!'
+              : 'JUMP!'}
+          </span>
         </button>
       </div>
     </div>

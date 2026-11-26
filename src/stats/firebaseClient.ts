@@ -29,9 +29,15 @@ import { TRACKED_GAMES } from '../analytics/games';
 import { markStatsRedirectPending } from './adminAccess';
 import type { SessionRecord } from './aggregate';
 
+const STATS_APP_NAME = 'point-catcher-stats';
+
 let app: FirebaseApp | null = null;
 function getApp(): FirebaseApp {
-  if (!app) app = getApps()[0] ?? initializeApp(firebaseWebConfig as Record<string, string>);
+  if (!app) {
+    app =
+      getApps().find((a) => a.name === STATS_APP_NAME) ??
+      initializeApp(firebaseWebConfig as Record<string, string>, STATS_APP_NAME);
+  }
   return app;
 }
 

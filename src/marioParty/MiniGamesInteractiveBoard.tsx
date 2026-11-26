@@ -1,6 +1,22 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { partyAudio } from './audio';
 import { HeroAvatarSvg } from './CharacterArt';
+import {
+  BobOmbSvg,
+  BowserBalloonSvg,
+  BrickBlockSvg,
+  FishingRodIconSvg,
+  FishingSceneSvg,
+  FlagIconSvg,
+  GoldCoinSvg,
+  GoldenHammerSvg,
+  GoombaSvg,
+  KoopaSvg,
+  QuestionBlockSvg,
+  SuperStarSvg,
+  ToadstoolSvg,
+  ToadSvg,
+} from './MiniGameArt';
 import type { MiniGamePlayProps } from './MiniGamesArcadeCanvas';
 import { MARIO_MINI_GAME_MAP, mulberry32 } from './types';
 
@@ -104,7 +120,7 @@ export const MiniGamesInteractiveBoard: React.FC<MiniGamePlayProps> = ({
       if (nh >= 100) {
         setOverheated(true);
         partyAudio.playHit();
-        setFeedback(lang === 'ar' ? '🔥 المنفاخ ساخن! انتظر لحظة!' : '🔥 OVERHEATED! Cool down!');
+        setFeedback(lang === 'ar' ? 'المنفاخ ساخن! انتظر لحظة!' : 'OVERHEATED! Cool down!');
         return 100;
       }
       return nh;
@@ -112,7 +128,7 @@ export const MiniGamesInteractiveBoard: React.FC<MiniGamePlayProps> = ({
     setBalloonFill((f) => {
       const nf = f + 14;
       if (nf >= 100) {
-        addScore(45, lang === 'ar' ? '💥 بوووم! +45 نقطة!' : '💥 POP! +45 pts!');
+        addScore(45, lang === 'ar' ? 'بوووم! +45 نقطة!' : 'POP! +45 pts!');
         partyAudio.playStar();
         return 0;
       }
@@ -149,13 +165,13 @@ export const MiniGamesInteractiveBoard: React.FC<MiniGamePlayProps> = ({
     if (kind === 'none') return;
     setPipePops((prev) => prev.map((v, i) => (i === idx ? 'none' : v)));
     if (kind === 'gold') {
-      addScore(35, lang === 'ar' ? '🍄 فطر ذهبي +35!' : '🍄 Golden Shroom +35!');
+      addScore(35, lang === 'ar' ? 'نجمة ذهبية +35!' : 'Super Star +35!');
       partyAudio.playStar();
     } else if (kind === 'goomba') {
       addScore(15, '+15');
       partyAudio.playCoin();
     } else {
-      addScore(-25, lang === 'ar' ? '💣 قنبلة! -25' : '💣 BOB-OMB! -25');
+      addScore(-25, lang === 'ar' ? 'قنبلة بوب-أومب! -25' : 'BOB-OMB! -25');
       partyAudio.playHit();
     }
   };
@@ -191,12 +207,12 @@ export const MiniGamesInteractiveBoard: React.FC<MiniGamePlayProps> = ({
       partyAudio.playCoin();
       const allFound = memStars.every((s) => nextRev.includes(s));
       if (allFound) {
-        addScore(40, lang === 'ar' ? '✨ لوحة كاملة! +40' : '✨ BOARD CLEAR! +40');
+        addScore(40, lang === 'ar' ? 'لوحة كاملة! +40' : 'BOARD CLEAR! +40');
         partyAudio.playStar();
         window.setTimeout(() => setMemRound((r) => r + 1), 450);
       }
     } else {
-      addScore(-15, '💣 -15');
+      addScore(-15, lang === 'ar' ? 'قنبلة! -15' : 'BOB-OMB! -15');
       partyAudio.playHit();
     }
   };
@@ -233,10 +249,10 @@ export const MiniGamesInteractiveBoard: React.FC<MiniGamePlayProps> = ({
 
   const handleCountPick = (val: number) => {
     if (val === countData.toads) {
-      addScore(45, lang === 'ar' ? '✅ عدّ مثالي! +45' : '✅ EXACT COUNT! +45');
+      addScore(45, lang === 'ar' ? 'عدّ مثالي! +45' : 'EXACT COUNT! +45');
       partyAudio.playStar();
     } else {
-      addScore(-15, lang === 'ar' ? `❌ العدد الصحيح ${countData.toads}` : `❌ Actual: ${countData.toads}`);
+      addScore(-15, lang === 'ar' ? `العدد الصحيح ${countData.toads}` : `Actual: ${countData.toads}`);
       partyAudio.playHit();
     }
     setCountStage((s) => s + 1);
@@ -270,14 +286,14 @@ export const MiniGamesInteractiveBoard: React.FC<MiniGamePlayProps> = ({
           addScore(32, '★ +32');
           partyAudio.playStar();
         } else if (cur.kind === 'coin') {
-          addScore(14, '🪙 +14');
+          addScore(14, '+14');
           partyAudio.playCoin();
         } else {
           addScore(4);
           partyAudio.playSelect();
         }
         if (next.every((b) => b.hp <= 0)) {
-          addScore(30, lang === 'ar' ? '💥 موجة طوب جديدة! +30' : '💥 NEW WAVE! +30');
+          addScore(30, lang === 'ar' ? 'موجة طوب جديدة! +30' : 'NEW WAVE! +30');
           window.setTimeout(() => setBrickWave((w) => w + 1), 220);
         }
       } else {
@@ -327,10 +343,10 @@ export const MiniGamesInteractiveBoard: React.FC<MiniGamePlayProps> = ({
       notesRef.current.splice(idx, 1);
       const dist = Math.abs(n.y - 82);
       if (dist <= 9) {
-        addScore(30, lang === 'ar' ? '✨ مثالي! +30' : '✨ PERFECT! +30');
+        addScore(30, lang === 'ar' ? 'مثالي! +30' : 'PERFECT! +30');
         partyAudio.playStar();
       } else {
-        addScore(15, lang === 'ar' ? '👍 جيد +15' : '👍 GOOD +15');
+        addScore(15, lang === 'ar' ? 'جيد +15' : 'GOOD +15');
         partyAudio.playCoin();
       }
     } else {
@@ -366,15 +382,15 @@ export const MiniGamesInteractiveBoard: React.FC<MiniGamePlayProps> = ({
 
   const handleFishYank = () => {
     if (fishBiting === 'gold') {
-      addScore(55, lang === 'ar' ? '🐟 سمكة ذهبية! +55' : '🐟 GOLDEN CHEEP! +55');
+      addScore(55, lang === 'ar' ? 'سمكة ذهبية! +55' : 'GOLDEN CHEEP! +55');
       partyAudio.playStar();
       setFishCycle((c) => c + 1);
     } else if (fishBiting === 'normal') {
-      addScore(28, lang === 'ar' ? '🐠 صيد ممتاز! +28' : '🐠 NICE CATCH! +28');
+      addScore(28, lang === 'ar' ? 'صيد ممتاز! +28' : 'NICE CATCH! +28');
       partyAudio.playCoin();
       setFishCycle((c) => c + 1);
     } else {
-      addScore(-12, lang === 'ar' ? '⏳ مبكر جداً! -12' : '⏳ TOO EARLY! -12');
+      addScore(-12, lang === 'ar' ? 'مبكر جداً! -12' : 'TOO EARLY! -12');
       partyAudio.playHit();
     }
   };
@@ -410,14 +426,14 @@ export const MiniGamesInteractiveBoard: React.FC<MiniGamePlayProps> = ({
   const handleHammerSlam = () => {
     const dist = Math.abs(needleRef.current.pos - 50);
     if (dist <= 9) {
-      addScore(45, lang === 'ar' ? '🔨 ضربة ذهبية مثالية! +45' : '🔨 GOLDEN BULLSEYE! +45');
+      addScore(45, lang === 'ar' ? 'ضربة ذهبية مثالية! +45' : 'GOLDEN BULLSEYE! +45');
       needleRef.current.speed = Math.min(250, needleRef.current.speed + 14);
       partyAudio.playStar();
     } else if (dist <= 22) {
-      addScore(20, lang === 'ar' ? '🔨 ضربة جيدة +20' : '🔨 GOOD HIT +20');
+      addScore(20, lang === 'ar' ? 'ضربة جيدة +20' : 'GOOD HIT +20');
       partyAudio.playCoin();
     } else {
-      addScore(-10, lang === 'ar' ? '❌ أخطأت المنتصف -10' : '❌ MISSED CENTER -10');
+      addScore(-10, lang === 'ar' ? 'أخطأت المنتصف -10' : 'MISSED CENTER -10');
       partyAudio.playHit();
     }
   };
@@ -431,10 +447,10 @@ export const MiniGamesInteractiveBoard: React.FC<MiniGamePlayProps> = ({
 
   const handleColorPick = (idx: number) => {
     if (idx === targetColorIdx) {
-      addScore(26, lang === 'ar' ? '🍄 قفزة سريعة! +26' : '🍄 SAFE JUMP! +26');
+      addScore(26, lang === 'ar' ? 'قفزة سريعة! +26' : 'SAFE JUMP! +26');
       partyAudio.playCoin();
     } else {
-      addScore(-18, lang === 'ar' ? '🔥 لون خاطئ! -18' : '🔥 WRONG COLOR! -18');
+      addScore(-18, lang === 'ar' ? 'لون خاطئ! -18' : 'WRONG COLOR! -18');
       partyAudio.playHit();
     }
     setColorRound((r) => r + 1);
@@ -451,7 +467,7 @@ export const MiniGamesInteractiveBoard: React.FC<MiniGamePlayProps> = ({
   const handleBombSymbol = (symId: number) => {
     if (bombSeq[bombStep] === symId) {
       if (bombStep === 2) {
-        addScore(36, lang === 'ar' ? '💣 تم تمرير القنبلة! +36' : '💣 BOMB PASSED! +36');
+        addScore(36, lang === 'ar' ? 'تم تمرير القنبلة! +36' : 'BOMB PASSED! +36');
         partyAudio.playStar();
         setBombStep(0);
         setBombRound((r) => r + 1);
@@ -460,7 +476,7 @@ export const MiniGamesInteractiveBoard: React.FC<MiniGamePlayProps> = ({
         partyAudio.playSelect();
       }
     } else {
-      addScore(-12, lang === 'ar' ? '⚡ سلك خاطئ! -12' : '⚡ WRONG WIRE! -12');
+      addScore(-12, lang === 'ar' ? 'سلك خاطئ! -12' : 'WRONG WIRE! -12');
       setBombStep(0);
       partyAudio.playHit();
     }
@@ -509,16 +525,8 @@ export const MiniGamesInteractiveBoard: React.FC<MiniGamePlayProps> = ({
         {/* #5: BALLOON PUMP */}
         {gameId === 'balloon_pump_burst' && (
           <div className="flex flex-col items-center gap-4 w-full max-w-md">
-            <div className="relative h-44 flex items-center justify-center">
-              <div
-                style={{
-                  transform: `scale(${0.55 + (balloonFill / 100) * 0.95})`,
-                  transition: 'transform 80ms ease-out',
-                }}
-                className="w-28 h-28 rounded-full bg-gradient-to-br from-rose-400 via-red-600 to-amber-500 border-4 border-amber-200 flex items-center justify-center text-3xl font-black text-white shadow-2xl"
-              >
-                {balloonFill}%
-              </div>
+            <div className="relative h-48 flex items-center justify-center">
+              <BowserBalloonSvg fillPct={balloonFill} overheated={overheated} />
             </div>
             <div className="w-full">
               <div className="flex justify-between text-xs text-slate-300 mb-1">
@@ -539,17 +547,17 @@ export const MiniGamesInteractiveBoard: React.FC<MiniGamePlayProps> = ({
               onClick={handlePump}
               className={`w-full py-4 rounded-xl font-black text-xl transition-transform active:scale-95 cursor-pointer ${
                 overheated
-                  ? 'bg-slate-700 text-slate-400'
+                  ? 'bg-slate-700 text-slate-300'
                   : 'bg-gradient-to-b from-amber-300 to-orange-500 text-slate-950 shadow-lg'
               }`}
             >
               {overheated
                 ? lang === 'ar'
-                  ? '🔥 انتظر التبريد...'
-                  : '🔥 COOLING DOWN...'
+                  ? 'انتظر التبريد...'
+                  : 'COOLING DOWN...'
                 : lang === 'ar'
-                ? '💨 اضغط للنفخ! (مسافة)'
-                : '💨 PUMP FAST! (SPACE)'}
+                ? 'اضغط للنفخ! (مسافة)'
+                : 'PUMP FAST! (SPACE)'}
             </button>
           </div>
         )}
@@ -562,13 +570,18 @@ export const MiniGamesInteractiveBoard: React.FC<MiniGamePlayProps> = ({
                 key={idx}
                 type="button"
                 onClick={() => handleWhack(idx)}
-                className="relative h-24 sm:h-28 rounded-2xl bg-gradient-to-b from-emerald-500 to-emerald-800 border-4 border-emerald-950 flex flex-col items-center justify-center active:scale-95 transition-transform cursor-pointer shadow-lg"
+                className="relative h-24 sm:h-28 rounded-2xl bg-gradient-to-b from-emerald-500 via-emerald-600 to-emerald-900 border-4 border-emerald-950 flex flex-col items-center justify-center active:scale-95 transition-transform cursor-pointer shadow-lg overflow-hidden"
               >
-                <div className="w-full h-3 bg-emerald-300/60 absolute top-0 left-0 rounded-t-xl" />
-                {pop === 'goomba' && <span className="text-4xl">🍄</span>}
-                {pop === 'gold' && <span className="text-4xl">⭐</span>}
-                {pop === 'bomb' && <span className="text-4xl">💣</span>}
-                {pop === 'none' && <span className="text-xs font-mono text-emerald-200/50">{idx + 1}</span>}
+                {/* Warp Pipe Rim */}
+                <div className="w-full h-3.5 bg-gradient-to-r from-emerald-300 via-emerald-200 to-emerald-400 border-b-2 border-emerald-950 absolute top-0 left-0" />
+                {pop === 'goomba' && <GoombaSvg size={60} className="mt-2 drop-shadow-md" />}
+                {pop === 'gold' && <SuperStarSvg size={58} className="mt-2 drop-shadow-md" />}
+                {pop === 'bomb' && <BobOmbSvg size={60} className="mt-2 drop-shadow-md" />}
+                {pop === 'none' && (
+                  <span className="text-xs font-mono font-bold text-emerald-200/50 mt-2">
+                    {idx + 1}
+                  </span>
+                )}
               </button>
             ))}
           </div>
@@ -577,14 +590,17 @@ export const MiniGamesInteractiveBoard: React.FC<MiniGamePlayProps> = ({
         {/* #8: STAR PANEL MEMORY */}
         {gameId === 'mushroom_memory' && (
           <div className="w-full max-w-md flex flex-col items-center gap-3">
-            <div className="text-sm font-bold text-amber-200">
-              {memShowing
-                ? lang === 'ar'
-                  ? '👀 احفظ مواقع النجوم الآن!'
-                  : '👀 MEMORIZE THE STAR TILES!'
-                : lang === 'ar'
-                ? '⭐ اضغط على جميع مربعات النجوم!'
-                : '⭐ TAP EVERY SUPER STAR TILE!'}
+            <div className="text-sm font-bold text-amber-200 flex items-center gap-2">
+              <SuperStarSvg size={22} />
+              <span>
+                {memShowing
+                  ? lang === 'ar'
+                    ? 'احفظ مواقع النجوم الآن!'
+                    : 'MEMORIZE THE STAR TILES!'
+                  : lang === 'ar'
+                  ? 'اضغط على جميع مربعات النجوم!'
+                  : 'TAP EVERY SUPER STAR TILE!'}
+              </span>
             </div>
             <div className="grid grid-cols-4 gap-2.5 w-full">
               {Array.from({ length: 12 }, (_, idx) => {
@@ -595,15 +611,23 @@ export const MiniGamesInteractiveBoard: React.FC<MiniGamePlayProps> = ({
                     key={idx}
                     type="button"
                     onClick={() => handleMemTap(idx)}
-                    className={`h-20 rounded-xl border-2 text-2xl font-black transition-all active:scale-95 cursor-pointer ${
+                    className={`h-20 rounded-xl border-2 flex items-center justify-center transition-all active:scale-95 cursor-pointer ${
                       revealed
                         ? isStar
-                          ? 'bg-amber-400 border-amber-200 text-slate-950'
-                          : 'bg-rose-900 border-rose-500 text-white'
+                          ? 'bg-amber-400/95 border-amber-200 text-slate-950 shadow-lg'
+                          : 'bg-rose-950 border-rose-500 text-white'
                         : 'bg-indigo-700 hover:bg-indigo-600 border-indigo-400 text-amber-200'
                     }`}
                   >
-                    {revealed ? (isStar ? '★' : '💣') : '?'}
+                    {revealed ? (
+                      isStar ? (
+                        <SuperStarSvg size={46} />
+                      ) : (
+                        <BobOmbSvg size={46} />
+                      )
+                    ) : (
+                      <QuestionBlockSvg size={46} />
+                    )}
                   </button>
                 );
               })}
@@ -614,19 +638,27 @@ export const MiniGamesInteractiveBoard: React.FC<MiniGamePlayProps> = ({
         {/* #11: COUNT THE TOADS */}
         {gameId === 'count_toads' && (
           <div className="w-full max-w-lg flex flex-col gap-4">
-            <div className="relative h-48 rounded-xl bg-gradient-to-b from-sky-700 to-emerald-800 border-2 border-white/20 overflow-hidden">
+            <div className="relative h-52 rounded-xl bg-gradient-to-b from-sky-500 via-sky-600 to-emerald-700 border-2 border-white/25 overflow-hidden shadow-inner">
+              {/* Illustrated Mushroom Kingdom hills backdrop */}
+              <div className="absolute -bottom-8 -left-6 w-44 h-24 rounded-full bg-emerald-600/80 border-t-2 border-emerald-400/40" />
+              <div className="absolute -bottom-10 right-2 w-56 h-28 rounded-full bg-emerald-500/75 border-t-2 border-emerald-300/40" />
               {countData.items.map((item) => (
                 <div
                   key={item.id}
                   style={{ left: `${item.x}%`, top: `${item.y}%` }}
-                  className="absolute text-3xl sm:text-4xl select-none"
+                  className="absolute -translate-x-1/2 -translate-y-1/2 select-none drop-shadow-md"
                 >
-                  {item.isToad ? '🍄' : '🐢'}
+                  {item.isToad ? <ToadSvg size={44} /> : <KoopaSvg size={44} />}
                 </div>
               ))}
             </div>
-            <div className="text-center text-sm font-bold text-amber-200">
-              {lang === 'ar' ? 'كم عدد الفطر 🍄 بالصورة؟' : 'How many Toad Mushrooms 🍄 are on stage?'}
+            <div className="flex items-center justify-center gap-2 text-sm font-bold text-amber-200">
+              <ToadSvg size={26} />
+              <span>
+                {lang === 'ar'
+                  ? 'كم عدد شخصيات الفطر (تود) بالصورة؟'
+                  : 'How many Toads are on stage?'}
+              </span>
             </div>
             <div className="grid grid-cols-4 gap-3">
               {countData.options.map((opt) => (
@@ -652,15 +684,29 @@ export const MiniGamesInteractiveBoard: React.FC<MiniGamePlayProps> = ({
                 type="button"
                 onClick={() => handleBrickTap(idx)}
                 disabled={b.hp <= 0}
-                className={`h-20 rounded-xl border-2 text-2xl font-black transition-transform active:scale-90 cursor-pointer ${
+                className={`h-20 rounded-xl border-2 flex items-center justify-center transition-transform active:scale-90 cursor-pointer ${
                   b.hp <= 0
-                    ? 'bg-slate-900/50 border-slate-800 text-amber-300'
+                    ? 'bg-slate-900/60 border-slate-800'
                     : b.kind === 'star'
-                    ? 'bg-gradient-to-b from-amber-400 to-amber-600 border-yellow-200 text-slate-950'
-                    : 'bg-gradient-to-b from-orange-600 to-amber-900 border-amber-400/60 text-amber-100'
+                    ? 'bg-amber-500/20 border-amber-300/70'
+                    : 'bg-orange-950/50 border-amber-400/50'
                 }`}
               >
-                {b.hp <= 0 ? (b.kind === 'star' ? '★' : b.kind === 'coin' ? '🪙' : '·') : b.hp === 2 ? '🧱' : '?'}
+                {b.hp <= 0 ? (
+                  b.kind === 'star' ? (
+                    <SuperStarSvg size={44} />
+                  ) : b.kind === 'coin' ? (
+                    <GoldCoinSvg size={40} />
+                  ) : (
+                    <span className="text-slate-600 font-black text-lg">—</span>
+                  )
+                ) : b.hp === 2 ? (
+                  <BrickBlockSvg size={54} />
+                ) : b.kind === 'star' ? (
+                  <QuestionBlockSvg size={54} />
+                ) : (
+                  <BrickBlockSvg size={54} cracked />
+                )}
               </button>
             ))}
           </div>
@@ -707,22 +753,30 @@ export const MiniGamesInteractiveBoard: React.FC<MiniGamePlayProps> = ({
           </div>
         )}
 
-        {/* #17: CHEEP-CHEEP FISHING */}
+        {/* #17: CHEEP-CHEEP FISHING — Custom Illustrated Lagoon Scene (Zero Emojis) */}
         {gameId === 'cheep_fishing' && (
-          <div className="w-full max-w-md flex flex-col items-center gap-5">
-            <div
-              className={`w-full h-44 rounded-2xl border-2 flex flex-col items-center justify-center transition-colors ${
+          <div className="w-full max-w-md flex flex-col items-center gap-4">
+            <button
+              type="button"
+              onClick={handleFishYank}
+              className={`relative w-full aspect-[420/185] rounded-2xl border-2 overflow-hidden transition-all cursor-pointer active:scale-[0.99] shadow-xl ${
                 fishBiting === 'gold'
-                  ? 'bg-amber-500/30 border-amber-300'
+                  ? 'border-amber-300 ring-4 ring-amber-400/35'
                   : fishBiting === 'normal'
-                  ? 'bg-emerald-500/25 border-emerald-300'
-                  : 'bg-sky-950 border-sky-700/60'
+                  ? 'border-emerald-300 ring-4 ring-emerald-400/30'
+                  : 'border-sky-400/50'
               }`}
             >
-              <div className="text-5xl mb-2">
-                {fishBiting === 'gold' ? '🌟🐟' : fishBiting === 'normal' ? '🐠💦' : '🎣'}
-              </div>
-              <div className="text-lg font-extrabold text-white">
+              <FishingSceneSvg state={fishBiting} />
+              <div
+                className={`absolute bottom-2 inset-x-3 py-1.5 px-3 rounded-xl text-center text-sm sm:text-base font-black shadow-lg ${
+                  fishBiting === 'gold'
+                    ? 'bg-amber-400 text-slate-950'
+                    : fishBiting === 'normal'
+                    ? 'bg-emerald-400 text-slate-950'
+                    : 'bg-slate-950/80 text-sky-100 border border-white/15'
+                }`}
+              >
                 {fishBiting === 'gold'
                   ? lang === 'ar'
                     ? 'سمكة ذهبية! اسحب الآن!!'
@@ -735,21 +789,22 @@ export const MiniGamesInteractiveBoard: React.FC<MiniGamePlayProps> = ({
                   ? 'انتظر حركة العوّامة...'
                   : 'Wait for the bobber splash...'}
               </div>
-            </div>
+            </button>
             <button
               type="button"
               onClick={handleFishYank}
-              className="w-full py-4 rounded-xl bg-gradient-to-b from-cyan-300 to-sky-500 hover:from-cyan-200 hover:to-sky-400 active:scale-95 text-slate-950 font-black text-xl cursor-pointer"
+              className="w-full py-3.5 rounded-xl bg-gradient-to-b from-cyan-300 to-sky-500 hover:from-cyan-200 hover:to-sky-400 active:scale-95 text-slate-950 font-black text-lg cursor-pointer flex items-center justify-center gap-2.5 shadow-lg"
             >
-              {lang === 'ar' ? '🎣 اسحب السنارة! (مسافة)' : '🎣 YANK LINE! (SPACE)'}
+              <FishingRodIconSvg size={24} />
+              <span>{lang === 'ar' ? 'اسحب السنارة! (لمس أو مسافة)' : 'YANK LINE! (TAP OR SPACE)'}</span>
             </button>
           </div>
         )}
 
         {/* #21: GOLDEN HAMMER SLAM */}
         {gameId === 'hammer_nail_bash' && (
-          <div className="w-full max-w-md flex flex-col items-center gap-6">
-            <div className="text-5xl">🔨⭐</div>
+          <div className="w-full max-w-md flex flex-col items-center gap-5">
+            <GoldenHammerSvg size={108} className="drop-shadow-xl" />
             <div className="relative w-full h-12 rounded-xl bg-slate-800 border-2 border-white/20 overflow-hidden">
               {/* Green zone & Golden sweet spot */}
               <div className="absolute inset-y-0 left-[28%] right-[28%] bg-emerald-500/40" />
@@ -763,9 +818,9 @@ export const MiniGamesInteractiveBoard: React.FC<MiniGamePlayProps> = ({
             <button
               type="button"
               onClick={handleHammerSlam}
-              className="w-full py-4 rounded-xl bg-gradient-to-b from-amber-300 to-orange-500 active:scale-95 text-slate-950 font-black text-xl cursor-pointer"
+              className="w-full py-4 rounded-xl bg-gradient-to-b from-amber-300 to-orange-500 active:scale-95 text-slate-950 font-black text-xl cursor-pointer shadow-lg"
             >
-              {lang === 'ar' ? '🔨 اضرب بالمطرقة! (مسافة)' : '🔨 SLAM HAMMER! (SPACE)'}
+              {lang === 'ar' ? 'اضرب بالمطرقة! (مسافة)' : 'SLAM HAMMER! (SPACE)'}
             </button>
           </div>
         )}
@@ -774,6 +829,7 @@ export const MiniGamesInteractiveBoard: React.FC<MiniGamePlayProps> = ({
         {gameId === 'mushroom_color_dash' && (
           <div className="w-full max-w-md flex flex-col items-center gap-5">
             <div className="flex items-center gap-3 px-5 py-3 rounded-xl bg-slate-900 border border-white/20">
+              <FlagIconSvg flagColor={MUSHROOM_COLORS[targetColorIdx].bg} size={28} />
               <span className="text-sm font-bold text-slate-300">
                 {lang === 'ar' ? 'اقفز على لون العلم:' : 'JUMP TO FLAG COLOR:'}
               </span>
@@ -793,9 +849,9 @@ export const MiniGamesInteractiveBoard: React.FC<MiniGamePlayProps> = ({
                   type="button"
                   onClick={() => handleColorPick(idx)}
                   style={{ backgroundColor: col.bg }}
-                  className="h-28 rounded-2xl border-4 border-white/80 text-slate-950 font-black text-xl active:scale-95 transition-transform cursor-pointer shadow-xl flex flex-col items-center justify-center"
+                  className="h-28 rounded-2xl border-4 border-white/80 text-slate-950 font-black text-lg active:scale-95 transition-transform cursor-pointer shadow-xl flex flex-col items-center justify-center gap-1"
                 >
-                  <span className="text-3xl">🍄</span>
+                  <ToadstoolSvg capColor={col.bg} size={50} className="drop-shadow" />
                   <span>{lang === 'ar' ? col.ar : col.en}</span>
                 </button>
               ))}
@@ -806,8 +862,8 @@ export const MiniGamesInteractiveBoard: React.FC<MiniGamePlayProps> = ({
         {/* #23: HOT BOB-OMB RELAY */}
         {gameId === 'bob_omb_pass' && (
           <div className="w-full max-w-md flex flex-col items-center gap-5">
-            <div className="flex flex-col items-center gap-2 p-4 rounded-2xl bg-slate-900 border-2 border-rose-500/60 w-full">
-              <div className="text-4xl">💣🔥</div>
+            <div className="flex flex-col items-center gap-3 p-4 rounded-2xl bg-slate-900 border-2 border-rose-500/60 w-full">
+              <BobOmbSvg size={72} lit className="drop-shadow-lg" />
               <div className="flex items-center gap-3">
                 {bombSeq.map((symIdx, idx) => {
                   const sym = BOMB_SYMBOLS[symIdx];

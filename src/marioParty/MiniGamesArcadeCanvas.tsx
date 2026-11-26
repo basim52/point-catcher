@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { partyAudio } from './audio';
 import { drawHeroSprite } from './CharacterArt';
+import { ArrowGlyphSvg } from './MiniGameArt';
 import {
   MARIO_MINI_GAME_MAP,
   mulberry32,
@@ -733,7 +734,7 @@ export const MiniGamesArcadeCanvas: React.FC<MiniGamePlayProps> = ({
           } else if (standingTile.state === 'sunk' && player.invuln <= 0) {
             score = Math.max(0, score - 15);
             player.invuln = 0.9;
-            addPop(player.x, player.y - 26, lang === 'ar' ? '🔥 حمم! -15' : '🔥 LAVA! -15', '#fef08a');
+            addPop(player.x, player.y - 26, lang === 'ar' ? 'حمم! -15' : 'LAVA! -15', '#fef08a');
             partyAudio.playHit();
             // Rescue to a solid tile
             const safe = lavaTiles.find((t) => t.state === 'solid');
@@ -746,7 +747,7 @@ export const MiniGamesArcadeCanvas: React.FC<MiniGamePlayProps> = ({
             const isStar = standingTile.pickup === 'star';
             const pts = isStar ? 40 : 18;
             score += pts;
-            addPop(player.x, player.y - 22, isStar ? '+40 ★' : '+18 🔥', isStar ? '#fde047' : '#fdba74');
+            addPop(player.x, player.y - 22, isStar ? '+40 ★' : '+18', isStar ? '#fde047' : '#fdba74');
             if (isStar) partyAudio.playStar();
             else partyAudio.playCoin();
             standingTile.pickup = 'none';
@@ -893,7 +894,7 @@ export const MiniGamesArcadeCanvas: React.FC<MiniGamePlayProps> = ({
         }
         if (aliveBricks === 0) {
           score += 65;
-          addPop(CANVAS_W / 2, 160, lang === 'ar' ? '👑 جدار جديد! +65' : '👑 NEW WAVE! +65', '#fde047');
+          addPop(CANVAS_W / 2, 160, lang === 'ar' ? 'جدار جديد! +65' : 'NEW WAVE! +65', '#fde047');
           partyAudio.playStar();
           resetCastleBricks();
         }
@@ -935,7 +936,7 @@ export const MiniGamesArcadeCanvas: React.FC<MiniGamePlayProps> = ({
             ball.vy = Math.abs(ball.vy);
             crownBoss.hitFlash = 0.25;
             score += 45;
-            addPop(crownBoss.x, crownBoss.y + 24, '👑 +45!', '#fde047');
+            addPop(crownBoss.x, crownBoss.y + 24, '★ +45!', '#fde047');
             partyAudio.playStar();
           }
 
@@ -1366,15 +1367,15 @@ export const MiniGamesArcadeCanvas: React.FC<MiniGamePlayProps> = ({
         // Clear Banner Cue
         const statusMsg = booLooking
           ? lang === 'ar'
-            ? '🛑 تجمّد! بو ينظر إليك!'
-            : '🛑 FREEZE! BOO IS LOOKING!'
+            ? 'تجمّد! بو ينظر إليك!'
+            : 'FREEZE! BOO IS LOOKING!'
           : booWarn
           ? lang === 'ar'
-            ? '⚠️ استعد للتوقف...'
-            : '⚠️ GET READY TO STOP...'
+            ? 'استعد للتوقف...'
+            : 'GET READY TO STOP...'
           : lang === 'ar'
-          ? '🟢 اركض الآن! بو نائم'
-          : '🟢 RUN NOW! BOO IS SLEEPING';
+          ? 'اركض الآن! بو نائم'
+          : 'RUN NOW! BOO IS SLEEPING';
         if (ts - lastHudAt > 120) setHudHint(statusMsg);
 
         drawHeroSprite(
@@ -1491,7 +1492,7 @@ export const MiniGamesArcadeCanvas: React.FC<MiniGamePlayProps> = ({
             if (playerShield) {
               playerShield = false;
               player.invuln = 0.7;
-              addPop(player.x, player.y - 26, lang === 'ar' ? '🛡️ صدّ الدرع!' : '🛡️ SHIELD BLOCK!', '#38bdf8');
+              addPop(player.x, player.y - 26, lang === 'ar' ? 'صدّ الدرع!' : 'SHIELD BLOCK!', '#38bdf8');
               partyAudio.playSelect();
             } else {
               score = Math.max(0, score - 22);
@@ -1524,7 +1525,7 @@ export const MiniGamesArcadeCanvas: React.FC<MiniGamePlayProps> = ({
             if (p.kind === 'shield') {
               playerShield = true;
               score += 15;
-              addPop(p.x, p.y - 12, lang === 'ar' ? '🛡️ درع حماية!' : '🛡️ SHIELD!', '#38bdf8');
+              addPop(p.x, p.y - 12, lang === 'ar' ? 'درع حماية!' : 'SHIELD!', '#38bdf8');
               partyAudio.playStar();
             } else {
               const pts = p.kind === 'star' ? 35 : 15;
@@ -1644,7 +1645,7 @@ export const MiniGamesArcadeCanvas: React.FC<MiniGamePlayProps> = ({
             if (d.kind === 'star') {
               mazePowerTimer = 4.2;
               score += 30;
-              addPop(cx, cy - 12, lang === 'ar' ? '⭐ اطارد الأشباح! +30' : '⭐ CHOMP GHOSTS! +30', '#fde047');
+              addPop(cx, cy - 12, lang === 'ar' ? '★ اطارد الأشباح! +30' : '★ CHOMP GHOSTS! +30', '#fde047');
               partyAudio.playStar();
             } else {
               score += 10;
@@ -1654,7 +1655,7 @@ export const MiniGamesArcadeCanvas: React.FC<MiniGamePlayProps> = ({
         }
         if (remainingDots === 0) {
           score += 60;
-          addPop(CANVAS_W / 2, CANVAS_H / 2, lang === 'ar' ? '✨ متاهة كاملة! +60' : '✨ MAZE CLEAR! +60', '#fde047');
+          addPop(CANVAS_W / 2, CANVAS_H / 2, lang === 'ar' ? '★ متاهة كاملة! +60' : '★ MAZE CLEAR! +60', '#fde047');
           partyAudio.playStar();
           for (const d of mazeDots) d.taken = false;
         }
@@ -1704,7 +1705,7 @@ export const MiniGamesArcadeCanvas: React.FC<MiniGamePlayProps> = ({
               g.respawn = 3.0;
               g.x = 7.5 * cellW;
               g.y = 3.5 * cellH;
-              addPop(player.x, player.y - 24, lang === 'ar' ? '👻 أكلت الشبح! +45' : '👻 GHOST CHOMP! +45', '#38bdf8');
+              addPop(player.x, player.y - 24, lang === 'ar' ? 'أكلت الشبح! +45' : 'GHOST CHOMP! +45', '#38bdf8');
               partyAudio.playStar();
             } else if (player.invuln <= 0) {
               score = Math.max(0, score - 18);
@@ -2029,7 +2030,7 @@ export const MiniGamesArcadeCanvas: React.FC<MiniGamePlayProps> = ({
             score = Math.max(0, score - 20);
             fireSpeed = Math.max(2.35, fireSpeed - 0.5);
             player.invuln = 0.75;
-            addPop(player.x, player.y - 36, '-20 🔥', '#ef4444');
+            addPop(player.x, player.y - 36, '-20', '#ef4444');
             partyAudio.playHit();
           }
         }
@@ -2209,57 +2210,170 @@ export const MiniGamesArcadeCanvas: React.FC<MiniGamePlayProps> = ({
         className="w-full max-w-[740px] aspect-[720/420] rounded-2xl border-2 border-amber-400/50 shadow-2xl touch-none select-none cursor-crosshair bg-slate-950"
       />
 
-      {/* Mobile & Desktop Quick Action Bar */}
-      <div className="w-full max-w-[740px] flex flex-wrap items-center justify-between gap-2 text-xs text-slate-300">
-        <span>{lang === 'ar' ? spec.controlsAr : spec.controlsEn}</span>
-        <div className="flex items-center gap-2">
-          <button
-            type="button"
-            onPointerDown={() => {
-              keysRef.current.ArrowLeft = true;
-            }}
-            onPointerUp={() => {
-              keysRef.current.ArrowLeft = false;
-            }}
-            onPointerLeave={() => {
-              keysRef.current.ArrowLeft = false;
-            }}
-            className="px-3.5 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 active:bg-amber-500 active:text-slate-950 font-bold text-sm border border-white/15 select-none"
-          >
-            ◀
-          </button>
-          <button
-            type="button"
-            onPointerDown={() => {
-              pointerRef.current.justPressed = true;
-              keysRef.current.Space = true;
-            }}
-            onPointerUp={() => {
-              keysRef.current.Space = false;
-            }}
-            onPointerLeave={() => {
-              keysRef.current.Space = false;
-            }}
-            className="px-5 py-2 rounded-lg bg-amber-400 hover:bg-amber-300 active:scale-95 text-slate-950 font-extrabold text-sm select-none"
-          >
-            {lang === 'ar' ? 'قفز / تنفيذ' : 'JUMP / ACT'}
-          </button>
-          <button
-            type="button"
-            onPointerDown={() => {
-              keysRef.current.ArrowRight = true;
-            }}
-            onPointerUp={() => {
-              keysRef.current.ArrowRight = false;
-            }}
-            onPointerLeave={() => {
-              keysRef.current.ArrowRight = false;
-            }}
-            className="px-3.5 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 active:bg-amber-500 active:text-slate-950 font-bold text-sm border border-white/15 select-none"
-          >
-            ▶
-          </button>
+      {/* Mobile & Desktop Arrow Pad + Touch Action Bar */}
+      <div className="w-full max-w-[740px] rounded-xl bg-slate-900/90 border border-white/15 px-3 py-2.5 flex flex-wrap items-center justify-between gap-3 text-xs text-slate-300">
+        {/* Directional Arrow Pad (forced LTR so Left arrow is always Left and Right is always Right) */}
+        <div dir="ltr" className="flex items-center gap-2">
+          {(gameId === 'lava_bridge_dash' ||
+            gameId === 'bullet_bill_dodge' ||
+            gameId === 'coin_magnet_maze' ||
+            gameId === 'paint_tiles_party' ||
+            gameId === 'sky_balloon_pop') ? (
+            <div className="flex flex-col items-center gap-1.5">
+              <button
+                type="button"
+                aria-label="Up"
+                onPointerDown={(e) => {
+                  e.preventDefault();
+                  keysRef.current.ArrowUp = true;
+                }}
+                onPointerUp={() => {
+                  keysRef.current.ArrowUp = false;
+                }}
+                onPointerLeave={() => {
+                  keysRef.current.ArrowUp = false;
+                }}
+                onPointerCancel={() => {
+                  keysRef.current.ArrowUp = false;
+                }}
+                className="w-11 h-9 rounded-lg bg-slate-800 hover:bg-slate-700 active:bg-amber-400 active:text-slate-950 text-white border border-white/15 flex items-center justify-center touch-none select-none cursor-pointer"
+              >
+                <ArrowGlyphSvg dir="up" size={18} />
+              </button>
+              <div className="flex items-center gap-1.5">
+                <button
+                  type="button"
+                  aria-label="Left"
+                  onPointerDown={(e) => {
+                    e.preventDefault();
+                    keysRef.current.ArrowLeft = true;
+                  }}
+                  onPointerUp={() => {
+                    keysRef.current.ArrowLeft = false;
+                  }}
+                  onPointerLeave={() => {
+                    keysRef.current.ArrowLeft = false;
+                  }}
+                  onPointerCancel={() => {
+                    keysRef.current.ArrowLeft = false;
+                  }}
+                  className="w-11 h-9 rounded-lg bg-slate-800 hover:bg-slate-700 active:bg-amber-400 active:text-slate-950 text-white border border-white/15 flex items-center justify-center touch-none select-none cursor-pointer"
+                >
+                  <ArrowGlyphSvg dir="left" size={18} />
+                </button>
+                <button
+                  type="button"
+                  aria-label="Down"
+                  onPointerDown={(e) => {
+                    e.preventDefault();
+                    keysRef.current.ArrowDown = true;
+                  }}
+                  onPointerUp={() => {
+                    keysRef.current.ArrowDown = false;
+                  }}
+                  onPointerLeave={() => {
+                    keysRef.current.ArrowDown = false;
+                  }}
+                  onPointerCancel={() => {
+                    keysRef.current.ArrowDown = false;
+                  }}
+                  className="w-11 h-9 rounded-lg bg-slate-800 hover:bg-slate-700 active:bg-amber-400 active:text-slate-950 text-white border border-white/15 flex items-center justify-center touch-none select-none cursor-pointer"
+                >
+                  <ArrowGlyphSvg dir="down" size={18} />
+                </button>
+                <button
+                  type="button"
+                  aria-label="Right"
+                  onPointerDown={(e) => {
+                    e.preventDefault();
+                    keysRef.current.ArrowRight = true;
+                  }}
+                  onPointerUp={() => {
+                    keysRef.current.ArrowRight = false;
+                  }}
+                  onPointerLeave={() => {
+                    keysRef.current.ArrowRight = false;
+                  }}
+                  onPointerCancel={() => {
+                    keysRef.current.ArrowRight = false;
+                  }}
+                  className="w-11 h-9 rounded-lg bg-slate-800 hover:bg-slate-700 active:bg-amber-400 active:text-slate-950 text-white border border-white/15 flex items-center justify-center touch-none select-none cursor-pointer"
+                >
+                  <ArrowGlyphSvg dir="right" size={18} />
+                </button>
+              </div>
+            </div>
+          ) : (
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                aria-label="Left"
+                onPointerDown={(e) => {
+                  e.preventDefault();
+                  keysRef.current.ArrowLeft = true;
+                }}
+                onPointerUp={() => {
+                  keysRef.current.ArrowLeft = false;
+                }}
+                onPointerLeave={() => {
+                  keysRef.current.ArrowLeft = false;
+                }}
+                onPointerCancel={() => {
+                  keysRef.current.ArrowLeft = false;
+                }}
+                className="w-12 h-10 rounded-lg bg-slate-800 hover:bg-slate-700 active:bg-amber-400 active:text-slate-950 text-white border border-white/15 flex items-center justify-center touch-none select-none cursor-pointer"
+              >
+                <ArrowGlyphSvg dir="left" size={20} />
+              </button>
+              <button
+                type="button"
+                aria-label="Right"
+                onPointerDown={(e) => {
+                  e.preventDefault();
+                  keysRef.current.ArrowRight = true;
+                }}
+                onPointerUp={() => {
+                  keysRef.current.ArrowRight = false;
+                }}
+                onPointerLeave={() => {
+                  keysRef.current.ArrowRight = false;
+                }}
+                onPointerCancel={() => {
+                  keysRef.current.ArrowRight = false;
+                }}
+                className="w-12 h-10 rounded-lg bg-slate-800 hover:bg-slate-700 active:bg-amber-400 active:text-slate-950 text-white border border-white/15 flex items-center justify-center touch-none select-none cursor-pointer"
+              >
+                <ArrowGlyphSvg dir="right" size={20} />
+              </button>
+            </div>
+          )}
         </div>
+
+        <span className="hidden sm:inline text-slate-300 text-xs">
+          {lang === 'ar' ? spec.controlsAr : spec.controlsEn}
+        </span>
+
+        <button
+          type="button"
+          onPointerDown={(e) => {
+            e.preventDefault();
+            pointerRef.current.justPressed = true;
+            keysRef.current.Space = true;
+          }}
+          onPointerUp={() => {
+            keysRef.current.Space = false;
+          }}
+          onPointerLeave={() => {
+            keysRef.current.Space = false;
+          }}
+          onPointerCancel={() => {
+            keysRef.current.Space = false;
+          }}
+          className="h-11 px-5 rounded-xl bg-amber-400 hover:bg-amber-300 active:scale-95 text-slate-950 font-extrabold text-sm touch-none select-none cursor-pointer flex items-center gap-1.5 shadow"
+        >
+          <ArrowGlyphSvg dir="up" size={16} />
+          <span>{lang === 'ar' ? 'قفز / تنفيذ' : 'JUMP / ACT'}</span>
+        </button>
       </div>
     </div>
   );

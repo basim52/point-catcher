@@ -1881,8 +1881,8 @@ const MarioPartyGameInner: React.FC<MarioPartyGameProps> = ({
                   >
                     {solo!.mode === 'cup'
                       ? ar
-                        ? 'بطولة جديدة بألعاب مختلفة 🎲'
-                        : 'New Cup (Different Games) 🎲'
+                        ? 'بطولة جديدة بألعاب مختلفة'
+                        : 'New Cup (Different Games)'
                       : ar
                       ? 'إعادة التحدي'
                       : 'Play Again'}
@@ -2244,7 +2244,7 @@ const MarioPartyGameInner: React.FC<MarioPartyGameProps> = ({
                     onClick={() => void handleShuffleCupGames()}
                     className="h-9 px-3 rounded-xl border border-amber-300/40 bg-amber-400/15 hover:bg-amber-400/25 text-amber-200 font-black text-xs whitespace-nowrap cursor-pointer"
                   >
-                    {ar ? 'تبديل الألعاب 🎲' : 'Shuffle Games 🎲'}
+                    {ar ? 'تبديل الألعاب' : 'Shuffle Games'}
                   </button>
                 )}
               </div>
