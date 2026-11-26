@@ -443,8 +443,10 @@ const StatsPage: React.FC<StatsPageProps> = ({ variant = 'page', onClose }) => {
                     <span className="truncate font-bold" title={r.gameName}>{r.gameName}</span>
                     <span className="h-4 overflow-hidden rounded-full bg-white/10">
                       <span
-                        className={`block h-full rounded-full ${i === 0 ? 'bg-amber-300' : 'bg-cyan-400'}`}
-                        style={{ width: `${Math.max(2, (r.totalSeconds / maxSeconds) * 100)}%` }}
+                        className={`block h-full rounded-full ${i === 0 && r.totalSeconds > 0 ? 'bg-amber-300' : 'bg-cyan-400'}`}
+                        style={{
+                          width: `${r.totalSeconds > 0 ? Math.max(2, (r.totalSeconds / maxSeconds) * 100) : 0}%`,
+                        }}
                       />
                     </span>
                     <span className="text-left tabular-nums whitespace-nowrap text-slate-300">

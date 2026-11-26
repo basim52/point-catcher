@@ -44,6 +44,7 @@ import {
   MARIO_MINI_GAMES,
   PARTY_CHARACTER_MAP,
   PARTY_CHARACTERS,
+  recordMarioPartyLocalStats,
   type MarioMiniGameId,
   type MiniGameCategory,
   type PartyCharacterId,
@@ -313,6 +314,7 @@ const MarioPartyGameInner: React.FC<MarioPartyGameProps> = ({
     coins: 0,
   });
   const roomBotAwardedSeedRef = useRef<number>(0);
+  const recordedSoloPodiumSeedRef = useRef<number>(0);
 
   // URL invite code (?partyRoom=XXXXXX)
   const [pendingUrlRoom, setPendingUrlRoom] = useState<string | null>(() => {
@@ -579,6 +581,11 @@ const MarioPartyGameInner: React.FC<MarioPartyGameProps> = ({
       const wonMatch = room.winnerUid === profile.uid;
       const totalEarnedStars = myPlayer.stars + addStars;
       void recordMatchProfileStats(profile, wonMatch, totalEarnedStars);
+      recordMarioPartyLocalStats({
+        won: wonMatch,
+        stars: totalEarnedStars,
+        bestRoundScore: myScore,
+      });
       setProfile((prev) =>
         prev
           ? {
@@ -591,6 +598,21 @@ const MarioPartyGameInner: React.FC<MarioPartyGameProps> = ({
       );
     }
   }, [room?.status, room?.roundSeed, room?.roomCode, room?.winnerUid, profile, myPlayer, roomPlayers]);
+
+  // Record unified Mario Party local stats when a Solo/Computer match finishes
+  useEffect(() => {
+    if (!solo || solo.phase !== 'podium') return;
+    if (recordedSoloPodiumSeedRef.current === solo.roundSeed) return;
+    recordedSoloPodiumSeedRef.current = solo.roundSeed;
+    const wonSolo =
+      solo.myStars > solo.botStars ||
+      (solo.myStars === solo.botStars && solo.myCoins >= solo.botCoins);
+    recordMarioPartyLocalStats({
+      won: wonSolo,
+      stars: solo.myStars,
+      bestRoundScore: solo.myScore,
+    });
+  }, [solo?.phase, solo?.roundSeed, solo?.myStars, solo?.botStars, solo?.myCoins, solo?.botCoins, solo?.myScore]);
 
   // Solo mode rival bot live simulation during playing phase
   useEffect(() => {

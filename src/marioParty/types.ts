@@ -796,3 +796,55 @@ export interface PartyRoomPlayer {
   roundProgress: number;
   roundDone: boolean;
 }
+
+export interface MarioPartyLocalStats {
+  gamesPlayed: number;
+  wins: number;
+  starsTotal: number;
+  bestScore: number;
+}
+
+const MARIO_PARTY_STATS_KEY = 'point_catcher_mario_party_stats_v1';
+
+export function readMarioPartyStats(): MarioPartyLocalStats {
+  if (typeof window === 'undefined') {
+    return { gamesPlayed: 0, wins: 0, starsTotal: 0, bestScore: 0 };
+  }
+  try {
+    const raw = window.localStorage.getItem(MARIO_PARTY_STATS_KEY);
+    if (!raw) return { gamesPlayed: 0, wins: 0, starsTotal: 0, bestScore: 0 };
+    const p = JSON.parse(raw) as Partial<MarioPartyLocalStats>;
+    const num = (v: unknown) =>
+      typeof v === 'number' && Number.isFinite(v) && v >= 0 ? Math.floor(v) : 0;
+    return {
+      gamesPlayed: num(p.gamesPlayed),
+      wins: num(p.wins),
+      starsTotal: num(p.starsTotal),
+      bestScore: num(p.bestScore),
+    };
+  } catch {
+    return { gamesPlayed: 0, wins: 0, starsTotal: 0, bestScore: 0 };
+  }
+}
+
+export function recordMarioPartyLocalStats(update: {
+  won: boolean;
+  stars: number;
+  bestRoundScore: number;
+}): MarioPartyLocalStats {
+  const cur = readMarioPartyStats();
+  const next: MarioPartyLocalStats = {
+    gamesPlayed: cur.gamesPlayed + 1,
+    wins: cur.wins + (update.won ? 1 : 0),
+    starsTotal: cur.starsTotal + Math.max(0, Math.floor(update.stars)),
+    bestScore: Math.max(cur.bestScore, Math.max(0, Math.floor(update.bestRoundScore))),
+  };
+  if (typeof window !== 'undefined') {
+    try {
+      window.localStorage.setItem(MARIO_PARTY_STATS_KEY, JSON.stringify(next));
+    } catch {
+      // ignore storage quota errors
+    }
+  }
+  return next;
+}

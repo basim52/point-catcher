@@ -70,13 +70,31 @@ export function summarize(
   };
 }
 
-/** Raise all-time visit totals to at least the durable game_stats counters. Never lowers a row. */
+/**
+ * Raise all-time visit totals to at least the durable game_stats counters and
+ * ensure every cataloged game in `names` is represented. Never lowers a row.
+ */
 export function applyAllTimeVisitFloor(
   summary: StatsSummary,
   floors: Record<string, number>,
   names: Record<string, string> = {}
 ): StatsSummary {
   const byId = new Map(summary.rows.map((r) => [r.gameId, { ...r }]));
+  for (const [id, label] of Object.entries(names)) {
+    const existing = byId.get(id);
+    if (existing) {
+      existing.gameName = label;
+    } else {
+      byId.set(id, {
+        gameId: id,
+        gameName: label,
+        visits: 0,
+        totalSeconds: 0,
+        totalMinutes: 0,
+        avgMinutesPerVisit: 0,
+      });
+    }
+  }
   for (const [id, raw] of Object.entries(floors)) {
     const floor = Math.max(0, Math.floor(Number(raw) || 0));
     if (floor <= 0) continue;

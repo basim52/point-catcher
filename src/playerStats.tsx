@@ -5,6 +5,15 @@ import { readPlantMergeStats } from './plantMerge/types';
 import { read2048Stats } from './game2048';
 import { readSnakeStats } from './gameSnake';
 import { readShawarmaStats } from './shawarmaShop/types';
+import { readMarioPartyStats } from './marioParty/types';
+import { readGumShopHubStats } from './gumShop/types';
+import { readFruitSlashStats } from './gameFruitSlash';
+import { readDesertRallyStats } from './desertRally/types';
+import { readFruitMergeStats } from './gameFruitMerge';
+import { readBrickBreakerStats } from './gameBrickBreaker';
+import { readDateCatcherBestScore } from './dateCatcher/types';
+import { readAppleCatchClearedCount } from './gameAppleCatch';
+import { readArrowMosaicClearedCount } from './gameArrowMosaic';
 
 export interface PlayerLifetimeStats {
   totalPlaySeconds: number;
@@ -140,7 +149,32 @@ export const PlayerStatsPanel: React.FC<PlayerStatsPanelProps> = ({
     const g2048 = read2048Stats();
     const snake = readSnakeStats();
     const shawarma = readShawarmaStats();
-    return { devil, arena, plant, g2048, snake, shawarma };
+    const mario = readMarioPartyStats();
+    const gum = readGumShopHubStats();
+    const fruitSlash = readFruitSlashStats();
+    const rally = readDesertRallyStats();
+    const fruitMerge = readFruitMergeStats();
+    const brick = readBrickBreakerStats();
+    const dateBest = readDateCatcherBestScore();
+    const appleCleared = readAppleCatchClearedCount();
+    const mosaicCleared = readArrowMosaicClearedCount();
+    return {
+      devil,
+      arena,
+      plant,
+      g2048,
+      snake,
+      shawarma,
+      mario,
+      gum,
+      fruitSlash,
+      rally,
+      fruitMerge,
+      brick,
+      dateBest,
+      appleCleared,
+      mosaicCleared,
+    };
   }, []);
 
   const totalClearedStages =
@@ -433,6 +467,60 @@ export const PlayerStatsPanel: React.FC<PlayerStatsPanelProps> = ({
             <div className="text-slate-400">{isAr ? '2048 · الثعبان · الشاورما' : '2048 · Snake · Shawarma'}</div>
             <div className="font-num font-bold text-sky-200 mt-0.5 tabular-nums truncate">
               {miniStats.g2048.bestScore} · {miniStats.snake.bestScore} · {miniStats.shawarma.bestCash}
+            </div>
+          </div>
+
+          <div className="rounded-lg bg-black/25 border border-amber-400/25 p-2.5">
+            <div className="text-slate-300">{isAr ? 'حفلة ماريو أونلاين' : 'Mario Party Online'}</div>
+            <div className="font-num font-bold text-amber-300 mt-0.5 tabular-nums truncate">
+              ★ {miniStats.mario.starsTotal}
+              <span className="text-[10.5px] text-emerald-300 ms-1.5">
+                ({miniStats.mario.wins}/{miniStats.mario.gamesPlayed} {isAr ? 'فوز' : 'wins'})
+              </span>
+            </div>
+          </div>
+
+          <div className="rounded-lg bg-black/25 border border-white/8 p-2.5">
+            <div className="text-slate-400">{isAr ? 'بياع العلك 3D' : 'Gum Shop 3D'}</div>
+            <div className="font-num font-bold text-pink-200 mt-0.5 tabular-nums truncate">
+              ${miniStats.gum.money.toLocaleString()}
+              <span className="text-[10.5px] text-slate-400 ms-1.5">
+                {isAr ? `يوم ${miniStats.gum.day}` : `Day ${miniStats.gum.day}`}
+              </span>
+            </div>
+          </div>
+
+          <div className="rounded-lg bg-black/25 border border-white/8 p-2.5">
+            <div className="text-slate-400">{isAr ? 'سيف الفواكه 2D' : 'Fruit Slash 2D'}</div>
+            <div className="font-num font-bold text-rose-200 mt-0.5 tabular-nums truncate">
+              {Math.max(miniStats.fruitSlash.bestClassic, miniStats.fruitSlash.bestZen).toLocaleString()}
+              <span className="text-[10.5px] text-amber-300 ms-1.5">
+                x{miniStats.fruitSlash.bestCombo}
+              </span>
+            </div>
+          </div>
+
+          <div className="rounded-lg bg-black/25 border border-white/8 p-2.5">
+            <div className="text-slate-400">{isAr ? 'سباق الصحراء 3D' : 'Desert Rally 3D'}</div>
+            <div className="font-num font-bold text-orange-200 mt-0.5 tabular-nums truncate">
+              {miniStats.rally.bestScore.toLocaleString()}
+              <span className="text-[10.5px] text-slate-400 ms-1.5">
+                {miniStats.rally.bestDistanceM}m
+              </span>
+            </div>
+          </div>
+
+          <div className="rounded-lg bg-black/25 border border-white/8 p-2.5">
+            <div className="text-slate-400">{isAr ? 'دمج الفواكه · تكسير النيون' : 'Fruit Merge · Bricks'}</div>
+            <div className="font-num font-bold text-violet-200 mt-0.5 tabular-nums truncate">
+              {miniStats.fruitMerge.bestScore.toLocaleString()} · {miniStats.brick.bestScore.toLocaleString()}
+            </div>
+          </div>
+
+          <div className="rounded-lg bg-black/25 border border-white/8 p-2.5">
+            <div className="text-slate-400">{isAr ? 'التمر · التفاح · الفسيفساء' : 'Date · Apple · Mosaic'}</div>
+            <div className="font-num font-bold text-cyan-200 mt-0.5 tabular-nums truncate">
+              {miniStats.dateBest} · {miniStats.appleCleared} · {miniStats.mosaicCleared}
             </div>
           </div>
         </div>
