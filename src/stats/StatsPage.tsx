@@ -159,8 +159,8 @@ type StatsPageProps = { variant?: Variant; onClose?: () => void };
 const StatsPage: React.FC<StatsPageProps> = ({ variant = 'page', onClose }) => {
   const [user, setUser] = useState<User | null>(null);
   const [authReady, setAuthReady] = useState(demoMode !== null);
-  const [period, setPeriod] = useState<Period>('7d');
-  const [appliedPeriod, setAppliedPeriod] = useState<Period>('7d');
+  const [period, setPeriod] = useState<Period>('all');
+  const [appliedPeriod, setAppliedPeriod] = useState<Period>('all');
   const [records, setRecords] = useState<SessionRecord[] | null>(null);
   const [visitFloors, setVisitFloors] = useState<Record<string, number>>({});
   const [loading, setLoading] = useState(false);

@@ -152,59 +152,88 @@ export function refreshGameVisits(force = false): Promise<void> {
 
   const projectId = firebaseWebConfig.projectId!;
   const apiKey = firebaseWebConfig.apiKey!;
-  const url =
+  const trackedIds = Object.keys(TRACKED_GAMES);
+  const batchUrl =
     `https://firestore.googleapis.com/v1/projects/${encodeURIComponent(projectId)}` +
-    `/databases/${encodeURIComponent(analyticsFirestoreDatabaseId)}/documents/${GAME_STATS_COLLECTION}?pageSize=50&key=${encodeURIComponent(apiKey)}`;
+    `/databases/${encodeURIComponent(analyticsFirestoreDatabaseId)}/documents:batchGet?key=${encodeURIComponent(apiKey)}`;
+  const batchBody = JSON.stringify({
+    documents: trackedIds.map(
+      (id) =>
+        `projects/${projectId}/databases/${analyticsFirestoreDatabaseId}/documents/${GAME_STATS_COLLECTION}/${id}`
+    ),
+  });
 
-  inFlightFetch = fetch(url, { credentials: 'omit' })
-    .then(async (res) => {
-      if (!res.ok) {
-        // Keep last known counts visible; just mark ready so we don't spin.
-        markReady();
-        return;
-      }
-      const json = (await res.json()) as {
-        documents?: Array<{
-          name?: string;
-          fields?: { visits?: { integerValue?: string; doubleValue?: number } };
-        }>;
-      };
-      lastFetchAt = Date.now();
-      const docs = json.documents ?? [];
-      if (docs.length === 0) {
-        markReady();
-        return;
-      }
+  type VisitDoc = {
+    name?: string;
+    fields?: { visits?: { integerValue?: string; doubleValue?: number } };
+  };
 
-      let changed = false;
-      const merged: Record<string, number> = { ...countsCache };
-      for (const doc of docs) {
-        const id = doc.name?.split('/').pop();
-        if (!id || !(id in TRACKED_GAMES)) continue;
-        const field = doc.fields?.visits;
-        const val =
-          field?.integerValue !== undefined
-            ? Number(field.integerValue)
-            : typeof field?.doubleValue === 'number'
-            ? field.doubleValue
-            : NaN;
-        if (Number.isFinite(val) && val >= 0) {
-          const remoteCount = Math.floor(val);
-          const best = Math.max(remoteCount, merged[id] ?? 0);
-          if (best !== merged[id]) {
-            merged[id] = best;
-            changed = true;
-          }
+  const applyDocs = (docs: VisitDoc[]) => {
+    lastFetchAt = Date.now();
+    if (docs.length === 0) {
+      markReady();
+      return;
+    }
+
+    let changed = false;
+    const merged: Record<string, number> = { ...countsCache };
+    for (const doc of docs) {
+      const id = doc.name?.split('/').pop();
+      if (!id || !(id in TRACKED_GAMES)) continue;
+      const field = doc.fields?.visits;
+      const val =
+        field?.integerValue !== undefined
+          ? Number(field.integerValue)
+          : typeof field?.doubleValue === 'number'
+          ? field.doubleValue
+          : NaN;
+      if (Number.isFinite(val) && val >= 0) {
+        const remoteCount = Math.floor(val);
+        const best = Math.max(remoteCount, merged[id] ?? 0);
+        if (best !== merged[id]) {
+          merged[id] = best;
+          changed = true;
         }
       }
-      if (changed) {
-        countsCache = merged;
-        saveLocalVisits(countsCache);
+    }
+    if (changed) {
+      countsCache = merged;
+      saveLocalVisits(countsCache);
+    }
+    countsReady = true;
+    notify();
+  };
+
+  inFlightFetch = fetch(batchUrl, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: batchBody,
+    credentials: 'omit',
+  })
+    .then(async (res) => {
+      if (res.ok) {
+        const json = (await res.json()) as Array<{ found?: VisitDoc }>;
+        const docs = Array.isArray(json)
+          ? json.map((entry) => entry.found).filter((d): d is VisitDoc => Boolean(d))
+          : [];
+        applyDocs(docs);
+        return;
       }
-      countsReady = true;
-      notify();
+      // Fallback to listDocuments for Standard Firestore setups if batchGet ever fails
+      const listUrl =
+        `https://firestore.googleapis.com/v1/projects/${encodeURIComponent(projectId)}` +
+        `/databases/${encodeURIComponent(analyticsFirestoreDatabaseId)}/documents/${GAME_STATS_COLLECTION}?pageSize=50&key=${encodeURIComponent(apiKey)}`;
+      const fallbackRes = await fetch(listUrl, { credentials: 'omit' });
+      if (!fallbackRes.ok) {
+        markReady();
+        return;
+      }
+      const fallbackJson = (await fallbackRes.json()) as { documents?: VisitDoc[] };
+      applyDocs(fallbackJson.documents ?? []);
     })
-    .catch(() => undefined)
+    .catch(() => {
+      markReady();
+    })
     .finally(() => {
       inFlightFetch = null;
     });

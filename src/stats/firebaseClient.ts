@@ -12,6 +12,7 @@ import {
 import {
   collection,
   doc,
+  getDoc,
   getDocs,
   getFirestore,
   query,
@@ -96,7 +97,13 @@ export async function fetchSessions(since: Date | null): Promise<SessionRecord[]
   const constraints: QueryConstraint[] = since
     ? [where('startedAt', '>=', Timestamp.fromDate(since))]
     : [];
-  const snap = await getDocs(query(collection(db, SESSIONS_COLLECTION), ...constraints));
+  let snap;
+  try {
+    snap = await getDocs(query(collection(db, SESSIONS_COLLECTION), ...constraints));
+  } catch (err) {
+    if (!since) throw err;
+    snap = await getDocs(collection(db, SESSIONS_COLLECTION));
+  }
   return snap.docs.map((d) => {
     const v = d.data();
     return {
@@ -113,14 +120,27 @@ export async function fetchSessions(since: Date | null): Promise<SessionRecord[]
 
 export async function fetchGameStats(): Promise<Record<string, number>> {
   const db = getStatsDb();
-  const snap = await getDocs(collection(db, GAME_STATS_COLLECTION));
   const out: Record<string, number> = {};
-  for (const d of snap.docs) {
-    if (!(d.id in TRACKED_GAMES)) continue;
-    const val = Number(d.data().visits ?? 0);
-    if (Number.isFinite(val) && val > 0) out[d.id] = Math.floor(val);
+  try {
+    const snap = await getDocs(collection(db, GAME_STATS_COLLECTION));
+    for (const d of snap.docs) {
+      if (!(d.id in TRACKED_GAMES)) continue;
+      const val = Number(d.data().visits ?? 0);
+      if (Number.isFinite(val) && val > 0) out[d.id] = Math.floor(val);
+    }
+    return out;
+  } catch {
+    const ids = Object.keys(TRACKED_GAMES);
+    const snaps = await Promise.all(
+      ids.map((id) => getDoc(doc(db, GAME_STATS_COLLECTION, id)).catch(() => null))
+    );
+    snaps.forEach((s, idx) => {
+      if (!s || !s.exists()) return;
+      const val = Number(s.data()?.visits ?? 0);
+      if (Number.isFinite(val) && val > 0) out[ids[idx]] = Math.floor(val);
+    });
+    return out;
   }
-  return out;
 }
 
 /**

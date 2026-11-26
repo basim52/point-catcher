@@ -47,6 +47,7 @@ const LANDING_COPY = {
     navGames: 'صالة الألعاب',
     navShop: 'المتجر',
     navIndex: 'الاندكس',
+    navStats: 'الإحصائيات',
     topCta: 'ابدأ اللعب',
     heroKicker: '5 عوالم · 235 مرحلة · 16 لعبة مصغرة',
     heroTitle: 'التقط النقاط النادرة، طوّر أدواتك، وتحدَّ صالة الألعاب',
@@ -110,6 +111,7 @@ const LANDING_COPY = {
     navGames: 'Games Hub',
     navShop: 'Shop',
     navIndex: 'Index',
+    navStats: 'Stats',
     topCta: 'Start Playing',
     heroKicker: '5 Worlds · 235 Stages · 16 Mini-Games',
     heroTitle: 'Catch Rare Gems, Upgrade Your Gear, and Master the Arcade',
@@ -280,10 +282,28 @@ export const LandingBoard: React.FC<LandingBoardProps> = ({
             >
               {t.navIndex}
             </button>
+            {onOpenSettings && (
+              <button
+                type="button"
+                onClick={onOpenSettings}
+                className="text-amber-300 hover:text-amber-200 font-semibold transition-colors whitespace-nowrap shrink-0 cursor-pointer"
+              >
+                {t.navStats}
+              </button>
+            )}
           </nav>
 
           {/* Zone 3: Single Primary Action */}
           <div className="flex items-center gap-2 shrink-0">
+            {onOpenSettings && (
+              <button
+                type="button"
+                onClick={onOpenSettings}
+                className="md:hidden h-9 px-3 rounded-lg border border-amber-300/35 bg-amber-400/10 hover:bg-amber-400/20 text-amber-200 text-xs font-bold transition-colors whitespace-nowrap shrink-0 cursor-pointer"
+              >
+                {t.navStats}
+              </button>
+            )}
             <StatsAdminButton />
             <button
               type="button"

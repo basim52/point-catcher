@@ -23,13 +23,26 @@ type SessionPayload = {
   visit: boolean;
 };
 
+function makeSessionDocId(): string {
+  const ts = Date.now().toString(36);
+  const rand =
+    typeof crypto !== 'undefined' && typeof crypto.getRandomValues === 'function'
+      ? Array.from(crypto.getRandomValues(new Uint8Array(6)), (b) => b.toString(36).padStart(2, '0'))
+          .join('')
+          .slice(0, 10)
+      : Math.random().toString(36).slice(2, 12);
+  return `s_${ts}_${rand}`;
+}
+
 function sendSession(p: SessionPayload): void {
   if (!isAnalyticsConfigured) return;
   if (!p.visit && p.durationSeconds < 1) return;
   const { projectId, apiKey } = firebaseWebConfig;
+  const docId = makeSessionDocId();
   const url =
     `https://firestore.googleapis.com/v1/projects/${encodeURIComponent(projectId!)}` +
-    `/databases/${encodeURIComponent(analyticsFirestoreDatabaseId)}/documents/${SESSIONS_COLLECTION}?key=${encodeURIComponent(apiKey!)}`;
+    `/databases/${encodeURIComponent(analyticsFirestoreDatabaseId)}/documents/${SESSIONS_COLLECTION}` +
+    `?documentId=${encodeURIComponent(docId)}&key=${encodeURIComponent(apiKey!)}`;
   const body = JSON.stringify({
     fields: {
       gameId: { stringValue: p.gameId },
