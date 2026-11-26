@@ -295,7 +295,7 @@ const StatsPage: React.FC<StatsPageProps> = ({ variant = 'page', onClose }) => {
   }, [records]);
 
   const summary = useMemo(() => {
-    const base = summarize(records ?? [], appliedPeriod);
+    const base = summarize(records ?? [], appliedPeriod, new Date(), TRACKED_GAMES);
     return appliedPeriod === 'all'
       ? applyAllTimeVisitFloor(base, visitFloors, TRACKED_GAMES)
       : base;

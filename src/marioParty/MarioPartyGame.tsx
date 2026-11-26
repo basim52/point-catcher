@@ -44,7 +44,10 @@ import {
   MARIO_MINI_GAMES,
   PARTY_CHARACTER_MAP,
   PARTY_CHARACTERS,
-  recordMarioPartyLocalStats,
+  recordMarioPartyMatchFinish,
+  recordMarioPartyPlaySeconds,
+  recordMarioPartyRoundStats,
+  recordMarioPartyVisit,
   type MarioMiniGameId,
   type MiniGameCategory,
   type PartyCharacterId,
@@ -314,6 +317,7 @@ const MarioPartyGameInner: React.FC<MarioPartyGameProps> = ({
     coins: 0,
   });
   const roomBotAwardedSeedRef = useRef<number>(0);
+  const recordedSoloRoundSeedRef = useRef<number>(0);
   const recordedSoloPodiumSeedRef = useRef<number>(0);
 
   // URL invite code (?partyRoom=XXXXXX)
@@ -334,6 +338,36 @@ const MarioPartyGameInner: React.FC<MarioPartyGameProps> = ({
   const lastLiveSyncAtRef = useRef<number>(0);
   const myLocalScoreRef = useRef<number>(0);
   const hadPodiumRef = useRef<boolean>(false);
+
+  // Count Mario Party entry and active play time in local player stats
+  useEffect(() => {
+    recordMarioPartyVisit();
+    let pendingSecs = 0;
+    const flush = () => {
+      if (pendingSecs > 0) {
+        recordMarioPartyPlaySeconds(pendingSecs);
+        pendingSecs = 0;
+      }
+    };
+    const timer = window.setInterval(() => {
+      if (document.visibilityState !== 'visible') return;
+      pendingSecs += 1;
+      if (pendingSecs >= 5) {
+        flush();
+      }
+    }, 1000);
+    const onHidden = () => {
+      if (document.visibilityState === 'hidden') flush();
+    };
+    document.addEventListener('visibilitychange', onHidden);
+    window.addEventListener('beforeunload', flush);
+    return () => {
+      window.clearInterval(timer);
+      document.removeEventListener('visibilitychange', onHidden);
+      window.removeEventListener('beforeunload', flush);
+      flush();
+    };
+  }, []);
 
   const showToast = useCallback((text: string, tone: 'ok' | 'err' | 'info' = 'info') => {
     setToast({ text, tone });
@@ -576,14 +610,19 @@ const MarioPartyGameInner: React.FC<MarioPartyGameProps> = ({
       myScore
     );
 
+    // Record every completed Online round so stats update even before the final podium
+    recordMarioPartyRoundStats({
+      starsEarned: addStars,
+      roundScore: myScore,
+    });
+
     if (room.status === 'podium' && recordedPodiumSeedRef.current !== room.roundSeed) {
       recordedPodiumSeedRef.current = room.roundSeed;
       const wonMatch = room.winnerUid === profile.uid;
       const totalEarnedStars = myPlayer.stars + addStars;
       void recordMatchProfileStats(profile, wonMatch, totalEarnedStars);
-      recordMarioPartyLocalStats({
+      recordMarioPartyMatchFinish({
         won: wonMatch,
-        stars: totalEarnedStars,
         bestRoundScore: myScore,
       });
       setProfile((prev) =>
@@ -599,20 +638,36 @@ const MarioPartyGameInner: React.FC<MarioPartyGameProps> = ({
     }
   }, [room?.status, room?.roundSeed, room?.roomCode, room?.winnerUid, profile, myPlayer, roomPlayers]);
 
-  // Record unified Mario Party local stats when a Solo/Computer match finishes
+  // Record unified Mario Party local stats on EVERY Solo/Computer round & podium finish
   useEffect(() => {
-    if (!solo || solo.phase !== 'podium') return;
-    if (recordedSoloPodiumSeedRef.current === solo.roundSeed) return;
-    recordedSoloPodiumSeedRef.current = solo.roundSeed;
-    const wonSolo =
-      solo.myStars > solo.botStars ||
-      (solo.myStars === solo.botStars && solo.myCoins >= solo.botCoins);
-    recordMarioPartyLocalStats({
-      won: wonSolo,
-      stars: solo.myStars,
-      bestRoundScore: solo.myScore,
-    });
-  }, [solo?.phase, solo?.roundSeed, solo?.myStars, solo?.botStars, solo?.myCoins, solo?.botCoins, solo?.myScore]);
+    if (!solo || (solo.phase !== 'round_result' && solo.phase !== 'podium')) return;
+    if (recordedSoloRoundSeedRef.current !== solo.roundSeed) {
+      recordedSoloRoundSeedRef.current = solo.roundSeed;
+      recordMarioPartyRoundStats({
+        starsEarned: solo.roundWinner === 'me' ? 1 : 0,
+        roundScore: solo.myScore,
+      });
+    }
+    if (solo.phase === 'podium' && recordedSoloPodiumSeedRef.current !== solo.roundSeed) {
+      recordedSoloPodiumSeedRef.current = solo.roundSeed;
+      const wonSolo =
+        solo.myStars > solo.botStars ||
+        (solo.myStars === solo.botStars && solo.myCoins >= solo.botCoins);
+      recordMarioPartyMatchFinish({
+        won: wonSolo,
+        bestRoundScore: solo.myScore,
+      });
+    }
+  }, [
+    solo?.phase,
+    solo?.roundSeed,
+    solo?.roundWinner,
+    solo?.myStars,
+    solo?.botStars,
+    solo?.myCoins,
+    solo?.botCoins,
+    solo?.myScore,
+  ]);
 
   // Solo mode rival bot live simulation during playing phase
   useEffect(() => {

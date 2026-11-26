@@ -471,22 +471,43 @@ export const PlayerStatsPanel: React.FC<PlayerStatsPanelProps> = ({
           </div>
 
           <div className="rounded-lg bg-black/25 border border-amber-400/25 p-2.5">
-            <div className="text-slate-300">{isAr ? 'حفلة ماريو أونلاين' : 'Mario Party Online'}</div>
-            <div className="font-num font-bold text-amber-300 mt-0.5 tabular-nums truncate">
-              ★ {miniStats.mario.starsTotal}
-              <span className="text-[10.5px] text-emerald-300 ms-1.5">
-                ({miniStats.mario.wins}/{miniStats.mario.gamesPlayed} {isAr ? 'فوز' : 'wins'})
+            <div className="text-slate-300 flex items-center justify-between gap-1">
+              <span>{isAr ? 'حفلة ماريو أونلاين' : 'Mario Party Online'}</span>
+              <span className="font-num text-[10.5px] font-bold text-amber-300">
+                ★ {miniStats.mario.starsTotal}
               </span>
+            </div>
+            <div className="font-num font-bold text-emerald-300 mt-0.5 tabular-nums truncate">
+              {miniStats.mario.wins}/{miniStats.mario.gamesPlayed} {isAr ? 'فوز' : 'wins'}
+              <span className="text-[10.5px] text-slate-400 ms-1.5">
+                · {miniStats.mario.roundsPlayed} {isAr ? 'جولة' : 'rounds'}
+              </span>
+            </div>
+            <div className="font-num text-[10.5px] text-sky-300 mt-0.5 tabular-nums truncate">
+              {isAr
+                ? `${miniStats.mario.visits} دخول · ${formatPlayDuration(miniStats.mario.totalPlaySeconds, lang)}`
+                : `${miniStats.mario.visits} visits · ${formatPlayDuration(miniStats.mario.totalPlaySeconds, lang)}`}
+              {miniStats.mario.bestScore > 0 ? ` · ${miniStats.mario.bestScore}` : ''}
             </div>
           </div>
 
-          <div className="rounded-lg bg-black/25 border border-white/8 p-2.5">
-            <div className="text-slate-400">{isAr ? 'بياع العلك 3D' : 'Gum Shop 3D'}</div>
+          <div className="rounded-lg bg-black/25 border border-yellow-400/20 p-2.5">
+            <div className="text-slate-300 flex items-center justify-between gap-1">
+              <span>{isAr ? 'بياع العلك 3D' : 'Gum Shop 3D'}</span>
+              <span className="font-num text-[10.5px] font-bold text-yellow-300">
+                🏆 {isAr ? `رانك ${miniStats.gum.rank}` : `Rank ${miniStats.gum.rank}`}
+              </span>
+            </div>
             <div className="font-num font-bold text-pink-200 mt-0.5 tabular-nums truncate">
               ${miniStats.gum.money.toLocaleString()}
               <span className="text-[10.5px] text-slate-400 ms-1.5">
                 {isAr ? `يوم ${miniStats.gum.day}` : `Day ${miniStats.gum.day}`}
               </span>
+            </div>
+            <div className="font-num text-[10.5px] text-emerald-300 mt-0.5 tabular-nums truncate">
+              {isAr
+                ? `${miniStats.gum.totalPacksSold} علك · ${formatPlayDuration(miniStats.gum.totalPlaySeconds, lang)}`
+                : `${miniStats.gum.totalPacksSold} sold · ${formatPlayDuration(miniStats.gum.totalPlaySeconds, lang)}`}
             </div>
           </div>
 

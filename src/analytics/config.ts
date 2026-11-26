@@ -1,11 +1,32 @@
+import appletFirebaseConfig from '../../firebase-applet-config.json';
+
 // Public Firebase web config comes from Vite env vars (set them in Vercel).
-// If any is missing, tracking silently does nothing and the game is unaffected.
-export const firebaseWebConfig = {
-  apiKey: import.meta.env.VITE_FIREBASE_API_KEY as string | undefined,
-  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN as string | undefined,
-  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID as string | undefined,
-  appId: import.meta.env.VITE_FIREBASE_APP_ID as string | undefined,
-};
+// When Vite env vars are not set (e.g. AI Studio preview), fall back to
+// firebase-applet-config.json and its named Firestore database ID.
+const hasViteEnvConfig = Boolean(
+  import.meta.env.VITE_FIREBASE_API_KEY &&
+    import.meta.env.VITE_FIREBASE_AUTH_DOMAIN &&
+    import.meta.env.VITE_FIREBASE_PROJECT_ID &&
+    import.meta.env.VITE_FIREBASE_APP_ID
+);
+
+export const firebaseWebConfig = hasViteEnvConfig
+  ? {
+      apiKey: import.meta.env.VITE_FIREBASE_API_KEY as string,
+      authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN as string,
+      projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID as string,
+      appId: import.meta.env.VITE_FIREBASE_APP_ID as string,
+    }
+  : {
+      apiKey: appletFirebaseConfig.apiKey as string | undefined,
+      authDomain: appletFirebaseConfig.authDomain as string | undefined,
+      projectId: appletFirebaseConfig.projectId as string | undefined,
+      appId: appletFirebaseConfig.appId as string | undefined,
+    };
+
+export const analyticsFirestoreDatabaseId: string = hasViteEnvConfig
+  ? '(default)'
+  : appletFirebaseConfig.firestoreDatabaseId || '(default)';
 
 export const isAnalyticsConfigured = Boolean(
   firebaseWebConfig.apiKey &&
@@ -18,6 +39,7 @@ export const isAnalyticsConfigured = Boolean(
 export const STATS_ADMIN_EMAILS: readonly string[] = [
   'aboodalkhalil73@gmail.com',
   'ab3256792@gmail.com',
+  'basim5252@gmail.com',
 ];
 
 export const SESSIONS_COLLECTION = 'analytics_sessions';

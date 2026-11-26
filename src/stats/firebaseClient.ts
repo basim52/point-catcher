@@ -21,6 +21,7 @@ import {
   type QueryConstraint,
 } from 'firebase/firestore';
 import {
+  analyticsFirestoreDatabaseId,
   firebaseWebConfig,
   GAME_STATS_COLLECTION,
   SESSIONS_COLLECTION,
@@ -39,6 +40,12 @@ function getApp(): FirebaseApp {
       initializeApp(firebaseWebConfig as Record<string, string>, STATS_APP_NAME);
   }
   return app;
+}
+
+function getStatsDb() {
+  return analyticsFirestoreDatabaseId === '(default)'
+    ? getFirestore(getApp())
+    : getFirestore(getApp(), analyticsFirestoreDatabaseId);
 }
 
 export function watchUser(cb: (u: User | null) => void): () => void {
@@ -85,7 +92,7 @@ export function signOutUser(): Promise<void> {
 }
 
 export async function fetchSessions(since: Date | null): Promise<SessionRecord[]> {
-  const db = getFirestore(getApp());
+  const db = getStatsDb();
   const constraints: QueryConstraint[] = since
     ? [where('startedAt', '>=', Timestamp.fromDate(since))]
     : [];
@@ -105,7 +112,7 @@ export async function fetchSessions(since: Date | null): Promise<SessionRecord[]
 
 
 export async function fetchGameStats(): Promise<Record<string, number>> {
-  const db = getFirestore(getApp());
+  const db = getStatsDb();
   const snap = await getDocs(collection(db, GAME_STATS_COLLECTION));
   const out: Record<string, number> = {};
   for (const d of snap.docs) {
@@ -121,7 +128,7 @@ export async function fetchGameStats(): Promise<Record<string, number>> {
  * into public game_stats/{gameId} whenever analytics_sessions has a higher count.
  */
 export async function syncPublicVisitCounts(records: SessionRecord[]): Promise<void> {
-  const db = getFirestore(getApp());
+  const db = getStatsDb();
   const totals = new Map<string, number>();
   for (const r of records) {
     if (!r.visit || !(r.gameId in TRACKED_GAMES)) continue;

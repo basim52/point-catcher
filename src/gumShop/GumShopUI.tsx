@@ -7,13 +7,22 @@ import {
   AD_DURATION_DAYS,
   DAY_DURATION_SEC,
   EMERGENCY_GRANT_AMOUNT,
+  formatGumPlayTime,
+  getFlavorsUnlockedAtRank,
+  getGumRankSpec,
+  getNextRankRequirements,
   getPriceVerdict,
   GUM_FLAVOR_MAP,
   GUM_FLAVORS,
+  GUM_RANK_COST,
+  GUM_RANK_PACKS_STEP,
+  GUM_RANKS,
   MAX_SHELVES,
   MIN_CRATE_COST,
   PACKS_PER_BOX,
   RENT_INTERVAL_DAYS,
+  SCOOTER_MAP,
+  SCOOTERS,
   SHELF_MAX_STOCK,
   SHELF_SLOTS,
   SHOP_TIERS,
@@ -24,6 +33,7 @@ import {
   type GumFlavorId,
   type GumShopHudSnapshot,
   type GumShopModalTab,
+  type ScooterId,
   type UpgradeId,
 } from './types';
 
@@ -62,6 +72,15 @@ interface GumShopUIProps {
   onSweepCratesToStorage: () => void;
   onAutoStockFromStorage: () => void;
   onBuyAdCampaign: (adId: AdCampaignId) => void;
+  onPromoteRank: () => void;
+  onAcceptDeliveryOrder: (orderId: number) => void;
+  onCancelActiveDelivery: () => void;
+  onRefreshDeliveries: () => void;
+  onGoToActiveDelivery: () => void;
+  onGoToScooterShop: () => void;
+  onBuyScooter: (scooterId: ScooterId) => void;
+  onEquipScooter: (scooterId: ScooterId) => void;
+  onToggleRideScooter: () => void;
   onPayRent: () => void;
   onEmergencyGrant: () => void;
   onInteractNearest: () => void;
@@ -185,6 +204,72 @@ const COPY = {
     puzzleMoves: (n: number) => `المحاولات: ${n}`,
     puzzleReset: 'إعادة خلط',
     puzzleUnlocked: '🔓 تم فتح القفل! جاري فتح الباب...',
+    ranksBtn: (rank: number) => `رانك ${rank} · الإحصائيات`,
+    rankUpReady: 'جاهز للترقية!',
+    ranksModalTitle: '🏆 الرانكات وإحصائيات بياع العلك',
+    ranksModalSub: `للترقية للرانك التالي يجب دفع ${GUM_RANK_COST} ريال وبيع ${GUM_RANK_PACKS_STEP} علك إضافي لكل رانك!`,
+    currentRankLabel: 'رانكك الحالي',
+    nextRankLabel: 'الرانك التالي',
+    reqMoneyLabel: `المبلغ المطلوب (${GUM_RANK_COST} ريال)`,
+    reqPacksLabel: (reqTotal: number) => `العلك المباع المطلوب (${reqTotal} علك)`,
+    reqDone: 'مكتمل ✓',
+    reqRemainingMoney: (rem: number) => `ناقصك ${rem} ريال`,
+    reqRemainingPacks: (rem: number) => `باقي تبيع ${rem} علك`,
+    promoteBtn: (nextRank: number) => `🏆 ترقية إلى رانك ${nextRank} (-${GUM_RANK_COST} ريال)`,
+    statsSectionTitle: '📊 إحصائياتك في بياع العلك',
+    statPlayTime: 'مدة اللعب (كم لعبت)',
+    statTotalSold: 'كم علك بعت (الإجمالي)',
+    statSessions: 'عدد مرات اللعب',
+    statTodaySold: 'علك مباع اليوم',
+    statTotalEarned: 'إجمالي الأرباح',
+    statCustomers: 'الزبائن المخدومون',
+    statDayShelves: 'اليوم والرفوف',
+    ranksLadderTitle: '🎖️ سلم الرانكات',
+    rankUnlocked: 'مفتوح ✓',
+    rankCurrent: 'رانكك الحالي',
+    rankLocked: 'مقفل',
+    rankStarterNote: 'رانك البداية',
+    rankRequirementShort: (packs: number) => `${packs} علك + ${GUM_RANK_COST} ريال`,
+    rankHudShort: (rank: number) => `رانك ${rank}`,
+    packsUnit: 'علك',
+    playTimeShort: 'مدة اللعب',
+    hideTopHud: 'إخفاء ▲',
+    showTopHud: 'إظهار الشريط ▼',
+    unlockAtRank: (r: number) => `🔒 رانك ${r}`,
+    rankProductBadge: (r: number) => `🏆 رانك ${r}`,
+    nextRankUnlockLabel: 'يفتح مع الرانك التالي (منتجات جديدة):',
+    starterProductsNote: '11 منتج أساسي مفتوح',
+    lockedPriceHint: (r: number) => `🔒 يفتح عند الوصول إلى رانك ${r}`,
+    phoneBtnLabel: 'جوال التوصيل',
+    phoneTitle: '📱 جوال توصيل العلك',
+    phoneSub: 'اقبل طلبات الجيران بالحي ووصّلها لبيوتهم واربح سعر العلك + سعر التوصيل!',
+    activeDeliveryLabel: 'طلب توصيل جاري الآن',
+    availableOrdersLabel: 'طلبات التوصيل المتاحة بالحي',
+    refreshOrdersBtn: '🔄 تحديث الطلبات',
+    gumPriceLabel: 'قيمة العلك',
+    deliveryFeeLabel: 'سعر التوصيل',
+    totalPayoutLabel: 'الإجمالي',
+    inStockLabel: (have: number, need: number) => `متوفر: ${have}/${need}`,
+    acceptDeliveryBtn: (reward: number) => `قبول وتوصيل (+${reward} ريال)`,
+    needStockOrderBtn: '📦 اطلب علك أولاً',
+    goToHouseDeliveryBtn: '🧭 توجه لبيت الجار الآن',
+    cancelDeliveryBtn: 'إلغاء الطلب',
+    deliveriesDoneLabel: 'التوصيلات المكتملة',
+    activeDeliveryBanner: (house: string, dist: number, fee: number) =>
+      `🛵 توصيل إلى ${house} · المسافة ${dist}م · التوصيل +${fee} ريال`,
+    actionScooterShop: '🛴 دخول محل السكوترات (E)',
+    actionDeliverNow: (reward: number) => `📦 تسليم طلب التوصيل (+${reward} ريال)`,
+    scooterShopTitle: '🛴 محل السكوترات (بجانب البيوت)',
+    scooterShopSub:
+      'اشترِ سكوترك المفضل ابتداءً من 400 ريال وتجوّل في كل الحي ووصّل طلبات الجوال بسرعة فائقة!',
+    scooterSpeedLabel: 'السرعة',
+    scooterBuyBtn: (cost: number) => `شراء (${cost} ريال)`,
+    scooterEquipBtn: 'ركوب هذا السكوتر 🛴',
+    scooterEquippedBadge: 'مُختار الآن ✓',
+    rideScooterShort: 'ركوب',
+    dismountScooterShort: 'نزول',
+    visitScooterShopBtn: '🛴 اذهب لمحل السكوترات (جمب البيوت)',
+    distanceUnit: 'م',
   },
   en: {
     title: 'Gum Shop 3D',
@@ -297,6 +382,72 @@ const COPY = {
     puzzleMoves: (n: number) => `Moves: ${n}`,
     puzzleReset: 'Reshuffle',
     puzzleUnlocked: '🔓 All Locks Released! Opening door...',
+    ranksBtn: (rank: number) => `Rank ${rank} · Stats`,
+    rankUpReady: 'Rank Up Ready!',
+    ranksModalTitle: '🏆 Ranks & Gum Shop Stats',
+    ranksModalSub: `Each promotion requires paying ${GUM_RANK_COST} SAR and selling ${GUM_RANK_PACKS_STEP} gum packs per rank!`,
+    currentRankLabel: 'Current Rank',
+    nextRankLabel: 'Next Rank',
+    reqMoneyLabel: `Required Cash (${GUM_RANK_COST} SAR)`,
+    reqPacksLabel: (reqTotal: number) => `Required Gum Sold (${reqTotal} packs)`,
+    reqDone: 'Complete ✓',
+    reqRemainingMoney: (rem: number) => `${rem} SAR short`,
+    reqRemainingPacks: (rem: number) => `Sell ${rem} more packs`,
+    promoteBtn: (nextRank: number) => `🏆 Promote to Rank ${nextRank} (-${GUM_RANK_COST} SAR)`,
+    statsSectionTitle: '📊 Your Gum Shop Statistics',
+    statPlayTime: 'Time Played',
+    statTotalSold: 'Total Gum Sold',
+    statSessions: 'Times Played',
+    statTodaySold: 'Sold Today',
+    statTotalEarned: 'Total Earnings',
+    statCustomers: 'Customers Served',
+    statDayShelves: 'Day & Shelves',
+    ranksLadderTitle: '🎖️ Rank Ladder',
+    rankUnlocked: 'Unlocked ✓',
+    rankCurrent: 'Current',
+    rankLocked: 'Locked',
+    rankStarterNote: 'Starting Rank',
+    rankRequirementShort: (packs: number) => `${packs} packs + ${GUM_RANK_COST} SAR`,
+    rankHudShort: (rank: number) => `Rank ${rank}`,
+    packsUnit: 'packs',
+    playTimeShort: 'Played',
+    hideTopHud: 'Hide ▲',
+    showTopHud: 'Show Top Bar ▼',
+    unlockAtRank: (r: number) => `🔒 Rank ${r}`,
+    rankProductBadge: (r: number) => `🏆 Rank ${r}`,
+    nextRankUnlockLabel: 'Unlocks at Next Rank:',
+    starterProductsNote: '11 Starter Products',
+    lockedPriceHint: (r: number) => `🔒 Unlocks at Rank ${r}`,
+    phoneBtnLabel: 'Delivery Phone',
+    phoneTitle: '📱 Gum Delivery Phone',
+    phoneSub: 'Accept neighborhood house orders and earn Gum Price + Delivery Fee!',
+    activeDeliveryLabel: 'Active Delivery',
+    availableOrdersLabel: 'Available Neighborhood Orders',
+    refreshOrdersBtn: '🔄 Refresh',
+    gumPriceLabel: 'Gum Value',
+    deliveryFeeLabel: 'Delivery Fee',
+    totalPayoutLabel: 'Total',
+    inStockLabel: (have: number, need: number) => `Stock: ${have}/${need}`,
+    acceptDeliveryBtn: (reward: number) => `Accept (+${reward} SAR)`,
+    needStockOrderBtn: '📦 Order Gum First',
+    goToHouseDeliveryBtn: '🧭 Go to House Now',
+    cancelDeliveryBtn: 'Cancel',
+    deliveriesDoneLabel: 'Deliveries Done',
+    activeDeliveryBanner: (house: string, dist: number, fee: number) =>
+      `🛵 Delivering to ${house} · ${dist}m · Fee +${fee} SAR`,
+    actionScooterShop: '🛴 Open Scooter Shop (E)',
+    actionDeliverNow: (reward: number) => `📦 Deliver Gum Order (+${reward} SAR)`,
+    scooterShopTitle: '🛴 Scooter Showroom (Next to Houses)',
+    scooterShopSub:
+      'Buy electric scooters starting at 400 SAR to cruise the whole neighborhood and deliver faster!',
+    scooterSpeedLabel: 'Speed',
+    scooterBuyBtn: (cost: number) => `Buy (${cost} SAR)`,
+    scooterEquipBtn: 'Ride Scooter 🛴',
+    scooterEquippedBadge: 'Equipped ✓',
+    rideScooterShort: 'Ride',
+    dismountScooterShort: 'Walk',
+    visitScooterShopBtn: '🛴 Go to Scooter Shop (By Houses)',
+    distanceUnit: 'm',
   },
 } as const;
 
@@ -335,6 +486,15 @@ export const GumShopUI: React.FC<GumShopUIProps> = ({
   onSweepCratesToStorage,
   onAutoStockFromStorage,
   onBuyAdCampaign,
+  onPromoteRank,
+  onAcceptDeliveryOrder,
+  onCancelActiveDelivery,
+  onRefreshDeliveries,
+  onGoToActiveDelivery,
+  onGoToScooterShop,
+  onBuyScooter,
+  onEquipScooter,
+  onToggleRideScooter,
   onPayRent,
   onEmergencyGrant,
   onInteractNearest,
@@ -347,6 +507,7 @@ export const GumShopUI: React.FC<GumShopUIProps> = ({
 }) => {
   const t = COPY[lang];
   const [confirmingReset, setConfirmingReset] = useState(false);
+  const [topHudHidden, setTopHudHidden] = useState(false);
 
   // Touch Virtual Joystick state
   const joyBaseRef = useRef<HTMLDivElement | null>(null);
@@ -411,6 +572,17 @@ export const GumShopUI: React.FC<GumShopUIProps> = ({
   const currentTier = SHOP_TIERS.find((tr) => tr.level === hud.shopLevel) ?? SHOP_TIERS[0];
   const nextTier = SHOP_TIERS.find((tr) => tr.level === hud.shopLevel + 1) ?? null;
 
+  const currentRankSpec = getGumRankSpec(hud.rank);
+  const nextRankReq = getNextRankRequirements(hud.rank);
+  const hasEnoughRankMoney = hud.money >= nextRankReq.cost;
+  const hasEnoughRankPacks = hud.totalPacksSold >= nextRankReq.requiredPacksTotal;
+  const canPromoteRank = hasEnoughRankMoney && hasEnoughRankPacks;
+  const rankMoneyPct = Math.min(100, Math.round((hud.money / nextRankReq.cost) * 100));
+  const rankPacksPct = Math.min(
+    100,
+    Math.round((hud.totalPacksSold / Math.max(1, nextRankReq.requiredPacksTotal)) * 100)
+  );
+
   return (
     <div
       dir={lang === 'ar' ? 'rtl' : 'ltr'}
@@ -427,176 +599,234 @@ export const GumShopUI: React.FC<GumShopUIProps> = ({
         </div>
       )}
 
-      {/* Top HUD Bar */}
-      <header className="p-2 sm:p-3.5 flex flex-wrap items-start justify-between gap-2">
-        {/* Exit & Sound */}
-        <div className="pointer-events-auto flex items-center gap-1.5 sm:gap-2">
+      {/* Top HUD Bar (Compact + Hide/Show Toggle) */}
+      {hud.status === 'PLAYING' && topHudHidden ? (
+        <header className="p-1.5 flex items-start justify-end">
           <button
             type="button"
-            onClick={onExit}
-            className="h-9 sm:h-10 px-3 rounded-lg border border-rose-400/50 bg-[#121c2d]/95 hover:bg-[#1e2c45] text-rose-200 hover:text-white font-bold text-xs sm:text-sm inline-flex items-center gap-1.5 cursor-pointer"
+            onClick={() => setTopHudHidden(false)}
+            className="pointer-events-auto h-7 px-2.5 rounded-md border border-sky-400/50 bg-[#0d1726]/90 hover:bg-[#182840] text-sky-200 font-extrabold text-[10.5px] inline-flex items-center gap-1 shadow-lg cursor-pointer"
           >
-            <svg
-              viewBox="0 0 24 24"
-              className="w-4 h-4 rtl:rotate-180"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2.3"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              aria-hidden="true"
-            >
-              <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
-              <polyline points="16 17 21 12 16 7" />
-              <line x1="21" y1="12" x2="9" y2="12" />
-            </svg>
-            <span>{t.exit}</span>
+            <span>👁️</span>
+            <span>{t.showTopHud}</span>
           </button>
-
-          <button
-            type="button"
-            onClick={onToggleSound}
-            className="h-9 w-9 sm:h-10 sm:w-10 rounded-lg border border-white/15 bg-[#121c2d]/95 hover:bg-[#1e2c45] text-amber-200 inline-flex items-center justify-center cursor-pointer"
-            aria-label="Toggle Sound"
-          >
-            {soundEnabled ? (
-              <svg viewBox="0 0 24 24" className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2.2">
-                <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" />
-                <path d="M15.54 8.46a5 5 0 0 1 0 7.07" />
-              </svg>
-            ) : (
-              <svg viewBox="0 0 24 24" className="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" strokeWidth="2.2">
-                <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" />
-                <line x1="23" y1="9" x2="17" y2="15" />
-                <line x1="17" y1="9" x2="23" y2="15" />
-              </svg>
-            )}
-          </button>
-
-          {hud.status === 'PLAYING' && (
-            <>
-              <button
-                type="button"
-                onClick={() => onSetTab(activeTab === 'storage' ? 'none' : 'storage')}
-                className={`h-9 sm:h-10 px-2.5 sm:px-3 rounded-lg border font-extrabold text-xs sm:text-sm inline-flex items-center gap-1.5 cursor-pointer whitespace-nowrap tabular-nums ${
-                  activeTab === 'storage'
-                    ? 'border-emerald-300 bg-emerald-400 text-slate-950'
-                    : 'border-emerald-400/50 bg-[#121c2d]/95 hover:bg-[#1e2c45] text-emerald-200'
-                }`}
-              >
-                <span>🏬</span>
-                <span>{t.storageBtn(hud.hasStorageRoom, hud.storageTotalPacks)}</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => onSetTab(activeTab === 'ads' ? 'none' : 'ads')}
-                className={`h-9 sm:h-10 px-2.5 sm:px-3 rounded-lg border font-extrabold text-xs sm:text-sm inline-flex items-center gap-1.5 cursor-pointer whitespace-nowrap tabular-nums ${
-                  activeTab === 'ads'
-                    ? 'border-fuchsia-300 bg-fuchsia-400 text-slate-950'
-                    : 'border-fuchsia-400/55 bg-[#121c2d]/95 hover:bg-[#1e2c45] text-fuchsia-200'
-                }`}
-              >
-                <span>📢</span>
-                <span>{t.adsBtn(hud.activeAds.length)}</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={onOpenPuzzleIndex}
-                className={`h-9 sm:h-10 px-2.5 sm:px-3 rounded-lg border font-extrabold text-xs sm:text-sm inline-flex items-center gap-1.5 cursor-pointer whitespace-nowrap tabular-nums ${
-                  activeTab === 'puzzles'
-                    ? 'border-amber-300 bg-amber-400 text-slate-950'
-                    : 'border-amber-400/50 bg-[#121c2d]/95 hover:bg-[#1e2c45] text-amber-200'
-                }`}
-              >
-                <span>📚</span>
-                <span>
-                  {lang === 'ar'
-                    ? `الألغاز (${hud.solvedPuzzleIds.length}/${TOTAL_PUZZLE_COUNT})`
-                    : `Puzzles (${hud.solvedPuzzleIds.length}/${TOTAL_PUZZLE_COUNT})`}
-                </span>
-              </button>
-            </>
-          )}
-
-          <div className="hidden xl:inline-flex items-center gap-1.5 h-9 sm:h-10 px-2.5 rounded-lg border border-emerald-400/35 bg-[#0c1d21]/95 text-emerald-300 text-xs font-bold">
-            <svg viewBox="0 0 24 24" className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="2.5">
-              <polyline points="20 6 9 17 4 12" />
-            </svg>
-            <span>{t.savedBadge}</span>
-          </div>
-        </div>
-
-        {/* Center Metrics when PLAYING */}
-        {hud.status === 'PLAYING' && (
-          <div className="flex flex-wrap items-center justify-center gap-1.5 sm:gap-2.5">
-            {/* Money */}
-            <div className="rounded-xl border border-amber-400/50 bg-[#121c2d]/95 px-3 py-1.5 flex items-center gap-2">
-              <span className="font-num text-base sm:text-xl font-black text-amber-300">
-                {hud.money}
-              </span>
-              <span className="text-[11px] sm:text-xs font-bold text-amber-100/80">
-                {t.currency}
-              </span>
-            </div>
-
-            {/* Day & Clock / Night State */}
-            <div
-              className={`rounded-xl border px-3 py-1.5 min-w-[126px] sm:min-w-[148px] ${
-                hud.isNight
-                  ? 'border-indigo-400/65 bg-[#121636]/95'
-                  : 'border-sky-400/40 bg-[#121c2d]/95'
-              }`}
+        </header>
+      ) : (
+        <header className="p-1 sm:p-1.5 flex flex-wrap items-center justify-between gap-1 sm:gap-1.5">
+          {/* Compact Top Action Buttons */}
+          <div className="pointer-events-auto flex flex-wrap items-center gap-1">
+            <button
+              type="button"
+              onClick={onExit}
+              className="h-7 px-2 rounded-md border border-rose-400/50 bg-[#121c2d]/95 hover:bg-[#1e2c45] text-rose-200 hover:text-white font-bold text-[10.5px] sm:text-[11px] inline-flex items-center gap-1 cursor-pointer"
             >
-              <div className="flex items-center justify-between gap-2 text-[11px] sm:text-xs font-bold mb-1">
-                <span className={hud.isNight ? 'text-indigo-200' : 'text-sky-200'}>
-                  {hud.isNight ? '🌙 ' : '☀️ '}
-                  {t.dayLabel(hud.day)}
-                </span>
-                <span className="font-num text-white">
-                  {hud.isNight ? t.nightBadge : `${hud.dayTimeLeft}s`}
-                </span>
-              </div>
-              <div className="h-1.5 w-full rounded-full bg-slate-800 overflow-hidden">
-                <div
-                  className={`h-full transition-all duration-200 ${
-                    hud.isNight
-                      ? 'bg-indigo-400'
-                      : 'bg-gradient-to-r from-sky-400 to-amber-300'
+              <svg
+                viewBox="0 0 24 24"
+                className="w-3 h-3 rtl:rotate-180"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2.3"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                aria-hidden="true"
+              >
+                <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+                <polyline points="16 17 21 12 16 7" />
+                <line x1="21" y1="12" x2="9" y2="12" />
+              </svg>
+              <span>{t.exit}</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={onToggleSound}
+              className="h-7 w-7 rounded-md border border-white/15 bg-[#121c2d]/95 hover:bg-[#1e2c45] text-amber-200 inline-flex items-center justify-center cursor-pointer"
+              aria-label="Toggle Sound"
+            >
+              {soundEnabled ? (
+                <svg viewBox="0 0 24 24" className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="2.2">
+                  <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" />
+                  <path d="M15.54 8.46a5 5 0 0 1 0 7.07" />
+                </svg>
+              ) : (
+                <svg viewBox="0 0 24 24" className="w-3.5 h-3.5 text-slate-400" fill="none" stroke="currentColor" strokeWidth="2.2">
+                  <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" />
+                  <line x1="23" y1="9" x2="17" y2="15" />
+                  <line x1="17" y1="9" x2="23" y2="15" />
+                </svg>
+              )}
+            </button>
+
+            {hud.status === 'PLAYING' && (
+              <>
+                <button
+                  type="button"
+                  onClick={() => onSetTab(activeTab === 'storage' ? 'none' : 'storage')}
+                  className={`h-7 px-2 rounded-md border font-extrabold text-[10.5px] sm:text-[11px] inline-flex items-center gap-1 cursor-pointer whitespace-nowrap tabular-nums ${
+                    activeTab === 'storage'
+                      ? 'border-emerald-300 bg-emerald-400 text-slate-950'
+                      : 'border-emerald-400/50 bg-[#121c2d]/95 hover:bg-[#1e2c45] text-emerald-200'
                   }`}
-                  style={{ width: `${hud.isNight ? 100 : dayPct}%` }}
-                />
-              </div>
-            </div>
+                >
+                  <span>🏬</span>
+                  <span>{t.storageBtn(hud.hasStorageRoom, hud.storageTotalPacks)}</span>
+                </button>
 
-            {/* 5-Day Rent Countdown & Amount */}
-            <div
-              className={`rounded-xl border px-3 py-1.5 text-xs font-bold ${
-                hud.isRentDay
-                  ? hud.money >= hud.totalRentDue
-                    ? 'border-amber-300/70 bg-[#2a1f0a]/95 text-amber-200'
-                    : 'border-rose-400/70 bg-[#29121a]/95 text-rose-200'
-                  : 'border-teal-400/40 bg-[#0f2027]/95 text-teal-200'
-              }`}
-            >
-              <span>{t.rentLabel}: </span>
-              <span className="font-num font-black text-white">
-                {hud.totalRentDue} {t.currency}
-              </span>
-              <span className="ms-1.5 text-[11px] opacity-90">
-                · {hud.isRentDay ? t.rentDueToday : t.rentInDays(hud.daysUntilRent)}
-              </span>
+                <button
+                  type="button"
+                  onClick={() => onSetTab(activeTab === 'ads' ? 'none' : 'ads')}
+                  className={`h-7 px-2 rounded-md border font-extrabold text-[10.5px] sm:text-[11px] inline-flex items-center gap-1 cursor-pointer whitespace-nowrap tabular-nums ${
+                    activeTab === 'ads'
+                      ? 'border-fuchsia-300 bg-fuchsia-400 text-slate-950'
+                      : 'border-fuchsia-400/55 bg-[#121c2d]/95 hover:bg-[#1e2c45] text-fuchsia-200'
+                  }`}
+                >
+                  <span>📢</span>
+                  <span>{t.adsBtn(hud.activeAds.length)}</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={onOpenPuzzleIndex}
+                  className={`h-7 px-2 rounded-md border font-extrabold text-[10.5px] sm:text-[11px] inline-flex items-center gap-1 cursor-pointer whitespace-nowrap tabular-nums ${
+                    activeTab === 'puzzles'
+                      ? 'border-amber-300 bg-amber-400 text-slate-950'
+                      : 'border-amber-400/50 bg-[#121c2d]/95 hover:bg-[#1e2c45] text-amber-200'
+                  }`}
+                >
+                  <span>📚</span>
+                  <span>
+                    {lang === 'ar'
+                      ? `الألغاز (${hud.solvedPuzzleIds.length}/${TOTAL_PUZZLE_COUNT})`
+                      : `Puzzles (${hud.solvedPuzzleIds.length}/${TOTAL_PUZZLE_COUNT})`}
+                  </span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => onSetTab(activeTab === 'ranks' ? 'none' : 'ranks')}
+                  className={`h-7 px-2 rounded-md border font-extrabold text-[10.5px] sm:text-[11px] inline-flex items-center gap-1 cursor-pointer whitespace-nowrap tabular-nums ${
+                    activeTab === 'ranks'
+                      ? 'border-yellow-300 bg-yellow-400 text-slate-950'
+                      : canPromoteRank
+                      ? 'border-emerald-300 bg-emerald-500/25 hover:bg-emerald-500/35 text-emerald-100 ring-1 ring-emerald-300/70'
+                      : 'border-yellow-400/55 bg-[#121c2d]/95 hover:bg-[#1e2c45] text-yellow-200'
+                  }`}
+                >
+                  <span>🏆</span>
+                  <span>{t.ranksBtn(hud.rank)}</span>
+                  {canPromoteRank && (
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                  )}
+                </button>
+              </>
+            )}
+
+            <div className="hidden 2xl:inline-flex items-center gap-1 h-7 px-2 rounded-md border border-emerald-400/35 bg-[#0c1d21]/95 text-emerald-300 text-[10px] font-bold">
+              <svg viewBox="0 0 24 24" className="w-3 h-3" fill="none" stroke="currentColor" strokeWidth="2.5">
+                <polyline points="20 6 9 17 4 12" />
+              </svg>
+              <span>{t.savedBadge}</span>
             </div>
           </div>
-        )}
 
-        <div className="hidden sm:block w-16" />
-      </header>
+          {/* Compact Center Metrics + Hide Toggle when PLAYING */}
+          {hud.status === 'PLAYING' && (
+            <div className="flex flex-wrap items-center justify-center gap-1 sm:gap-1.5">
+              {/* Money */}
+              <div className="rounded-lg border border-amber-400/50 bg-[#121c2d]/95 px-2 py-0.5 h-7 flex items-center gap-1">
+                <span className="font-num text-xs sm:text-sm font-black text-amber-300 tabular-nums">
+                  {hud.money}
+                </span>
+                <span className="text-[10px] font-bold text-amber-100/80">
+                  {t.currency}
+                </span>
+              </div>
 
-      {/* Mid-Top Status Banners */}
+              {/* Day & Clock / Night State */}
+              <div
+                className={`rounded-lg border px-2 py-0.5 h-7 min-w-[96px] sm:min-w-[110px] flex flex-col justify-center ${
+                  hud.isNight
+                    ? 'border-indigo-400/65 bg-[#121636]/95'
+                    : 'border-sky-400/40 bg-[#121c2d]/95'
+                }`}
+              >
+                <div className="flex items-center justify-between gap-1.5 text-[10px] font-bold leading-none mb-0.5">
+                  <span className={hud.isNight ? 'text-indigo-200' : 'text-sky-200'}>
+                    {hud.isNight ? '🌙' : '☀️'} {t.dayLabel(hud.day)}
+                  </span>
+                  <span className="font-num text-white tabular-nums">
+                    {hud.isNight ? (lang === 'ar' ? 'ليل' : 'Night') : `${hud.dayTimeLeft}s`}
+                  </span>
+                </div>
+                <div className="h-1 w-full rounded-full bg-slate-800 overflow-hidden">
+                  <div
+                    className={`h-full transition-all duration-200 ${
+                      hud.isNight
+                        ? 'bg-indigo-400'
+                        : 'bg-gradient-to-r from-sky-400 to-amber-300'
+                    }`}
+                    style={{ width: `${hud.isNight ? 100 : dayPct}%` }}
+                  />
+                </div>
+              </div>
+
+              {/* 5-Day Rent Countdown & Amount */}
+              <div
+                className={`rounded-lg border px-2 py-0.5 h-7 inline-flex items-center gap-1 text-[10.5px] font-bold ${
+                  hud.isRentDay
+                    ? hud.money >= hud.totalRentDue
+                      ? 'border-amber-300/70 bg-[#2a1f0a]/95 text-amber-200'
+                      : 'border-rose-400/70 bg-[#29121a]/95 text-rose-200'
+                    : 'border-teal-400/40 bg-[#0f2027]/95 text-teal-200'
+                }`}
+              >
+                <span>{t.rentLabel}:</span>
+                <span className="font-num font-black text-white tabular-nums">
+                  {hud.totalRentDue}
+                </span>
+                <span className="text-[9.5px] opacity-90">
+                  · {hud.isRentDay ? t.rentDueToday : t.rentInDays(hud.daysUntilRent)}
+                </span>
+              </div>
+
+              {/* Clickable Current Rank & Total Gum Sold Quick Badge */}
+              <button
+                type="button"
+                onClick={() => onSetTab(activeTab === 'ranks' ? 'none' : 'ranks')}
+                className={`pointer-events-auto rounded-lg border px-2 py-0.5 h-7 text-[10.5px] font-bold inline-flex items-center gap-1 cursor-pointer transition-colors ${
+                  canPromoteRank
+                    ? 'border-emerald-300 bg-[#0d2b22]/95 text-emerald-200 hover:bg-[#133b2f]'
+                    : 'border-yellow-400/45 bg-[#1d190e]/95 text-yellow-200 hover:bg-[#2a2413]'
+                }`}
+              >
+                <span>🏆</span>
+                <span className="font-black" style={{ color: currentRankSpec.color }}>
+                  {t.rankHudShort(hud.rank)}
+                </span>
+                <span className="opacity-60">·</span>
+                <span className="font-num text-white tabular-nums">
+                  {hud.totalPacksSold}/{nextRankReq.requiredPacksTotal}
+                </span>
+              </button>
+
+              {/* Hide Top Bar Option */}
+              <button
+                type="button"
+                onClick={() => setTopHudHidden(true)}
+                className="pointer-events-auto h-7 px-2 rounded-md border border-slate-500/50 bg-[#0f1a2b]/95 hover:bg-[#1c2d45] text-slate-300 hover:text-white font-bold text-[10px] inline-flex items-center gap-1 cursor-pointer"
+                title={t.hideTopHud}
+              >
+                <span>{t.hideTopHud}</span>
+              </button>
+            </div>
+          )}
+        </header>
+      )}
+
+      {/* Mid-Top Status Banners (compact, and passive banners also hide when topHudHidden) */}
       {hud.status === 'PLAYING' && (
-        <div className="px-3 flex flex-col items-center gap-1.5 -mt-1">
+        <div className="px-2 flex flex-col items-center gap-1 -mt-0.5">
           {moveCashierMode && (
             <div className="pointer-events-auto flex items-center gap-2 rounded-xl border border-sky-300 bg-[#0a233d]/95 px-3.5 py-2 text-xs sm:text-sm font-extrabold text-sky-100 shadow-xl">
               <span>{t.moveCashierBanner}</span>
@@ -634,18 +864,18 @@ export const GumShopUI: React.FC<GumShopUIProps> = ({
             </div>
           )}
 
-          {hud.isNight && (
+          {!topHudHidden && hud.isNight && (
             <button
               type="button"
               onClick={onGoToHouse}
-              className="pointer-events-auto rounded-xl border border-indigo-300/80 bg-[#1a1f4a]/95 hover:bg-[#252c66] px-4 py-2 text-xs sm:text-sm font-black text-amber-200 shadow-xl cursor-pointer"
+              className="pointer-events-auto rounded-lg border border-indigo-300/80 bg-[#1a1f4a]/95 hover:bg-[#252c66] px-3 py-1 text-[11px] sm:text-xs font-black text-amber-200 shadow-lg cursor-pointer"
             >
               {hud.houseDoorUnlocked ? t.nightBannerUnlocked : t.nightBannerLocked}
             </button>
           )}
 
-          {hud.carriedCrate && (
-            <div className="rounded-xl border border-emerald-400/60 bg-[#0d261e]/95 px-3.5 py-1.5 text-xs sm:text-sm font-extrabold text-emerald-200 shadow-lg text-center">
+          {!topHudHidden && hud.carriedCrate && (
+            <div className="rounded-lg border border-emerald-400/60 bg-[#0d261e]/95 px-2.5 py-1 text-[11px] sm:text-xs font-extrabold text-emerald-200 shadow-md text-center">
               {t.carrying(
                 lang === 'ar'
                   ? GUM_FLAVOR_MAP[hud.carriedCrate.flavor].nameAr
@@ -655,21 +885,35 @@ export const GumShopUI: React.FC<GumShopUIProps> = ({
             </div>
           )}
 
-          {!hud.carriedCrate && hud.cratesOutsideCount > 0 && (
+          {!topHudHidden && !hud.carriedCrate && hud.cratesOutsideCount > 0 && (
             <button
               type="button"
               onClick={onGoOutsideToCrates}
-              className="pointer-events-auto rounded-xl border border-amber-300/75 bg-[#2c1e06]/95 hover:bg-[#3f2c0a] px-3.5 py-1.5 text-xs sm:text-sm font-extrabold text-amber-200 shadow-lg cursor-pointer"
+              className="pointer-events-auto rounded-lg border border-amber-300/75 bg-[#2c1e06]/95 hover:bg-[#3f2c0a] px-2.5 py-1 text-[11px] sm:text-xs font-extrabold text-amber-200 shadow-md cursor-pointer"
             >
               {t.cratesOutside(hud.cratesOutsideCount)}
             </button>
           )}
 
-          {hud.waitingCustomerCount > 0 && (
+          {hud.activeDelivery && (
+            <button
+              type="button"
+              onClick={onGoToActiveDelivery}
+              className="pointer-events-auto rounded-lg border border-emerald-300/80 bg-[#0b2b22]/95 hover:bg-[#113d30] px-3 py-1 text-[11px] sm:text-xs font-black text-emerald-200 shadow-md cursor-pointer"
+            >
+              {t.activeDeliveryBanner(
+                lang === 'ar' ? hud.activeDelivery.customerNameAr : hud.activeDelivery.customerNameEn,
+                hud.activeDeliveryDistance ?? 0,
+                hud.activeDelivery.deliveryFee
+              )}
+            </button>
+          )}
+
+          {!topHudHidden && hud.waitingCustomerCount > 0 && (
             <button
               type="button"
               onClick={onCheckoutNow}
-              className="pointer-events-auto rounded-xl border border-teal-300/70 bg-[#0a2729]/95 hover:bg-[#113b3e] px-3.5 py-1.5 text-xs sm:text-sm font-extrabold text-teal-200 shadow-lg cursor-pointer"
+              className="pointer-events-auto rounded-lg border border-teal-300/70 bg-[#0a2729]/95 hover:bg-[#113b3e] px-2.5 py-1 text-[11px] sm:text-xs font-extrabold text-teal-200 shadow-md cursor-pointer"
             >
               {t.waitingCustomers(hud.waitingCustomerCount)}
             </button>
@@ -679,7 +923,7 @@ export const GumShopUI: React.FC<GumShopUIProps> = ({
             <button
               type="button"
               onClick={onEmergencyGrant}
-              className="pointer-events-auto rounded-xl border border-emerald-300 bg-emerald-500 hover:bg-emerald-400 px-4 py-1.5 text-xs sm:text-sm font-black text-slate-950 shadow-lg cursor-pointer"
+              className="pointer-events-auto rounded-lg border border-emerald-300 bg-emerald-500 hover:bg-emerald-400 px-3 py-1 text-[11px] sm:text-xs font-black text-slate-950 shadow-md cursor-pointer"
             >
               {t.emergencyBtn}
             </button>
@@ -733,6 +977,10 @@ export const GumShopUI: React.FC<GumShopUIProps> = ({
                 className={`pointer-events-auto h-10 sm:h-11 px-5 rounded-xl font-black text-xs sm:text-sm shadow-xl cursor-pointer ${
                   hud.nearPrompt.kind === 'house_door'
                     ? 'bg-gradient-to-b from-amber-300 to-amber-500 hover:from-amber-200 hover:to-amber-400 text-slate-950'
+                    : hud.nearPrompt.kind === 'scooter_shop'
+                    ? 'bg-gradient-to-b from-cyan-300 to-sky-500 hover:from-cyan-200 hover:to-sky-400 text-slate-950'
+                    : hud.nearPrompt.kind === 'delivery_dropoff'
+                    ? 'bg-gradient-to-b from-emerald-300 to-green-500 hover:from-emerald-200 hover:to-green-400 text-slate-950'
                     : hud.nearPrompt.kind === 'bed'
                     ? hud.isNight
                       ? 'bg-gradient-to-b from-indigo-400 to-indigo-600 hover:from-indigo-300 hover:to-indigo-500 text-white'
@@ -742,6 +990,10 @@ export const GumShopUI: React.FC<GumShopUIProps> = ({
               >
                 {hud.nearPrompt.kind === 'pickup_crate'
                   ? t.actionPickup
+                  : hud.nearPrompt.kind === 'scooter_shop'
+                  ? t.actionScooterShop
+                  : hud.nearPrompt.kind === 'delivery_dropoff'
+                  ? t.actionDeliverNow(hud.activeDelivery?.totalReward ?? 0)
                   : hud.nearPrompt.kind === 'house_door'
                   ? t.actionOpenDoorPuzzle
                   : hud.nearPrompt.kind === 'storage_door'
@@ -823,7 +1075,55 @@ export const GumShopUI: React.FC<GumShopUIProps> = ({
             </div>
           </div>
 
-          <div className="hidden sm:block w-24 shrink-0" />
+          {/* Bottom-Corner Delivery Phone & Quick Scooter Ride Toggle */}
+          <div className="pointer-events-auto flex flex-col items-end gap-1.5 shrink-0">
+            {hud.equippedScooter && (
+              <button
+                type="button"
+                onClick={onToggleRideScooter}
+                className={`h-8 px-2.5 rounded-xl border font-black text-[11px] inline-flex items-center gap-1 shadow-lg cursor-pointer transition-colors ${
+                  hud.ridingScooter
+                    ? 'border-cyan-300 bg-cyan-400 text-slate-950 hover:bg-cyan-300'
+                    : 'border-cyan-400/55 bg-[#0f2233]/95 text-cyan-200 hover:bg-[#16344d]'
+                }`}
+                title="R"
+              >
+                <span>{hud.ridingScooter ? '🚶' : '🛴'}</span>
+                <span>{hud.ridingScooter ? t.dismountScooterShort : t.rideScooterShort}</span>
+              </button>
+            )}
+
+            <button
+              type="button"
+              onClick={() => onSetTab(activeTab === 'phone' ? 'none' : 'phone')}
+              className={`relative w-[78px] h-[78px] sm:w-24 sm:h-24 rounded-2xl border-2 flex flex-col items-center justify-center gap-0.5 shadow-xl cursor-pointer transition-colors ${
+                activeTab === 'phone'
+                  ? 'border-emerald-200 bg-emerald-400 text-slate-950'
+                  : hud.activeDelivery
+                  ? 'border-emerald-300 bg-[#0c2d23]/95 hover:bg-[#124032] text-emerald-100'
+                  : 'border-emerald-400/65 bg-[#0d1c2e]/95 hover:bg-[#162d47] text-emerald-200'
+              }`}
+              aria-label={t.phoneBtnLabel}
+            >
+              <span className="text-2xl sm:text-3xl leading-none">📱</span>
+              <span className="text-[10px] sm:text-[11px] font-black leading-tight text-center px-1">
+                {t.phoneBtnLabel}
+              </span>
+              <span
+                className={`text-[9.5px] font-num font-black px-1.5 py-0.5 rounded-md leading-none ${
+                  activeTab === 'phone'
+                    ? 'bg-slate-950/20 text-slate-950'
+                    : hud.activeDelivery
+                    ? 'bg-emerald-400 text-slate-950'
+                    : 'bg-emerald-500/25 text-emerald-200'
+                }`}
+              >
+                {hud.activeDelivery
+                  ? `${hud.activeDeliveryDistance ?? 0}${t.distanceUnit}`
+                  : `${hud.availableDeliveries.length}`}
+              </span>
+            </button>
+          </div>
         </div>
       )}
 
@@ -849,22 +1149,42 @@ export const GumShopUI: React.FC<GumShopUIProps> = ({
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 mt-4">
               {GUM_FLAVORS.map((f) => {
-                const canAfford = hud.money >= f.boxCost;
+                const isLocked = hud.rank < f.requiredRank;
+                const canAfford = !isLocked && hud.money >= f.boxCost;
                 return (
                   <div
                     key={f.id}
-                    className="rounded-xl border border-white/12 bg-[#14253d] p-3 flex items-center justify-between gap-3"
+                    className={`rounded-xl border p-3 flex items-center justify-between gap-3 ${
+                      isLocked
+                        ? 'border-white/8 bg-[#0f1a2b]/85 opacity-75'
+                        : f.requiredRank > 1
+                        ? 'border-yellow-400/35 bg-[#17243b]'
+                        : 'border-white/12 bg-[#14253d]'
+                    }`}
                   >
                     <div className="flex items-center gap-3 min-w-0">
                       <div
                         className="w-11 h-11 rounded-lg border border-white/25 shrink-0 flex items-center justify-center font-num font-black text-xs text-slate-950"
                         style={{ backgroundColor: f.color }}
                       >
-                        ×{f.packsPerBox}
+                        {isLocked ? '🔒' : `×${f.packsPerBox}`}
                       </div>
                       <div className="min-w-0">
-                        <div className="font-bold text-sm sm:text-base text-white truncate">
-                          {lang === 'ar' ? f.nameAr : f.nameEn}
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <span className="font-bold text-sm sm:text-base text-white truncate">
+                            {lang === 'ar' ? f.nameAr : f.nameEn}
+                          </span>
+                          {f.requiredRank > 1 && (
+                            <span
+                              className={`text-[10px] font-black px-1.5 py-0.5 rounded whitespace-nowrap ${
+                                isLocked
+                                  ? 'bg-slate-800 text-amber-300'
+                                  : 'bg-yellow-400/20 text-yellow-200 border border-yellow-400/40'
+                              }`}
+                            >
+                              {t.rankProductBadge(f.requiredRank)}
+                            </span>
+                          )}
                         </div>
                         <div className="text-[11px] text-slate-300">
                           {t.wholesaleCost}:{' '}
@@ -878,18 +1198,28 @@ export const GumShopUI: React.FC<GumShopUIProps> = ({
                       </div>
                     </div>
 
-                    <button
-                      type="button"
-                      disabled={!canAfford}
-                      onClick={() => onOrderCrate(f.id)}
-                      className={`h-10 px-3 rounded-lg font-extrabold text-xs whitespace-nowrap transition-colors ${
-                        canAfford
-                          ? 'bg-amber-400 hover:bg-amber-300 text-slate-950 cursor-pointer'
-                          : 'bg-slate-800 text-slate-500 cursor-not-allowed'
-                      }`}
-                    >
-                      {t.orderBtn(f.boxCost)}
-                    </button>
+                    {isLocked ? (
+                      <button
+                        type="button"
+                        onClick={() => onSetTab('ranks')}
+                        className="h-10 px-3 rounded-lg bg-slate-800 hover:bg-slate-700 border border-amber-400/35 text-amber-200 font-extrabold text-xs whitespace-nowrap cursor-pointer"
+                      >
+                        {t.unlockAtRank(f.requiredRank)}
+                      </button>
+                    ) : (
+                      <button
+                        type="button"
+                        disabled={!canAfford}
+                        onClick={() => onOrderCrate(f.id)}
+                        className={`h-10 px-3 rounded-lg font-extrabold text-xs whitespace-nowrap transition-colors ${
+                          canAfford
+                            ? 'bg-amber-400 hover:bg-amber-300 text-slate-950 cursor-pointer'
+                            : 'bg-slate-800 text-slate-500 cursor-not-allowed'
+                        }`}
+                      >
+                        {t.orderBtn(f.boxCost)}
+                      </button>
+                    )}
                   </div>
                 );
               })}
@@ -920,6 +1250,7 @@ export const GumShopUI: React.FC<GumShopUIProps> = ({
 
             <div className="space-y-2.5 mt-4">
               {GUM_FLAVORS.map((f) => {
+                const isLocked = hud.rank < f.requiredRank;
                 const curPrice = hud.prices[f.id] ?? f.fairPrice;
                 const verdict = getPriceVerdict(f.id, curPrice);
                 const verdictText =
@@ -942,62 +1273,86 @@ export const GumShopUI: React.FC<GumShopUIProps> = ({
                 return (
                   <div
                     key={f.id}
-                    className="rounded-xl border border-white/12 bg-[#13263a] p-3 flex flex-wrap items-center justify-between gap-3"
+                    className={`rounded-xl border p-3 flex flex-wrap items-center justify-between gap-3 ${
+                      isLocked
+                        ? 'border-white/8 bg-[#0f1a2b]/80 opacity-70'
+                        : 'border-white/12 bg-[#13263a]'
+                    }`}
                   >
                     <div className="flex items-center gap-3 min-w-[175px]">
                       <div
-                        className="w-9 h-9 rounded-lg border border-white/25 shrink-0"
+                        className="w-9 h-9 rounded-lg border border-white/25 shrink-0 flex items-center justify-center text-xs"
                         style={{ backgroundColor: f.color }}
-                      />
+                      >
+                        {isLocked ? '🔒' : ''}
+                      </div>
                       <div>
-                        <div className="font-bold text-sm sm:text-base text-white">
-                          {lang === 'ar' ? f.nameAr : f.nameEn}
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <span className="font-bold text-sm sm:text-base text-white">
+                            {lang === 'ar' ? f.nameAr : f.nameEn}
+                          </span>
+                          {f.requiredRank > 1 && (
+                            <span className="text-[10px] font-black px-1.5 py-0.5 rounded bg-yellow-400/20 text-yellow-200 border border-yellow-400/35">
+                              {t.rankProductBadge(f.requiredRank)}
+                            </span>
+                          )}
                         </div>
                         <div className="text-[11px] text-slate-300">
-                          {t.wholesaleCost}: <span className="font-num font-bold">{f.unitCost}</span> ·{' '}
-                          {t.marketPrice}:{' '}
-                          <span className="font-num font-bold text-teal-300">{f.fairPrice}</span> ·{' '}
-                          <span
-                            className={`font-num font-extrabold ${
-                              curPrice - f.unitCost >= 0 ? 'text-emerald-300' : 'text-rose-400'
-                            }`}
-                          >
-                            {t.profitLabel(curPrice - f.unitCost)}
-                          </span>{' '}
-                          · <span className={`font-extrabold ${verdictColor}`}>{verdictText}</span>
+                          {isLocked ? (
+                            <span className="text-amber-300 font-bold">
+                              {t.lockedPriceHint(f.requiredRank)}
+                            </span>
+                          ) : (
+                            <>
+                              {t.wholesaleCost}:{' '}
+                              <span className="font-num font-bold">{f.unitCost}</span> ·{' '}
+                              {t.marketPrice}:{' '}
+                              <span className="font-num font-bold text-teal-300">{f.fairPrice}</span> ·{' '}
+                              <span
+                                className={`font-num font-extrabold ${
+                                  curPrice - f.unitCost >= 0 ? 'text-emerald-300' : 'text-rose-400'
+                                }`}
+                              >
+                                {t.profitLabel(curPrice - f.unitCost)}
+                              </span>{' '}
+                              · <span className={`font-extrabold ${verdictColor}`}>{verdictText}</span>
+                            </>
+                          )}
                         </div>
                       </div>
                     </div>
 
-                    <div className="flex items-center gap-1.5">
-                      <button
-                        type="button"
-                        onClick={() => onSetPrice(f.id, curPrice - 1)}
-                        className="w-9 h-9 rounded-lg border border-white/20 bg-slate-800 hover:bg-slate-700 text-white font-black text-base cursor-pointer"
-                      >
-                        -
-                      </button>
-                      <div className="min-w-[74px] text-center rounded-lg border border-teal-400/35 bg-[#0a1624] py-1.5 px-2">
-                        <span className="font-num font-black text-base text-white">
-                          {curPrice}
-                        </span>
-                        <span className="text-[10px] text-slate-400 ms-1">{t.currency}</span>
+                    {!isLocked && (
+                      <div className="flex items-center gap-1.5">
+                        <button
+                          type="button"
+                          onClick={() => onSetPrice(f.id, curPrice - 1)}
+                          className="w-9 h-9 rounded-lg border border-white/20 bg-slate-800 hover:bg-slate-700 text-white font-black text-base cursor-pointer"
+                        >
+                          -
+                        </button>
+                        <div className="min-w-[74px] text-center rounded-lg border border-teal-400/35 bg-[#0a1624] py-1.5 px-2">
+                          <span className="font-num font-black text-base text-white">
+                            {curPrice}
+                          </span>
+                          <span className="text-[10px] text-slate-400 ms-1">{t.currency}</span>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => onSetPrice(f.id, curPrice + 1)}
+                          className="w-9 h-9 rounded-lg border border-white/20 bg-slate-800 hover:bg-slate-700 text-white font-black text-base cursor-pointer"
+                        >
+                          +
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => onSetPrice(f.id, f.fairPrice)}
+                          className="h-9 px-2.5 rounded-lg border border-teal-400/40 bg-teal-500/20 hover:bg-teal-500/30 text-teal-200 text-xs font-bold cursor-pointer"
+                        >
+                          {t.fairBtn}
+                        </button>
                       </div>
-                      <button
-                        type="button"
-                        onClick={() => onSetPrice(f.id, curPrice + 1)}
-                        className="w-9 h-9 rounded-lg border border-white/20 bg-slate-800 hover:bg-slate-700 text-white font-black text-base cursor-pointer"
-                      >
-                        +
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => onSetPrice(f.id, f.fairPrice)}
-                        className="h-9 px-2.5 rounded-lg border border-teal-400/40 bg-teal-500/20 hover:bg-teal-500/30 text-teal-200 text-xs font-bold cursor-pointer"
-                      >
-                        {t.fairBtn}
-                      </button>
-                    </div>
+                    )}
                   </div>
                 );
               })}
@@ -1431,6 +1786,721 @@ export const GumShopUI: React.FC<GumShopUIProps> = ({
         />
       )}
 
+      {/* MODAL: Ranks Promotion (300 SAR + 50 Gum Sold/Rank) & In-Game Gum Shop Statistics */}
+      {hud.status === 'PLAYING' && activeTab === 'ranks' && (
+        <div className="pointer-events-auto fixed inset-0 z-30 bg-[#060e1a]/78 flex items-center justify-center p-3 sm:p-5">
+          <div className="w-full max-w-2xl max-h-[88vh] overflow-y-auto rounded-2xl border border-yellow-400/55 bg-[#0e1a2c] p-4 sm:p-6 shadow-2xl space-y-5">
+            {/* Header */}
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <h2 className="text-lg sm:text-2xl font-black text-yellow-200">
+                  {t.ranksModalTitle}
+                </h2>
+                <p className="text-xs sm:text-sm text-slate-300 mt-0.5">{t.ranksModalSub}</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => onSetTab('none')}
+                className="h-9 px-3 rounded-lg border border-white/20 bg-slate-800 hover:bg-slate-700 text-xs font-bold text-white cursor-pointer shrink-0"
+              >
+                {t.close}
+              </button>
+            </div>
+
+            {/* 1. Current Rank & Next Promotion Requirements */}
+            <div className="rounded-xl border border-yellow-400/40 bg-[#14233b] p-4 space-y-3.5">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div className="flex items-center gap-3">
+                  <div
+                    className="w-12 h-12 rounded-xl border-2 flex flex-col items-center justify-center font-num font-black shadow-lg shrink-0"
+                    style={{
+                      backgroundColor: currentRankSpec.badgeBg,
+                      borderColor: currentRankSpec.color,
+                      color: currentRankSpec.color,
+                    }}
+                  >
+                    <span className="text-[10px] leading-none opacity-80">★</span>
+                    <span className="text-lg leading-tight">{hud.rank}</span>
+                  </div>
+                  <div>
+                    <div className="text-[11px] font-bold text-slate-400">
+                      {t.currentRankLabel}
+                    </div>
+                    <div
+                      className="text-base sm:text-lg font-black"
+                      style={{ color: currentRankSpec.color }}
+                    >
+                      {t.rankHudShort(hud.rank)} —{' '}
+                      {lang === 'ar' ? currentRankSpec.nameAr : currentRankSpec.nameEn}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="rounded-lg border border-white/10 bg-[#0c1626] px-3 py-1.5 text-end">
+                  <div className="text-[10.5px] text-slate-400">{t.nextRankLabel}</div>
+                  <div
+                    className="text-xs sm:text-sm font-black"
+                    style={{ color: nextRankReq.nextSpec.color }}
+                  >
+                    {t.rankHudShort(nextRankReq.nextRank)} —{' '}
+                    {lang === 'ar' ? nextRankReq.nextSpec.nameAr : nextRankReq.nextSpec.nameEn}
+                  </div>
+                </div>
+              </div>
+
+              {/* Next Rank Product Unlock Preview */}
+              {(() => {
+                const nextProducts = getFlavorsUnlockedAtRank(nextRankReq.nextRank);
+                if (nextProducts.length === 0) return null;
+                return (
+                  <div className="rounded-lg border border-fuchsia-400/35 bg-[#1b1533] px-3 py-2 flex flex-wrap items-center gap-2 text-xs">
+                    <span className="font-bold text-fuchsia-200">🎁 {t.nextRankUnlockLabel}</span>
+                    {nextProducts.map((p) => (
+                      <span
+                        key={p.id}
+                        className="inline-flex items-center gap-1.5 rounded-md bg-black/35 border border-white/15 px-2 py-0.5 font-extrabold text-white"
+                      >
+                        <span
+                          className="w-3 h-3 rounded-sm border border-white/40 inline-block"
+                          style={{ backgroundColor: p.color }}
+                        />
+                        <span>{lang === 'ar' ? p.nameAr : p.nameEn}</span>
+                        <span className="font-num text-emerald-300 text-[10.5px]">
+                          ({t.profitLabel(p.fairPrice - p.unitCost)})
+                        </span>
+                      </span>
+                    ))}
+                  </div>
+                );
+              })()}
+
+              {/* 2 Required Conditions: 300 Money + 50 Gum Packs per Rank */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                {/* Requirement 1: 300 Money */}
+                <div
+                  className={`rounded-xl border p-3 ${
+                    hasEnoughRankMoney
+                      ? 'border-emerald-400/55 bg-emerald-950/30'
+                      : 'border-amber-400/35 bg-[#0e192b]'
+                  }`}
+                >
+                  <div className="flex items-center justify-between gap-2 text-xs font-bold mb-1.5">
+                    <span className="text-amber-200">💰 {t.reqMoneyLabel}</span>
+                    <span
+                      className={
+                        hasEnoughRankMoney ? 'text-emerald-300 font-black' : 'text-amber-300'
+                      }
+                    >
+                      {hasEnoughRankMoney
+                        ? t.reqDone
+                        : t.reqRemainingMoney(nextRankReq.cost - hud.money)}
+                    </span>
+                  </div>
+                  <div className="font-num text-sm font-black text-white tabular-nums mb-1.5">
+                    {hud.money.toLocaleString()} / {nextRankReq.cost} {t.currency}
+                  </div>
+                  <div className="h-2 w-full rounded-full bg-slate-800 overflow-hidden">
+                    <div
+                      className={`h-full transition-all duration-200 ${
+                        hasEnoughRankMoney ? 'bg-emerald-400' : 'bg-amber-400'
+                      }`}
+                      style={{ width: `${rankMoneyPct}%` }}
+                    />
+                  </div>
+                </div>
+
+                {/* Requirement 2: 50 Gum Packs per Rank */}
+                <div
+                  className={`rounded-xl border p-3 ${
+                    hasEnoughRankPacks
+                      ? 'border-emerald-400/55 bg-emerald-950/30'
+                      : 'border-sky-400/35 bg-[#0e192b]'
+                  }`}
+                >
+                  <div className="flex items-center justify-between gap-2 text-xs font-bold mb-1.5">
+                    <span className="text-sky-200">
+                      🍬 {t.reqPacksLabel(nextRankReq.requiredPacksTotal)}
+                    </span>
+                    <span
+                      className={
+                        hasEnoughRankPacks ? 'text-emerald-300 font-black' : 'text-sky-300'
+                      }
+                    >
+                      {hasEnoughRankPacks
+                        ? t.reqDone
+                        : t.reqRemainingPacks(
+                            nextRankReq.requiredPacksTotal - hud.totalPacksSold
+                          )}
+                    </span>
+                  </div>
+                  <div className="font-num text-sm font-black text-white tabular-nums mb-1.5">
+                    {hud.totalPacksSold.toLocaleString()} /{' '}
+                    {nextRankReq.requiredPacksTotal.toLocaleString()} {t.packsUnit}
+                  </div>
+                  <div className="h-2 w-full rounded-full bg-slate-800 overflow-hidden">
+                    <div
+                      className={`h-full transition-all duration-200 ${
+                        hasEnoughRankPacks ? 'bg-emerald-400' : 'bg-sky-400'
+                      }`}
+                      style={{ width: `${rankPacksPct}%` }}
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={onPromoteRank}
+                className={`w-full h-12 rounded-xl font-black text-sm sm:text-base transition-colors cursor-pointer ${
+                  canPromoteRank
+                    ? 'bg-gradient-to-b from-yellow-300 to-amber-500 hover:from-yellow-200 hover:to-amber-400 text-slate-950 shadow-lg'
+                    : 'bg-slate-800 hover:bg-slate-750 text-slate-400 border border-white/10'
+                }`}
+              >
+                {t.promoteBtn(nextRankReq.nextRank)}
+              </button>
+            </div>
+
+            {/* 2. In-Game Gum Shop Statistics ("كم لعبت وكم علك بعت") */}
+            <div className="space-y-2.5">
+              <h3 className="text-sm sm:text-base font-black text-teal-200">
+                {t.statsSectionTitle}
+              </h3>
+
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+                <div className="rounded-xl border border-sky-400/35 bg-[#12243b] p-3">
+                  <div className="text-[11px] text-sky-200/80 font-bold">{t.statPlayTime}</div>
+                  <div className="font-num text-base sm:text-lg font-black text-sky-300 mt-1 tabular-nums">
+                    {formatGumPlayTime(hud.totalPlaySeconds, lang)}
+                  </div>
+                </div>
+
+                <div className="rounded-xl border border-emerald-400/40 bg-[#102826] p-3">
+                  <div className="text-[11px] text-emerald-200/80 font-bold">
+                    {t.statTotalSold}
+                  </div>
+                  <div className="font-num text-base sm:text-lg font-black text-emerald-300 mt-1 tabular-nums">
+                    {hud.totalPacksSold.toLocaleString()} {t.packsUnit}
+                  </div>
+                </div>
+
+                <div className="rounded-xl border border-violet-400/35 bg-[#1b1a38] p-3">
+                  <div className="text-[11px] text-violet-200/80 font-bold">{t.statSessions}</div>
+                  <div className="font-num text-base sm:text-lg font-black text-violet-200 mt-1 tabular-nums">
+                    {hud.totalSessions.toLocaleString()}
+                  </div>
+                </div>
+
+                <div className="rounded-xl border border-yellow-400/35 bg-[#241f12] p-3">
+                  <div className="text-[11px] text-yellow-200/80 font-bold">
+                    {t.currentRankLabel}
+                  </div>
+                  <div
+                    className="font-num text-base sm:text-lg font-black mt-1 tabular-nums"
+                    style={{ color: currentRankSpec.color }}
+                  >
+                    {t.rankHudShort(hud.rank)}
+                  </div>
+                </div>
+
+                <div className="rounded-xl border border-white/10 bg-[#132238] p-3">
+                  <div className="text-[11px] text-slate-400 font-bold">{t.statTodaySold}</div>
+                  <div className="font-num text-sm sm:text-base font-black text-teal-200 mt-0.5 tabular-nums">
+                    {hud.todayPacksSold.toLocaleString()} {t.packsUnit}
+                  </div>
+                </div>
+
+                <div className="rounded-xl border border-white/10 bg-[#132238] p-3">
+                  <div className="text-[11px] text-slate-400 font-bold">{t.statTotalEarned}</div>
+                  <div className="font-num text-sm sm:text-base font-black text-amber-300 mt-0.5 tabular-nums">
+                    {hud.totalEarned.toLocaleString()} {t.currency}
+                  </div>
+                </div>
+
+                <div className="rounded-xl border border-white/10 bg-[#132238] p-3">
+                  <div className="text-[11px] text-slate-400 font-bold">{t.statCustomers}</div>
+                  <div className="font-num text-sm sm:text-base font-black text-pink-200 mt-0.5 tabular-nums">
+                    {hud.totalCustomersServed.toLocaleString()}
+                  </div>
+                </div>
+
+                <div className="rounded-xl border border-white/10 bg-[#132238] p-3">
+                  <div className="text-[11px] text-slate-400 font-bold">{t.statDayShelves}</div>
+                  <div className="font-num text-sm sm:text-base font-black text-white mt-0.5 tabular-nums">
+                    {t.dayLabel(hud.day)} · {hud.shelves.length}/{MAX_SHELVES}
+                  </div>
+                </div>
+
+                <div className="col-span-2 sm:col-span-4 rounded-xl border border-emerald-400/30 bg-[#102620] p-2.5 flex items-center justify-between">
+                  <span className="text-xs text-emerald-200 font-bold">
+                    📱 {t.deliveriesDoneLabel}
+                  </span>
+                  <span className="font-num text-sm sm:text-base font-black text-emerald-300 tabular-nums">
+                    {hud.totalDeliveriesCompleted.toLocaleString()} · 🛴 {hud.ownedScooters.length}/{SCOOTERS.length}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            {/* 3. Full 15-Rank Ladder Roadmap (with New Product Unlocks per Rank) */}
+            <div className="space-y-2.5">
+              <h3 className="text-sm sm:text-base font-black text-amber-200">
+                {t.ranksLadderTitle} ({GUM_RANKS.length})
+              </h3>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                {GUM_RANKS.map((spec) => {
+                  const isCurrent = hud.rank === spec.rank;
+                  const isUnlocked = hud.rank >= spec.rank;
+                  const unlockedProducts = getFlavorsUnlockedAtRank(spec.rank);
+                  return (
+                    <div
+                      key={spec.rank}
+                      className={`rounded-xl border px-3 py-2.5 flex items-center justify-between gap-2 ${
+                        isCurrent
+                          ? 'border-yellow-300 bg-[#252113]'
+                          : isUnlocked
+                          ? 'border-emerald-400/35 bg-[#102424]'
+                          : 'border-white/10 bg-[#111c2e] opacity-85'
+                      }`}
+                    >
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        <span
+                          className="w-8 h-8 rounded-lg border font-num font-black text-xs flex items-center justify-center shrink-0"
+                          style={{
+                            backgroundColor: spec.badgeBg,
+                            borderColor: spec.color,
+                            color: spec.color,
+                          }}
+                        >
+                          {spec.rank}
+                        </span>
+                        <div className="min-w-0">
+                          <div
+                            className="font-extrabold text-xs sm:text-sm truncate"
+                            style={{ color: isUnlocked ? spec.color : '#cbd5e1' }}
+                          >
+                            {lang === 'ar' ? spec.nameAr : spec.nameEn}
+                          </div>
+                          <div className="text-[10.5px] text-slate-400 tabular-nums">
+                            {spec.rank === 1
+                              ? t.rankStarterNote
+                              : t.rankRequirementShort(spec.requiredPacksTotal)}
+                          </div>
+                          <div className="mt-1 flex flex-wrap items-center gap-1">
+                            {spec.rank === 1 ? (
+                              <span className="text-[10px] font-bold text-teal-300">
+                                🍬 {t.starterProductsNote}
+                              </span>
+                            ) : (
+                              unlockedProducts.map((p) => (
+                                <span
+                                  key={p.id}
+                                  className="inline-flex items-center gap-1 text-[10px] font-bold text-slate-200 bg-black/30 border border-white/10 rounded px-1.5 py-0.5 truncate max-w-full"
+                                >
+                                  <span
+                                    className="w-2.5 h-2.5 rounded-sm shrink-0 border border-white/30"
+                                    style={{ backgroundColor: p.color }}
+                                  />
+                                  <span className="truncate">
+                                    {lang === 'ar' ? p.nameAr : p.nameEn}
+                                  </span>
+                                </span>
+                              ))
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                      <span
+                        className={`text-[10.5px] font-black px-2 py-0.5 rounded whitespace-nowrap shrink-0 ${
+                          isCurrent
+                            ? 'bg-yellow-400 text-slate-950'
+                            : isUnlocked
+                            ? 'bg-emerald-500/20 text-emerald-300'
+                            : 'bg-slate-800 text-slate-400'
+                        }`}
+                      >
+                        {isCurrent ? t.rankCurrent : isUnlocked ? t.rankUnlocked : t.rankLocked}
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL: Delivery Phone (Accept Neighborhood House Orders with Delivery Fee!) */}
+      {hud.status === 'PLAYING' && activeTab === 'phone' && (
+        <div className="pointer-events-auto fixed inset-0 z-30 bg-[#060e1a]/78 flex items-center justify-center p-3 sm:p-5">
+          <div className="w-full max-w-md max-h-[88vh] overflow-y-auto rounded-[28px] border-2 border-emerald-400/65 bg-[#0b1626] p-4 sm:p-5 shadow-2xl">
+            {/* Smartphone Top Speaker Bar */}
+            <div className="w-16 h-1.5 rounded-full bg-slate-700 mx-auto mb-3" />
+
+            <div className="flex items-start justify-between gap-2 mb-2">
+              <div>
+                <h2 className="text-lg sm:text-xl font-black text-emerald-200">
+                  {t.phoneTitle}
+                </h2>
+                <p className="text-[11.5px] text-slate-300 leading-snug">{t.phoneSub}</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => onSetTab('none')}
+                className="h-8 px-3 rounded-lg border border-white/20 bg-slate-800 hover:bg-slate-700 text-xs font-bold text-white cursor-pointer shrink-0"
+              >
+                {t.close}
+              </button>
+            </div>
+
+            {/* Phone Quick Stats Strip */}
+            <div className="grid grid-cols-2 gap-2 my-3">
+              <div className="rounded-xl border border-emerald-400/30 bg-[#102620] px-3 py-2 flex items-center justify-between">
+                <span className="text-[11px] font-bold text-emerald-200/80">
+                  {t.deliveriesDoneLabel}
+                </span>
+                <span className="font-num text-sm font-black text-emerald-300 tabular-nums">
+                  {hud.totalDeliveriesCompleted}
+                </span>
+              </div>
+              <button
+                type="button"
+                onClick={onGoToScooterShop}
+                className="rounded-xl border border-cyan-400/50 bg-[#0e2638] hover:bg-[#163a54] px-2.5 py-2 text-[11px] font-black text-cyan-200 text-center cursor-pointer transition-colors"
+              >
+                {t.visitScooterShopBtn}
+              </button>
+            </div>
+
+            {/* Active Delivery Order Card */}
+            {hud.activeDelivery && (() => {
+              const ord = hud.activeDelivery;
+              const fSpec = GUM_FLAVOR_MAP[ord.flavor];
+              return (
+                <div className="rounded-2xl border-2 border-emerald-400 bg-[#0d2d24] p-3.5 mb-3.5 shadow-lg">
+                  <div className="flex items-center justify-between gap-2 mb-2">
+                    <span className="text-xs font-black text-emerald-300">
+                      🛵 {t.activeDeliveryLabel}
+                    </span>
+                    <span className="font-num text-xs font-black px-2 py-0.5 rounded bg-emerald-400 text-slate-950">
+                      {hud.activeDeliveryDistance ?? 0} {t.distanceUnit}
+                    </span>
+                  </div>
+
+                  <div className="flex items-center gap-3 mb-2.5">
+                    <div
+                      className="w-11 h-11 rounded-xl border border-white/30 shrink-0 flex items-center justify-center font-num font-black text-xs text-slate-950"
+                      style={{ backgroundColor: fSpec.color }}
+                    >
+                      ×{ord.quantity}
+                    </div>
+                    <div className="min-w-0">
+                      <div className="font-black text-sm text-white truncate">
+                        🏠 {lang === 'ar' ? ord.customerNameAr : ord.customerNameEn}
+                      </div>
+                      <div className="text-[11px] text-emerald-200/90">
+                        {lang === 'ar' ? ord.areaAr : ord.areaEn} ·{' '}
+                        {lang === 'ar' ? fSpec.nameAr : fSpec.nameEn}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-3 gap-1.5 text-center rounded-xl bg-black/30 p-2 mb-3 text-[11px]">
+                    <div>
+                      <div className="text-slate-400">{t.gumPriceLabel}</div>
+                      <div className="font-num font-black text-white">{ord.gumTotal}</div>
+                    </div>
+                    <div>
+                      <div className="text-emerald-300 font-bold">{t.deliveryFeeLabel}</div>
+                      <div className="font-num font-black text-emerald-300">
+                        +{ord.deliveryFee}
+                      </div>
+                    </div>
+                    <div>
+                      <div className="text-amber-200 font-bold">{t.totalPayoutLabel}</div>
+                      <div className="font-num font-black text-amber-300">
+                        {ord.totalReward} {t.currency}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={onGoToActiveDelivery}
+                      className="flex-1 h-10 rounded-xl bg-emerald-400 hover:bg-emerald-300 text-slate-950 font-black text-xs cursor-pointer"
+                    >
+                      {t.goToHouseDeliveryBtn}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={onCancelActiveDelivery}
+                      className="h-10 px-3 rounded-xl border border-rose-400/50 bg-rose-950/60 hover:bg-rose-900/70 text-rose-200 font-bold text-xs cursor-pointer"
+                    >
+                      {t.cancelDeliveryBtn}
+                    </button>
+                  </div>
+                </div>
+              );
+            })()}
+
+            {/* Available Neighbor Delivery Orders */}
+            <div className="flex items-center justify-between gap-2 mb-2">
+              <h3 className="text-xs sm:text-sm font-black text-sky-200">
+                {t.availableOrdersLabel}
+              </h3>
+              <button
+                type="button"
+                onClick={onRefreshDeliveries}
+                className="h-7 px-2.5 rounded-lg border border-sky-400/40 bg-sky-950/60 hover:bg-sky-900/70 text-sky-200 text-[11px] font-bold cursor-pointer"
+              >
+                {t.refreshOrdersBtn}
+              </button>
+            </div>
+
+            <div className="space-y-2.5">
+              {hud.availableDeliveries.map((order) => {
+                const fSpec = GUM_FLAVOR_MAP[order.flavor];
+                const stockInShelves = hud.shelves.reduce(
+                  (sum, s) => sum + (s.flavor === order.flavor ? s.stock : 0),
+                  0
+                );
+                const stockInStorage = hud.storageStock[order.flavor] ?? 0;
+                const stockInHand =
+                  hud.carriedCrate && hud.carriedCrate.flavor === order.flavor
+                    ? hud.carriedCrate.packs
+                    : 0;
+                const havePacks = stockInShelves + stockInStorage + stockInHand;
+                const canAccept = !hud.activeDelivery && havePacks >= order.quantity;
+
+                return (
+                  <div
+                    key={order.id}
+                    className="rounded-xl border border-white/12 bg-[#13233a] p-3"
+                  >
+                    <div className="flex items-center justify-between gap-2 mb-2">
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        <div
+                          className="w-10 h-10 rounded-lg border border-white/25 shrink-0 flex items-center justify-center font-num font-black text-xs text-slate-950"
+                          style={{ backgroundColor: fSpec.color }}
+                        >
+                          ×{order.quantity}
+                        </div>
+                        <div className="min-w-0">
+                          <div className="font-black text-sm text-white truncate">
+                            🏠 {lang === 'ar' ? order.customerNameAr : order.customerNameEn}
+                          </div>
+                          <div className="text-[11px] text-slate-300 truncate">
+                            {lang === 'ar' ? order.areaAr : order.areaEn} ·{' '}
+                            {lang === 'ar' ? fSpec.nameAr : fSpec.nameEn}
+                          </div>
+                        </div>
+                      </div>
+                      <span
+                        className={`text-[10.5px] font-num font-black px-2 py-0.5 rounded shrink-0 ${
+                          havePacks >= order.quantity
+                            ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-400/40'
+                            : 'bg-rose-500/20 text-rose-200 border border-rose-400/35'
+                        }`}
+                      >
+                        {t.inStockLabel(havePacks, order.quantity)}
+                      </span>
+                    </div>
+
+                    {/* Clear Price Breakdown including Delivery Fee! */}
+                    <div className="grid grid-cols-3 gap-1.5 text-center rounded-lg bg-black/25 p-2 mb-2.5 text-[11px]">
+                      <div>
+                        <div className="text-slate-400">{t.gumPriceLabel}</div>
+                        <div className="font-num font-bold text-white">
+                          {order.gumTotal} {t.currency}
+                        </div>
+                      </div>
+                      <div>
+                        <div className="text-emerald-300 font-bold">{t.deliveryFeeLabel}</div>
+                        <div className="font-num font-black text-emerald-300">
+                          +{order.deliveryFee} {t.currency}
+                        </div>
+                      </div>
+                      <div>
+                        <div className="text-amber-200 font-bold">{t.totalPayoutLabel}</div>
+                        <div className="font-num font-black text-amber-300">
+                          {order.totalReward} {t.currency}
+                        </div>
+                      </div>
+                    </div>
+
+                    {havePacks >= order.quantity ? (
+                      <button
+                        type="button"
+                        disabled={!canAccept}
+                        onClick={() => onAcceptDeliveryOrder(order.id)}
+                        className={`w-full h-9 rounded-lg font-black text-xs transition-colors ${
+                          canAccept
+                            ? 'bg-emerald-400 hover:bg-emerald-300 text-slate-950 cursor-pointer'
+                            : 'bg-slate-700 text-slate-400 cursor-not-allowed'
+                        }`}
+                      >
+                        {t.acceptDeliveryBtn(order.totalReward)}
+                      </button>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => onSetTab('order')}
+                        className="w-full h-9 rounded-lg border border-amber-400/50 bg-amber-500/15 hover:bg-amber-500/25 text-amber-200 font-black text-xs cursor-pointer"
+                      >
+                        {t.needStockOrderBtn}
+                      </button>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL: 3D Scooter Showroom (Located Right Next to the Houses, Starting at 400 SAR!) */}
+      {hud.status === 'PLAYING' && activeTab === 'scooter' && (
+        <div className="pointer-events-auto fixed inset-0 z-30 bg-[#060e1a]/78 flex items-center justify-center p-3 sm:p-5">
+          <div className="w-full max-w-2xl max-h-[88vh] overflow-y-auto rounded-2xl border border-cyan-400/60 bg-[#0c1b2e] p-4 sm:p-6 shadow-2xl">
+            <div className="flex items-start justify-between gap-3 mb-2">
+              <div>
+                <h2 className="text-lg sm:text-2xl font-black text-cyan-200">
+                  {t.scooterShopTitle}
+                </h2>
+                <p className="text-xs sm:text-sm text-slate-300">{t.scooterShopSub}</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => onSetTab('none')}
+                className="h-9 px-3 rounded-lg border border-white/20 bg-slate-800 hover:bg-slate-700 text-xs font-bold text-white cursor-pointer shrink-0"
+              >
+                {t.close}
+              </button>
+            </div>
+
+            {hud.equippedScooter && (
+              <div className="rounded-xl border border-cyan-400/40 bg-[#102b3d] p-3 my-3 flex flex-wrap items-center justify-between gap-2">
+                <div className="flex items-center gap-2 text-xs sm:text-sm font-black text-cyan-100">
+                  <span>🛴</span>
+                  <span>
+                    {lang === 'ar'
+                      ? SCOOTER_MAP[hud.equippedScooter].nameAr
+                      : SCOOTER_MAP[hud.equippedScooter].nameEn}
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  onClick={onToggleRideScooter}
+                  className="h-8 px-3 rounded-lg bg-cyan-400 hover:bg-cyan-300 text-slate-950 font-black text-xs cursor-pointer"
+                >
+                  {hud.ridingScooter
+                    ? `🚶 ${t.dismountScooterShort}`
+                    : `🛴 ${t.rideScooterShort}`}
+                </button>
+              </div>
+            )}
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-4">
+              {SCOOTERS.map((sc) => {
+                const isOwned = hud.ownedScooters.includes(sc.id);
+                const isEquipped = hud.equippedScooter === sc.id;
+                const canAfford = hud.money >= sc.cost;
+                const speedPct = Math.min(100, Math.round((sc.speed / 15.2) * 100));
+
+                return (
+                  <div
+                    key={sc.id}
+                    className={`rounded-xl border p-3.5 flex flex-col justify-between gap-3 ${
+                      isEquipped
+                        ? 'border-cyan-300 bg-[#102c3f]'
+                        : isOwned
+                        ? 'border-emerald-400/45 bg-[#11282a]'
+                        : 'border-white/12 bg-[#14253d]'
+                    }`}
+                  >
+                    <div>
+                      <div className="flex items-center justify-between gap-2 mb-2">
+                        <div className="flex items-center gap-2.5 min-w-0">
+                          <div
+                            className="w-11 h-11 rounded-xl border-2 shrink-0 flex items-center justify-center text-xl shadow-md"
+                            style={{
+                              backgroundColor: sc.bodyColor,
+                              borderColor: sc.glowColor ?? sc.rimColor,
+                            }}
+                          >
+                            🛴
+                          </div>
+                          <div className="min-w-0">
+                            <div className="font-black text-sm sm:text-base text-white truncate">
+                              {lang === 'ar' ? sc.nameAr : sc.nameEn}
+                            </div>
+                            <div className="font-num text-xs font-extrabold text-amber-300">
+                              {sc.cost} {t.currency}
+                            </div>
+                          </div>
+                        </div>
+                        {isEquipped && (
+                          <span className="text-[10.5px] font-black px-2 py-0.5 rounded bg-cyan-400 text-slate-950 shrink-0">
+                            {t.scooterEquippedBadge}
+                          </span>
+                        )}
+                      </div>
+
+                      <p className="text-xs text-slate-300 leading-relaxed mb-2.5">
+                        {lang === 'ar' ? sc.descAr : sc.descEn}
+                      </p>
+
+                      {/* Speed Bar */}
+                      <div className="flex items-center justify-between text-[11px] font-bold mb-1">
+                        <span className="text-cyan-200">{t.scooterSpeedLabel}</span>
+                        <span className="font-num text-white">{sc.speed.toFixed(1)}×</span>
+                      </div>
+                      <div className="h-2 w-full rounded-full bg-slate-800 overflow-hidden">
+                        <div
+                          className="h-full rounded-full"
+                          style={{
+                            width: `${speedPct}%`,
+                            backgroundColor: sc.bodyColor,
+                          }}
+                        />
+                      </div>
+                    </div>
+
+                    {isOwned ? (
+                      <button
+                        type="button"
+                        onClick={() => onEquipScooter(sc.id)}
+                        className={`w-full h-10 rounded-xl font-black text-xs transition-colors cursor-pointer ${
+                          isEquipped && hud.ridingScooter
+                            ? 'bg-emerald-500/25 border border-emerald-400/50 text-emerald-200'
+                            : 'bg-cyan-400 hover:bg-cyan-300 text-slate-950'
+                        }`}
+                      >
+                        {t.scooterEquipBtn}
+                      </button>
+                    ) : (
+                      <button
+                        type="button"
+                        disabled={!canAfford}
+                        onClick={() => onBuyScooter(sc.id)}
+                        className={`w-full h-10 rounded-xl font-black text-xs transition-colors ${
+                          canAfford
+                            ? 'bg-amber-400 hover:bg-amber-300 text-slate-950 cursor-pointer'
+                            : 'bg-slate-700 text-slate-400 cursor-not-allowed'
+                        }`}
+                      >
+                        {t.scooterBuyBtn(sc.cost)}
+                      </button>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* MODAL: Sleep House Front Door Lock Puzzle (50 Diverse Types) */}
       {hud.status === 'PLAYING' && housePuzzleOpen && (
         <DoorPuzzleModal
@@ -1541,23 +2611,38 @@ export const GumShopUI: React.FC<GumShopUIProps> = ({
             </p>
 
             {hasExistingSave && (
-              <div className="grid grid-cols-3 gap-2 mb-4">
+              <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 mb-4">
                 <div className="rounded-xl border border-white/10 bg-[#14253d] p-2.5 text-center">
                   <div className="text-[11px] text-slate-400">{t.dayLabel(hud.day)}</div>
-                  <div className="font-num text-base font-black text-amber-300">
+                  <div className="font-num text-sm sm:text-base font-black text-amber-300">
                     {hud.money} {t.currency}
+                  </div>
+                </div>
+                <div className="rounded-xl border border-yellow-400/30 bg-[#1e1d14] p-2.5 text-center">
+                  <div className="text-[11px] text-slate-400">{t.currentRankLabel}</div>
+                  <div
+                    className="font-num text-sm sm:text-base font-black"
+                    style={{ color: currentRankSpec.color }}
+                  >
+                    🏆 {t.rankHudShort(hud.rank)}
                   </div>
                 </div>
                 <div className="rounded-xl border border-white/10 bg-[#14253d] p-2.5 text-center">
                   <div className="text-[11px] text-slate-400">{t.shelvesOwned}</div>
-                  <div className="font-num text-base font-black text-sky-300">
+                  <div className="font-num text-sm sm:text-base font-black text-sky-300">
                     {hud.shelves.length}/{MAX_SHELVES}
                   </div>
                 </div>
                 <div className="rounded-xl border border-white/10 bg-[#14253d] p-2.5 text-center">
                   <div className="text-[11px] text-slate-400">{t.totalSold}</div>
-                  <div className="font-num text-base font-black text-emerald-300">
+                  <div className="font-num text-sm sm:text-base font-black text-emerald-300">
                     {hud.totalPacksSold}
+                  </div>
+                </div>
+                <div className="col-span-2 sm:col-span-1 rounded-xl border border-white/10 bg-[#14253d] p-2.5 text-center">
+                  <div className="text-[11px] text-slate-400">{t.playTimeShort}</div>
+                  <div className="font-num text-sm sm:text-base font-black text-cyan-300 tabular-nums">
+                    {formatGumPlayTime(hud.totalPlaySeconds, lang)}
                   </div>
                 </div>
               </div>

@@ -18,14 +18,17 @@ import {
   getShopBounds,
   GUM_FLAVOR_MAP,
   GUM_FLAVORS,
+  SCOOTER_MAP,
   SHELF_MAX_STOCK,
   STORAGE_MAX_PACKS,
   STORAGE_ROOM_COST,
   type ActiveAdState,
   type AdCampaignSpec,
   type DeliveryCrateState,
+  type DeliveryOrder,
   type GumFlavorId,
   type GumShopHudSnapshot,
+  type ScooterSpec,
   type ShelfState,
   type ShopLevel,
 } from './types';
@@ -47,9 +50,12 @@ interface GumShopSceneProps {
   onHouseDoorClick: () => void;
   onBedClick: () => void;
   onStorageClick: () => void;
+  onScooterShopClick: () => void;
+  onDeliveryBeaconClick: () => void;
   onAdScreenClick: () => void;
   onOpenHousePuzzle: () => void;
   onOpenStorageModal: () => void;
+  onOpenScooterShopModal: () => void;
 }
 
 // Reusable module-level colors for zero-GC Day -> Dusk -> Night sky/lighting transitions
@@ -1324,7 +1330,8 @@ const NeighborhoodHouses3D: React.FC<{
   sidewalkTex: THREE.CanvasTexture;
   isNight: boolean;
   isSoftwareGl: boolean;
-}> = ({ storageX, houseX, backZ, sidewalkTex, isNight, isSoftwareGl }) => {
+  onFloorClick: (x: number, z: number) => void;
+}> = ({ storageX, houseX, backZ, sidewalkTex, isNight, isSoftwareGl, onFloorClick }) => {
   const houses = useMemo<NeighborHouseSpec[]>(
     () => [
       // Flanking left & right neighbor homes (visible immediately beside the shop!)
@@ -1363,7 +1370,7 @@ const NeighborhoodHouses3D: React.FC<{
       },
       {
         id: 'right-2',
-        x: houseX + 14.0,
+        x: houseX + 21.8,
         z: -0.8,
         rotY: -0.06,
         wallColor: '#ffedd5',
@@ -1508,8 +1515,12 @@ const NeighborhoodHouses3D: React.FC<{
         rotation={[-Math.PI / 2, 0, 0]}
         position={[0, -0.02, backZ - 4.1]}
         receiveShadow={!isSoftwareGl}
+        onClick={(e) => {
+          e.stopPropagation();
+          onFloorClick(e.point.x, e.point.z);
+        }}
       >
-        <planeGeometry args={[76, 2.7]} />
+        <planeGeometry args={[116, 2.7]} />
         <meshStandardMaterial color="#cbd5e1" roughness={0.9} />
       </mesh>
 
@@ -1518,12 +1529,16 @@ const NeighborhoodHouses3D: React.FC<{
         rotation={[-Math.PI / 2, 0, 0]}
         position={[3, -0.01, 16.95]}
         receiveShadow={!isSoftwareGl}
+        onClick={(e) => {
+          e.stopPropagation();
+          onFloorClick(e.point.x, e.point.z);
+        }}
       >
-        <planeGeometry args={[88, 2.7]} />
+        <planeGeometry args={[140, 2.7]} />
         <meshStandardMaterial map={sidewalkTex} roughness={0.9} />
       </mesh>
       <mesh position={[3, 0.04, 15.65]}>
-        <boxGeometry args={[88, 0.14, 0.28]} />
+        <boxGeometry args={[140, 0.14, 0.28]} />
         <meshStandardMaterial color="#cbd5e1" roughness={0.85} />
       </mesh>
 
@@ -1550,6 +1565,348 @@ const NeighborhoodHouses3D: React.FC<{
           </mesh>
         </group>
       ))}
+    </group>
+  );
+};
+
+/**
+ * Composite 10-part Procedural 3D Electric Scooter (grounded at y = 0).
+ */
+const ScooterMesh3D: React.FC<{
+  spec: ScooterSpec;
+  isNight: boolean;
+  isSoftwareGl: boolean;
+  scale?: number;
+}> = ({ spec, isNight, isSoftwareGl, scale = 1 }) => {
+  return (
+    <group scale={[scale, scale, scale]}>
+      {/* Rear Tire & Metallic Rim */}
+      <mesh position={[0, 0.14, -0.38]} rotation={[0, 0, Math.PI / 2]} castShadow={!isSoftwareGl}>
+        <cylinderGeometry args={[0.14, 0.14, 0.11, 14]} />
+        <meshStandardMaterial color="#111827" roughness={0.92} />
+      </mesh>
+      <mesh position={[0, 0.14, -0.38]} rotation={[0, 0, Math.PI / 2]}>
+        <cylinderGeometry args={[0.075, 0.075, 0.125, 10]} />
+        <meshStandardMaterial color={spec.rimColor} metalness={0.85} roughness={0.2} />
+      </mesh>
+
+      {/* Front Tire & Metallic Rim */}
+      <mesh position={[0, 0.14, 0.42]} rotation={[0, 0, Math.PI / 2]} castShadow={!isSoftwareGl}>
+        <cylinderGeometry args={[0.14, 0.14, 0.11, 14]} />
+        <meshStandardMaterial color="#111827" roughness={0.92} />
+      </mesh>
+      <mesh position={[0, 0.14, 0.42]} rotation={[0, 0, Math.PI / 2]}>
+        <cylinderGeometry args={[0.075, 0.075, 0.125, 10]} />
+        <meshStandardMaterial color={spec.rimColor} metalness={0.85} roughness={0.2} />
+      </mesh>
+
+      {/* Contoured Scooter Deck + Anti-Slip Grip Pad */}
+      <mesh position={[0, 0.16, 0.02]} castShadow={!isSoftwareGl}>
+        <boxGeometry args={[0.38, 0.07, 0.92]} />
+        <meshStandardMaterial color={spec.bodyColor} metalness={0.45} roughness={0.28} />
+      </mesh>
+      <mesh position={[0, 0.2, 0.02]}>
+        <boxGeometry args={[0.3, 0.02, 0.78]} />
+        <meshStandardMaterial color={spec.trimColor} roughness={0.92} />
+      </mesh>
+
+      {/* Rear Mudguard & Glowing Red Brake Light */}
+      <mesh position={[0, 0.28, -0.38]}>
+        <boxGeometry args={[0.16, 0.06, 0.24]} />
+        <meshStandardMaterial color={spec.bodyColor} metalness={0.4} roughness={0.32} />
+      </mesh>
+      <mesh position={[0, 0.27, -0.5]}>
+        <boxGeometry args={[0.12, 0.05, 0.04]} />
+        <meshStandardMaterial
+          color="#ef4444"
+          emissive="#dc2626"
+          emissiveIntensity={isNight ? 1.8 : 0.75}
+          roughness={0.25}
+        />
+      </mesh>
+
+      {/* Angled Front Steering Column & Fork */}
+      <mesh position={[0, 0.62, 0.36]} rotation={[-0.18, 0, 0]} castShadow={!isSoftwareGl}>
+        <cylinderGeometry args={[0.038, 0.046, 0.92, 10]} />
+        <meshStandardMaterial color={spec.bodyColor} metalness={0.65} roughness={0.22} />
+      </mesh>
+      <mesh position={[0, 0.3, 0.4]} rotation={[-0.18, 0, 0]}>
+        <boxGeometry args={[0.14, 0.26, 0.09]} />
+        <meshStandardMaterial color={spec.trimColor} metalness={0.5} roughness={0.4} />
+      </mesh>
+
+      {/* Handlebar Crossbar + Rubber Handgrips */}
+      <mesh position={[0, 1.04, 0.28]} rotation={[0, 0, Math.PI / 2]}>
+        <cylinderGeometry args={[0.028, 0.028, 0.66, 10]} />
+        <meshStandardMaterial color="#e2e8f0" metalness={0.85} roughness={0.2} />
+      </mesh>
+      <mesh position={[-0.27, 1.04, 0.28]} rotation={[0, 0, Math.PI / 2]}>
+        <cylinderGeometry args={[0.04, 0.04, 0.16, 10]} />
+        <meshStandardMaterial color="#0f172a" roughness={0.9} />
+      </mesh>
+      <mesh position={[0.27, 1.04, 0.28]} rotation={[0, 0, Math.PI / 2]}>
+        <cylinderGeometry args={[0.04, 0.04, 0.16, 10]} />
+        <meshStandardMaterial color="#0f172a" roughness={0.9} />
+      </mesh>
+
+      {/* Glowing Front LED Headlight */}
+      <mesh position={[0, 0.96, 0.35]}>
+        <boxGeometry args={[0.12, 0.09, 0.09]} />
+        <meshStandardMaterial
+          color="#fef08a"
+          emissive="#fde047"
+          emissiveIntensity={isNight ? 2.2 : 0.85}
+          roughness={0.18}
+        />
+      </mesh>
+
+      {/* Optional Neon Under-Deck Strip (Cyber Neon & Golden King VIP) */}
+      {spec.glowColor && (
+        <mesh position={[0, 0.115, 0.02]}>
+          <boxGeometry args={[0.42, 0.03, 0.82]} />
+          <meshStandardMaterial
+            color={spec.glowColor}
+            emissive={spec.glowColor}
+            emissiveIntensity={isNight ? 2.0 : 1.1}
+            roughness={0.2}
+          />
+        </mesh>
+      )}
+    </group>
+  );
+};
+
+function createScooterSignTexture(lang: 'ar' | 'en', maxAniso: number): THREE.CanvasTexture {
+  const canvas = document.createElement('canvas');
+  canvas.width = 512;
+  canvas.height = 160;
+  const ctx = canvas.getContext('2d');
+  if (ctx) {
+    const grad = ctx.createLinearGradient(0, 0, 512, 160);
+    grad.addColorStop(0, '#0f172a');
+    grad.addColorStop(0.5, '#0e7490');
+    grad.addColorStop(1, '#1e293b');
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, 0, 512, 160);
+
+    ctx.strokeStyle = '#38bdf8';
+    ctx.lineWidth = 8;
+    ctx.strokeRect(8, 8, 496, 144);
+
+    ctx.fillStyle = '#fef08a';
+    ctx.font = 'bold 48px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(lang === 'ar' ? '🛴 محل السكوترات' : '🛴 SCOOTER SHOP', 256, 62);
+
+    ctx.fillStyle = '#67e8f9';
+    ctx.font = 'bold 30px sans-serif';
+    ctx.fillText(
+      lang === 'ar' ? 'تبدأ من 400 ريال · 5 موديلات' : 'FROM 400 SAR · 5 MODELS',
+      256,
+      118
+    );
+  }
+  const tex = new THREE.CanvasTexture(canvas);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  tex.anisotropy = Math.min(8, Math.max(1, maxAniso));
+  return tex;
+}
+
+/**
+ * 3D Scooter Showroom Building right next to the neighborhood houses!
+ */
+const ScooterShop3D: React.FC<{
+  x: number;
+  z: number;
+  lang: 'ar' | 'en';
+  isNight: boolean;
+  isSoftwareGl: boolean;
+  onClick: () => void;
+}> = ({ x, z, lang, isNight, isSoftwareGl, onClick }) => {
+  const { gl } = useThree();
+  const signTex = useMemo(
+    () => createScooterSignTexture(lang, gl.capabilities.getMaxAnisotropy()),
+    [lang, gl]
+  );
+
+  useEffect(() => {
+    return () => {
+      signTex.dispose();
+    };
+  }, [signTex]);
+
+  return (
+    <group
+      position={[x, 0, z]}
+      onClick={(e) => {
+        e.stopPropagation();
+        onClick();
+      }}
+    >
+      {/* Concrete Plinth & Front Showroom Display Pad */}
+      <mesh position={[0, 0.08, 0]} receiveShadow={!isSoftwareGl}>
+        <boxGeometry args={[5.5, 0.16, 4.5]} />
+        <meshStandardMaterial color="#334155" roughness={0.85} />
+      </mesh>
+      <mesh position={[0, 0.03, 3.05]} receiveShadow={!isSoftwareGl}>
+        <boxGeometry args={[5.4, 0.06, 1.9]} />
+        <meshStandardMaterial color="#0e7490" roughness={0.7} />
+      </mesh>
+
+      {/* Main Modern Showroom Building */}
+      <mesh position={[0, 1.75, 0]} castShadow={!isSoftwareGl} receiveShadow={!isSoftwareGl}>
+        <boxGeometry args={[5.2, 3.3, 4.2]} />
+        <meshStandardMaterial color="#1e293b" roughness={0.62} metalness={0.2} />
+      </mesh>
+
+      {/* Bright Cyan & Amber Accent Trim Bands */}
+      <mesh position={[0, 0.42, 0]}>
+        <boxGeometry args={[5.3, 0.36, 4.3]} />
+        <meshStandardMaterial color="#06b6d4" roughness={0.42} metalness={0.25} />
+      </mesh>
+      <mesh position={[0, 3.45, 0]}>
+        <boxGeometry args={[5.45, 0.24, 4.45]} />
+        <meshStandardMaterial color="#f59e0b" roughness={0.4} metalness={0.35} />
+      </mesh>
+
+      {/* Front Illuminated Glass Showroom Window */}
+      <mesh position={[0, 1.55, 2.13]}>
+        <boxGeometry args={[3.9, 2.1, 0.08]} />
+        <meshStandardMaterial
+          color="#bae6fd"
+          emissive={isNight ? '#38bdf8' : '#0284c7'}
+          emissiveIntensity={isNight ? 0.85 : 0.22}
+          roughness={0.14}
+          metalness={0.55}
+        />
+      </mesh>
+      {/* Glass Door Frame */}
+      <mesh position={[0, 1.2, 2.18]}>
+        <boxGeometry args={[1.25, 2.05, 0.06]} />
+        <meshStandardMaterial color="#0f172a" roughness={0.35} metalness={0.5} />
+      </mesh>
+      <mesh position={[0, 1.2, 2.22]}>
+        <boxGeometry args={[1.05, 1.9, 0.04]} />
+        <meshStandardMaterial
+          color="#7dd3fc"
+          emissive="#38bdf8"
+          emissiveIntensity={isNight ? 0.9 : 0.3}
+          roughness={0.1}
+          metalness={0.6}
+        />
+      </mesh>
+
+      {/* Striped Cyan & Orange Showroom Awning */}
+      {[-2.1, -1.4, -0.7, 0, 0.7, 1.4, 2.1].map((ax, i) => (
+        <mesh key={ax} position={[ax, 2.75, 2.55]} rotation={[0.25, 0, 0]} castShadow={!isSoftwareGl}>
+          <boxGeometry args={[0.72, 0.12, 1.15]} />
+          <meshStandardMaterial color={i % 2 === 0 ? '#06b6d4' : '#f97316'} roughness={0.65} />
+        </mesh>
+      ))}
+
+      {/* Rooftop Glowing Scooter Shop Signboard */}
+      <mesh position={[0, 4.35, 1.55]} castShadow={!isSoftwareGl}>
+        <boxGeometry args={[4.6, 1.38, 0.26]} />
+        <meshStandardMaterial color="#0f172a" metalness={0.5} roughness={0.35} />
+      </mesh>
+      <mesh position={[0, 4.35, 1.7]}>
+        <planeGeometry args={[4.4, 1.24]} />
+        <meshStandardMaterial
+          map={signTex}
+          emissive="#38bdf8"
+          emissiveMap={signTex}
+          emissiveIntensity={isNight ? 0.95 : 0.45}
+          roughness={0.3}
+        />
+      </mesh>
+
+      {/* 3 Showcase 3D Scooters parked right outside the showroom! */}
+      <group position={[-1.65, 0.06, 2.95]} rotation={[0, 0.35, 0]}>
+        <ScooterMesh3D spec={SCOOTER_MAP.city_e} isNight={isNight} isSoftwareGl={isSoftwareGl} scale={1.08} />
+      </group>
+      <group position={[0, 0.06, 3.25]} rotation={[0, -0.1, 0]}>
+        <ScooterMesh3D spec={SCOOTER_MAP.crimson_racer} isNight={isNight} isSoftwareGl={isSoftwareGl} scale={1.12} />
+      </group>
+      <group position={[1.65, 0.06, 2.95]} rotation={[0, -0.35, 0]}>
+        <ScooterMesh3D spec={SCOOTER_MAP.golden_king} isNight={isNight} isSoftwareGl={isSoftwareGl} scale={1.12} />
+      </group>
+    </group>
+  );
+};
+
+/**
+ * Glowing 3D Delivery Drop-off Beacon at the target neighbor's house!
+ */
+const DeliveryBeacon3D: React.FC<{
+  order: DeliveryOrder;
+  onClick: () => void;
+}> = ({ order, onClick }) => {
+  const bobRef = useRef<THREE.Group | null>(null);
+  const spec = GUM_FLAVOR_MAP[order.flavor];
+
+  useFrame(({ clock }) => {
+    const t = clock.getElapsedTime();
+    if (bobRef.current) {
+      bobRef.current.position.y = 2.0 + Math.sin(t * 3.8) * 0.26;
+      bobRef.current.rotation.y = t * 1.6;
+    }
+  });
+
+  return (
+    <group
+      position={[order.dropoffX, 0, order.dropoffZ]}
+      onClick={(e) => {
+        e.stopPropagation();
+        onClick();
+      }}
+    >
+      {/* Glowing Ground Drop-Off Ring */}
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.04, 0]}>
+        <ringGeometry args={[1.05, 1.48, 32]} />
+        <meshStandardMaterial
+          color="#10b981"
+          emissive="#10b981"
+          emissiveIntensity={1.2}
+          side={THREE.DoubleSide}
+        />
+      </mesh>
+      {/* Translucent Vertical Beacon Pillar */}
+      <mesh position={[0, 3.8, 0]}>
+        <cylinderGeometry args={[0.55, 1.15, 7.6, 16, 1, true]} />
+        <meshBasicMaterial
+          color="#34d399"
+          transparent
+          opacity={0.22}
+          depthWrite={false}
+          side={THREE.DoubleSide}
+        />
+      </mesh>
+      {/* Bobbing 3D Gum Delivery Box & Pointer Arrow */}
+      <group ref={bobRef} position={[0, 2.0, 0]}>
+        <mesh position={[0, 0.45, 0]}>
+          <boxGeometry args={[0.72, 0.56, 0.62]} />
+          <meshStandardMaterial color="#d4a373" roughness={0.7} />
+        </mesh>
+        <mesh position={[0, 0.45, 0]}>
+          <boxGeometry args={[0.75, 0.18, 0.65]} />
+          <meshStandardMaterial
+            color={spec.color}
+            emissive={spec.color}
+            emissiveIntensity={0.45}
+            roughness={0.3}
+          />
+        </mesh>
+        <mesh position={[0, -0.35, 0]} rotation={[Math.PI, 0, 0]}>
+          <coneGeometry args={[0.32, 0.58, 6]} />
+          <meshStandardMaterial
+            color="#facc15"
+            emissive="#f59e0b"
+            emissiveIntensity={0.95}
+            roughness={0.22}
+          />
+        </mesh>
+      </group>
     </group>
   );
 };
@@ -1951,6 +2308,7 @@ const ShopEnvironment: React.FC<{
   onHouseDoorClick: () => void;
   onBedClick: () => void;
   onStorageClick: () => void;
+  onScooterShopClick: () => void;
   onAdScreenClick: () => void;
 }> = ({
   worldRef,
@@ -1974,6 +2332,7 @@ const ShopEnvironment: React.FC<{
   onHouseDoorClick,
   onBedClick,
   onStorageClick,
+  onScooterShopClick,
   onAdScreenClick,
 }) => {
   const { scene, gl } = useThree();
@@ -2073,8 +2432,8 @@ const ShopEnvironment: React.FC<{
   const frontWinCenter = DOOR_HALF_WIDTH + frontWinWidth / 2;
   const awningCount = Math.max(12, Math.floor(shopWidth));
   const awningStep = shopWidth / awningCount;
-  const sidewalkLeft = bounds.storageX - 3.6;
-  const sidewalkRight = bounds.houseX + 6.4;
+  const sidewalkLeft = bounds.storageX - 18.0;
+  const sidewalkRight = bounds.scooterShopX + 12.0;
   const sidewalkWidth = sidewalkRight - sidewalkLeft;
   const sidewalkCenterX = (sidewalkLeft + sidewalkRight) / 2;
 
@@ -2106,18 +2465,34 @@ const ShopEnvironment: React.FC<{
         color="#fff7ed"
       />
 
-      {/* Outer Grass / Neighborhood Ground */}
-      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[3, -0.06, 2]} receiveShadow={!isSoftwareGl}>
-        <planeGeometry args={[110, 90]} />
+      {/* Outer Grass / Neighborhood Ground (Clickable everywhere for free-roam walking!) */}
+      <mesh
+        rotation={[-Math.PI / 2, 0, 0]}
+        position={[3, -0.06, 2]}
+        receiveShadow={!isSoftwareGl}
+        onClick={(e) => {
+          e.stopPropagation();
+          onFloorClick(e.point.x, e.point.z);
+        }}
+      >
+        <planeGeometry args={[160, 140]} />
         <meshStandardMaterial color="#65a34e" roughness={0.95} />
       </mesh>
 
-      {/* Asphalt Neighborhood Street */}
-      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[3, -0.03, 12.2]} receiveShadow={!isSoftwareGl}>
-        <planeGeometry args={[90, 7]} />
+      {/* Asphalt Neighborhood Street (Walkable & Clickable!) */}
+      <mesh
+        rotation={[-Math.PI / 2, 0, 0]}
+        position={[3, -0.03, 12.2]}
+        receiveShadow={!isSoftwareGl}
+        onClick={(e) => {
+          e.stopPropagation();
+          onFloorClick(e.point.x, e.point.z);
+        }}
+      >
+        <planeGeometry args={[140, 7]} />
         <meshStandardMaterial color="#334155" roughness={0.92} />
       </mesh>
-      {[-16, -11, -6, -1, 4, 9, 14, 19, 24].map((x) => (
+      {[-46, -41, -36, -31, -26, -21, -16, -11, -6, -1, 4, 9, 14, 19, 24, 29, 34, 39, 44, 49].map((x) => (
         <mesh key={x} rotation={[-Math.PI / 2, 0, 0]} position={[x, -0.02, 12.2]}>
           <planeGeometry args={[2.6, 0.25]} />
           <meshStandardMaterial color="#fde047" roughness={0.7} />
@@ -2340,6 +2715,16 @@ const ShopEnvironment: React.FC<{
         onAdScreenClick={onAdScreenClick}
       />
 
+      {/* 3D Scooter Showroom Building right next to the neighborhood houses! */}
+      <ScooterShop3D
+        x={bounds.scooterShopX}
+        z={bounds.scooterShopZ}
+        lang={lang}
+        isNight={isNight}
+        isSoftwareGl={isSoftwareGl}
+        onClick={onScooterShopClick}
+      />
+
       {/* Surrounding 3D Neighborhood Houses & Lanes */}
       <NeighborhoodHouses3D
         storageX={bounds.storageX}
@@ -2348,6 +2733,7 @@ const ShopEnvironment: React.FC<{
         sidewalkTex={sidewalkTex}
         isNight={isNight}
         isSoftwareGl={isSoftwareGl}
+        onFloorClick={onFloorClick}
       />
 
       {/* Animated 3D Neighborhood Townsfolk Strolling Outside */}
@@ -2617,8 +3003,10 @@ const ShopActorsController: React.FC<{
   onHudUpdate: (snapshot: GumShopHudSnapshot) => void;
   onSyncVisuals: () => void;
   onCheckoutClick: () => void;
+  onDeliveryBeaconClick: () => void;
   onOpenHousePuzzle: () => void;
   onOpenStorageModal: () => void;
+  onOpenScooterShopModal: () => void;
 }> = ({
   worldRef,
   inputRef,
@@ -2627,8 +3015,10 @@ const ShopActorsController: React.FC<{
   onHudUpdate,
   onSyncVisuals,
   onCheckoutClick,
+  onDeliveryBeaconClick,
   onOpenHousePuzzle,
   onOpenStorageModal,
+  onOpenScooterShopModal,
 }) => {
   const { camera } = useThree();
   const playerGroupRef = useRef<THREE.Group | null>(null);
@@ -2654,11 +3044,16 @@ const ShopActorsController: React.FC<{
       world.pendingOpenStorage = false;
       onOpenStorageModal();
     }
+    if (world.pendingOpenScooterShop) {
+      world.pendingOpenScooterShop = false;
+      onOpenScooterShopModal();
+    }
 
     if (playerGroupRef.current) {
       playerGroupRef.current.position.set(world.playerX, 0, world.playerZ);
       playerGroupRef.current.rotation.y = world.playerRotY;
-      const swing = world.playerMoving ? Math.sin(t * 13) * 0.45 : 0;
+      const isRiding = world.ridingScooter && world.equippedScooter !== null;
+      const swing = !isRiding && world.playerMoving ? Math.sin(t * 13) * 0.45 : 0;
       if (leftLegRef.current) leftLegRef.current.rotation.x = swing;
       if (rightLegRef.current) rightLegRef.current.rotation.x = -swing;
     }
@@ -2672,7 +3067,7 @@ const ShopActorsController: React.FC<{
     }
 
     const tierOffset = world.shopLevel - 1;
-    const camTargetX = world.playerX * 0.78;
+    const camTargetX = world.playerX;
     const camTargetY = 10.6 + tierOffset * 1.1;
     const camTargetZ = world.playerZ + 9.4 + tierOffset * 0.8;
     camera.position.x = THREE.MathUtils.damp(camera.position.x, camTargetX, 5.5, dt);
@@ -2681,7 +3076,7 @@ const ShopActorsController: React.FC<{
 
     lookTargetRef.current.x = THREE.MathUtils.damp(
       lookTargetRef.current.x,
-      world.playerX * 0.82,
+      world.playerX,
       6.0,
       dt
     );
@@ -2709,66 +3104,105 @@ const ShopActorsController: React.FC<{
   const world = worldRef.current;
   const carried = world.carriedCrate;
   const carriedSpec = carried ? GUM_FLAVOR_MAP[carried.flavor] : null;
+  const activeScooterSpec =
+    world.ridingScooter && world.equippedScooter ? SCOOTER_MAP[world.equippedScooter] : null;
+  const activeDelivery = world.activeDelivery;
+  const activeDeliverySpec = activeDelivery ? GUM_FLAVOR_MAP[activeDelivery.flavor] : null;
+  const riderYOffset = activeScooterSpec ? 0.16 : 0;
 
   return (
     <group>
-      {/* 3D Shopkeeper Player */}
-      <group ref={playerGroupRef} position={[world.playerX, 0, world.playerZ]}>
-        <mesh ref={leftLegRef} position={[-0.14, 0.34, 0]} castShadow={!isSoftwareGl}>
-          <boxGeometry args={[0.18, 0.68, 0.2]} />
-          <meshStandardMaterial color="#1e293b" roughness={0.75} />
-        </mesh>
-        <mesh ref={rightLegRef} position={[0.14, 0.34, 0]} castShadow={!isSoftwareGl}>
-          <boxGeometry args={[0.18, 0.68, 0.2]} />
-          <meshStandardMaterial color="#1e293b" roughness={0.75} />
-        </mesh>
-        <mesh position={[0, 1.0, 0]} castShadow={!isSoftwareGl}>
-          <boxGeometry args={[0.56, 0.72, 0.34]} />
-          <meshStandardMaterial color="#f8fafc" roughness={0.7} />
-        </mesh>
-        <mesh position={[0, 0.94, 0.18]}>
-          <boxGeometry args={[0.46, 0.64, 0.04]} />
-          <meshStandardMaterial color="#14b8a6" roughness={0.65} />
-        </mesh>
-        <mesh position={[0, 1.56, 0]} castShadow={!isSoftwareGl}>
-          <sphereGeometry args={[0.26, 14, 12]} />
-          <meshStandardMaterial color="#f5cba7" roughness={0.7} />
-        </mesh>
-        <mesh position={[0, 1.74, 0.02]}>
-          <cylinderGeometry args={[0.27, 0.27, 0.14, 14]} />
-          <meshStandardMaterial color="#f43f5e" roughness={0.55} />
-        </mesh>
-        <mesh position={[0, 1.71, 0.22]}>
-          <boxGeometry args={[0.34, 0.04, 0.2]} />
-          <meshStandardMaterial color="#e11d48" roughness={0.55} />
-        </mesh>
-        <mesh
-          position={[-0.36, 1.02, carriedSpec ? 0.24 : 0]}
-          rotation={[carriedSpec ? -1.1 : 0, 0, 0]}
-        >
-          <boxGeometry args={[0.15, 0.56, 0.16]} />
-          <meshStandardMaterial color="#f5cba7" roughness={0.7} />
-        </mesh>
-        <mesh
-          position={[0.36, 1.02, carriedSpec ? 0.24 : 0]}
-          rotation={[carriedSpec ? -1.1 : 0, 0, 0]}
-        >
-          <boxGeometry args={[0.15, 0.56, 0.16]} />
-          <meshStandardMaterial color="#f5cba7" roughness={0.7} />
-        </mesh>
+      {/* Active Delivery 3D Destination Beacon at Target Neighbor House */}
+      {activeDelivery && (
+        <DeliveryBeacon3D order={activeDelivery} onClick={onDeliveryBeaconClick} />
+      )}
 
-        {carriedSpec && (
-          <group position={[0, 1.05, 0.56]}>
-            <mesh castShadow={!isSoftwareGl}>
-              <boxGeometry args={[0.62, 0.46, 0.5]} />
-              <meshStandardMaterial color="#d4a373" roughness={0.85} />
-            </mesh>
-            <mesh>
-              <boxGeometry args={[0.64, 0.15, 0.52]} />
-              <meshStandardMaterial color={carriedSpec.color} roughness={0.4} />
-            </mesh>
-          </group>
+      {/* 3D Shopkeeper Player (On Foot or Riding Equipped 3D Scooter!) */}
+      <group ref={playerGroupRef} position={[world.playerX, 0, world.playerZ]}>
+        {activeScooterSpec && (
+          <ScooterMesh3D
+            spec={activeScooterSpec}
+            isNight={world.isNight}
+            isSoftwareGl={isSoftwareGl}
+          />
         )}
+
+        <group position={[0, riderYOffset, activeScooterSpec ? -0.04 : 0]}>
+          <mesh ref={leftLegRef} position={[-0.14, 0.34, 0]} castShadow={!isSoftwareGl}>
+            <boxGeometry args={[0.18, 0.68, 0.2]} />
+            <meshStandardMaterial color="#1e293b" roughness={0.75} />
+          </mesh>
+          <mesh ref={rightLegRef} position={[0.14, 0.34, 0]} castShadow={!isSoftwareGl}>
+            <boxGeometry args={[0.18, 0.68, 0.2]} />
+            <meshStandardMaterial color="#1e293b" roughness={0.75} />
+          </mesh>
+          <mesh position={[0, 1.0, 0]} castShadow={!isSoftwareGl}>
+            <boxGeometry args={[0.56, 0.72, 0.34]} />
+            <meshStandardMaterial color="#f8fafc" roughness={0.7} />
+          </mesh>
+          <mesh position={[0, 0.94, 0.18]}>
+            <boxGeometry args={[0.46, 0.64, 0.04]} />
+            <meshStandardMaterial color="#14b8a6" roughness={0.65} />
+          </mesh>
+          <mesh position={[0, 1.56, 0]} castShadow={!isSoftwareGl}>
+            <sphereGeometry args={[0.26, 14, 12]} />
+            <meshStandardMaterial color="#f5cba7" roughness={0.7} />
+          </mesh>
+          <mesh position={[0, 1.74, 0.02]}>
+            <cylinderGeometry args={[0.27, 0.27, 0.14, 14]} />
+            <meshStandardMaterial color="#f43f5e" roughness={0.55} />
+          </mesh>
+          <mesh position={[0, 1.71, 0.22]}>
+            <boxGeometry args={[0.34, 0.04, 0.2]} />
+            <meshStandardMaterial color="#e11d48" roughness={0.55} />
+          </mesh>
+          <mesh
+            position={[-0.36, 1.02, carriedSpec ? 0.24 : activeScooterSpec ? 0.16 : 0]}
+            rotation={[carriedSpec ? -1.1 : activeScooterSpec ? -0.78 : 0, 0, 0]}
+          >
+            <boxGeometry args={[0.15, 0.56, 0.16]} />
+            <meshStandardMaterial color="#f5cba7" roughness={0.7} />
+          </mesh>
+          <mesh
+            position={[0.36, 1.02, carriedSpec ? 0.24 : activeScooterSpec ? 0.16 : 0]}
+            rotation={[carriedSpec ? -1.1 : activeScooterSpec ? -0.78 : 0, 0, 0]}
+          >
+            <boxGeometry args={[0.15, 0.56, 0.16]} />
+            <meshStandardMaterial color="#f5cba7" roughness={0.7} />
+          </mesh>
+
+          {/* Thermal Delivery Backpack while carrying a Phone Delivery Order */}
+          {activeDeliverySpec && (
+            <group position={[0, 1.05, -0.34]}>
+              <mesh castShadow={!isSoftwareGl}>
+                <boxGeometry args={[0.5, 0.54, 0.34]} />
+                <meshStandardMaterial color="#059669" roughness={0.55} />
+              </mesh>
+              <mesh position={[0, 0.02, -0.18]}>
+                <boxGeometry args={[0.42, 0.16, 0.04]} />
+                <meshStandardMaterial
+                  color={activeDeliverySpec.color}
+                  emissive={activeDeliverySpec.color}
+                  emissiveIntensity={0.35}
+                  roughness={0.35}
+                />
+              </mesh>
+            </group>
+          )}
+
+          {carriedSpec && (
+            <group position={[0, 1.05, 0.56]}>
+              <mesh castShadow={!isSoftwareGl}>
+                <boxGeometry args={[0.62, 0.46, 0.5]} />
+                <meshStandardMaterial color="#d4a373" roughness={0.85} />
+              </mesh>
+              <mesh>
+                <boxGeometry args={[0.64, 0.15, 0.52]} />
+                <meshStandardMaterial color={carriedSpec.color} roughness={0.4} />
+              </mesh>
+            </group>
+          )}
+        </group>
       </group>
 
       {/* 3D Neighborhood Customers */}
@@ -2858,9 +3292,12 @@ export const GumShopScene: React.FC<GumShopSceneProps> = ({
   onHouseDoorClick,
   onBedClick,
   onStorageClick,
+  onScooterShopClick,
+  onDeliveryBeaconClick,
   onAdScreenClick,
   onOpenHousePuzzle,
   onOpenStorageModal,
+  onOpenScooterShopModal,
 }) => {
   const isSoftwareGl = useMemo(() => detectSoftwareGl(), []);
   const [contextLost, setContextLost] = useState(false);
@@ -2939,6 +3376,7 @@ export const GumShopScene: React.FC<GumShopSceneProps> = ({
               onHouseDoorClick={onHouseDoorClick}
               onBedClick={onBedClick}
               onStorageClick={onStorageClick}
+              onScooterShopClick={onScooterShopClick}
               onAdScreenClick={onAdScreenClick}
             />
 
@@ -2980,8 +3418,10 @@ export const GumShopScene: React.FC<GumShopSceneProps> = ({
               onHudUpdate={onHudUpdate}
               onSyncVisuals={() => setVisualTick((v) => v + 1)}
               onCheckoutClick={onCheckoutClick}
+              onDeliveryBeaconClick={onDeliveryBeaconClick}
               onOpenHousePuzzle={onOpenHousePuzzle}
               onOpenStorageModal={onOpenStorageModal}
+              onOpenScooterShopModal={onOpenScooterShopModal}
             />
           </Canvas>
         </GumShopErrorBoundary>

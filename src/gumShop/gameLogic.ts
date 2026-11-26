@@ -12,6 +12,9 @@ import {
   DEFAULT_CHECKOUT_POS,
   EMERGENCY_GRANT_AMOUNT,
   getDaysUntilRent,
+  getFlavorsUnlockedAtRank,
+  getNeighborhoodDeliveryHouses,
+  getNextRankRequirements,
   getPriceVerdict,
   getShopBounds,
   GUM_FLAVOR_MAP,
@@ -20,6 +23,7 @@ import {
   PACKS_PER_BOX,
   readGumShopSave,
   RENT_INTERVAL_DAYS,
+  SCOOTER_MAP,
   SHELF_MAX_STOCK,
   SHELF_SLOTS,
   SHOP_TIERS,
@@ -32,11 +36,13 @@ import {
   type CarriedCrateState,
   type CustomerEntity,
   type DeliveryCrateState,
+  type DeliveryOrder,
   type FloatingNotice,
   type GumFlavorId,
   type GumShopHudSnapshot,
   type GumShopSaveData,
   type GumShopStatus,
+  type ScooterId,
   type ShelfState,
   type ShopBounds,
   type ShopLevel,
@@ -57,7 +63,9 @@ export interface WalkTarget {
     | { kind: 'checkout' }
     | { kind: 'open_house_puzzle' }
     | { kind: 'sleep_bed' }
-    | { kind: 'storage_interact' };
+    | { kind: 'storage_interact' }
+    | { kind: 'scooter_shop' }
+    | { kind: 'delivery_dropoff' };
 }
 
 export interface GumShopWorld {
@@ -72,6 +80,7 @@ export interface GumShopWorld {
   solvedPuzzleIds: number[];
   pendingHousePuzzle: boolean;
   pendingOpenStorage: boolean;
+  pendingOpenScooterShop: boolean;
   hasStorageRoom: boolean;
   storageStock: Partial<Record<GumFlavorId, number>>;
   activeAds: ActiveAdState[];
@@ -86,11 +95,24 @@ export interface GumShopWorld {
   todayRevenue: number;
   todayWholesale: number;
   todayPacksSold: number;
+  rank: number;
+  totalPlaySeconds: number;
+  totalSessions: number;
+  totalCustomersServed: number;
+  totalDeliveriesCompleted: number;
+  playSecAccum: number;
+  sessionCounted: boolean;
   shelves: ShelfState[];
   prices: Record<GumFlavorId, number>;
   cratesOutside: DeliveryCrateState[];
   carriedCrate: CarriedCrateState | null;
   upgrades: UpgradeId[];
+  ownedScooters: ScooterId[];
+  equippedScooter: ScooterId | null;
+  ridingScooter: boolean;
+  availableDeliveries: DeliveryOrder[];
+  activeDelivery: DeliveryOrder | null;
+  nextDeliveryId: number;
   customers: CustomerEntity[];
   nextCrateId: number;
   nextCustomerId: number;
@@ -211,6 +233,11 @@ function createFreshWorldData(): GumShopSaveData {
     todayRevenue: 0,
     todayWholesale: 0,
     todayPacksSold: 0,
+    rank: 1,
+    totalPlaySeconds: 0,
+    totalSessions: 0,
+    totalCustomersServed: 0,
+    totalDeliveriesCompleted: 0,
     shelves: [
       {
         slotIndex: 0,
@@ -237,16 +264,100 @@ function createFreshWorldData(): GumShopSaveData {
     ],
     carriedCrate: null,
     upgrades: [],
+    ownedScooters: [],
+    equippedScooter: null,
+    ridingScooter: false,
     nextCrateId: 2,
     savedAt: Date.now(),
   };
+}
+
+export function getAvailableStockForFlavor(world: GumShopWorld, flavor: GumFlavorId): number {
+  let total = Math.max(0, world.storageStock[flavor] ?? 0);
+  for (const s of world.shelves) {
+    if (s.flavor === flavor && s.stock > 0) {
+      total += s.stock;
+    }
+  }
+  if (world.carriedCrate && world.carriedCrate.flavor === flavor) {
+    total += world.carriedCrate.packs;
+  }
+  return total;
+}
+
+function buildDeliveryOrder(
+  world: GumShopWorld,
+  excludeHouseIds: Set<string>,
+  preferStocked: boolean
+): DeliveryOrder {
+  const bounds = getShopBounds(world.shopLevel);
+  const houses = getNeighborhoodDeliveryHouses(bounds);
+  const poolHouses = houses.filter((h) => !excludeHouseIds.has(h.houseId));
+  const house =
+    poolHouses.length > 0
+      ? poolHouses[Math.floor(Math.random() * poolHouses.length)]
+      : houses[Math.floor(Math.random() * houses.length)];
+
+  const unlockedFlavors = GUM_FLAVORS.filter((f) => f.requiredRank <= world.rank);
+  const stockedFlavors = unlockedFlavors.filter(
+    (f) => getAvailableStockForFlavor(world, f.id) >= 2
+  );
+  const pickPool =
+    preferStocked && stockedFlavors.length > 0 && Math.random() < 0.72
+      ? stockedFlavors
+      : unlockedFlavors.length > 0
+      ? unlockedFlavors
+      : [GUM_FLAVORS[0]];
+  const spec = pickPool[Math.floor(Math.random() * pickPool.length)];
+  const maxStock = getAvailableStockForFlavor(world, spec.id);
+  const quantity =
+    maxStock >= 2
+      ? Math.min(Math.max(2, Math.min(5, maxStock)), 2 + Math.floor(Math.random() * 3))
+      : 2 + Math.floor(Math.random() * 3);
+
+  const playerPrice = world.prices[spec.id] ?? spec.fairPrice;
+  const unitPrice = Math.max(
+    spec.unitCost + 2,
+    Math.min(Math.round(spec.fairPrice * 1.18), playerPrice)
+  );
+  const gumTotal = Math.round(unitPrice * quantity);
+  const deliveryFee = house.baseDeliveryFee + quantity * 4;
+  const totalReward = gumTotal + deliveryFee;
+
+  return {
+    id: world.nextDeliveryId++,
+    houseId: house.houseId,
+    customerNameAr: house.customerNameAr,
+    customerNameEn: house.customerNameEn,
+    areaAr: house.areaAr,
+    areaEn: house.areaEn,
+    flavor: spec.id,
+    quantity,
+    gumTotal,
+    deliveryFee,
+    totalReward,
+    dropoffX: house.dropoffX,
+    dropoffZ: house.dropoffZ,
+  };
+}
+
+function refillDeliveryOrders(world: GumShopWorld, targetCount = 3): void {
+  const used = new Set<string>(world.availableDeliveries.map((o) => o.houseId));
+  if (world.activeDelivery) used.add(world.activeDelivery.houseId);
+  let guard = 0;
+  while (world.availableDeliveries.length < targetCount && guard < 12) {
+    guard += 1;
+    const order = buildDeliveryOrder(world, used, guard <= 2);
+    used.add(order.houseId);
+    world.availableDeliveries.push(order);
+  }
 }
 
 export function createGumShopWorld(lang: 'ar' | 'en'): GumShopWorld {
   const saved = readGumShopSave();
   const data = saved ?? createFreshWorldData();
 
-  return {
+  const world: GumShopWorld = {
     lang,
     status: 'TITLE',
     hasExistingSave: Boolean(saved),
@@ -258,6 +369,7 @@ export function createGumShopWorld(lang: 'ar' | 'en'): GumShopWorld {
     solvedPuzzleIds: [...data.solvedPuzzleIds],
     pendingHousePuzzle: false,
     pendingOpenStorage: false,
+    pendingOpenScooterShop: false,
     hasStorageRoom: data.hasStorageRoom,
     storageStock: { ...data.storageStock },
     activeAds: data.activeAds.map((a) => ({ ...a })),
@@ -272,6 +384,13 @@ export function createGumShopWorld(lang: 'ar' | 'en'): GumShopWorld {
     todayRevenue: data.todayRevenue,
     todayWholesale: data.todayWholesale,
     todayPacksSold: data.todayPacksSold,
+    rank: data.rank,
+    totalPlaySeconds: data.totalPlaySeconds,
+    totalSessions: data.totalSessions,
+    totalCustomersServed: data.totalCustomersServed,
+    totalDeliveriesCompleted: data.totalDeliveriesCompleted,
+    playSecAccum: 0,
+    sessionCounted: false,
     shelves: data.shelves.map((s) => ({
       ...s,
       stock: Math.min(SHELF_MAX_STOCK, Math.max(0, s.stock)),
@@ -280,6 +399,12 @@ export function createGumShopWorld(lang: 'ar' | 'en'): GumShopWorld {
     cratesOutside: data.cratesOutside.map((c) => ({ ...c })),
     carriedCrate: data.carriedCrate ? { ...data.carriedCrate } : null,
     upgrades: [...data.upgrades],
+    ownedScooters: [...data.ownedScooters],
+    equippedScooter: data.equippedScooter,
+    ridingScooter: data.ridingScooter && data.equippedScooter !== null,
+    availableDeliveries: [],
+    activeDelivery: null,
+    nextDeliveryId: 1,
     customers: [],
     nextCrateId: data.nextCrateId,
     nextCustomerId: 1,
@@ -296,6 +421,8 @@ export function createGumShopWorld(lang: 'ar' | 'en'): GumShopWorld {
     nextNoticeId: 1,
     version: 1,
   };
+  refillDeliveryOrders(world, 3);
+  return world;
 }
 
 export function saveGumShopWorldNow(world: GumShopWorld): void {
@@ -321,11 +448,19 @@ export function saveGumShopWorldNow(world: GumShopWorld): void {
     todayRevenue: Math.max(0, Math.round(world.todayRevenue)),
     todayWholesale: Math.max(0, Math.round(world.todayWholesale)),
     todayPacksSold: world.todayPacksSold,
+    rank: Math.max(1, Math.floor(world.rank)),
+    totalPlaySeconds: Math.max(0, Math.floor(world.totalPlaySeconds)),
+    totalSessions: Math.max(0, Math.floor(world.totalSessions)),
+    totalCustomersServed: Math.max(0, Math.floor(world.totalCustomersServed)),
+    totalDeliveriesCompleted: Math.max(0, Math.floor(world.totalDeliveriesCompleted)),
     shelves: world.shelves.map((s) => ({ ...s })),
     prices: { ...world.prices },
     cratesOutside: world.cratesOutside.map((c) => ({ ...c })),
     carriedCrate: world.carriedCrate ? { ...world.carriedCrate } : null,
     upgrades: [...world.upgrades],
+    ownedScooters: [...world.ownedScooters],
+    equippedScooter: world.equippedScooter,
+    ridingScooter: world.ridingScooter && world.equippedScooter !== null,
     nextCrateId: world.nextCrateId,
     savedAt: now,
   };
@@ -349,11 +484,17 @@ export function pushNotice(
 }
 
 export function actionStartOrResume(world: GumShopWorld): void {
+  if (!world.sessionCounted) {
+    world.totalSessions += 1;
+    world.sessionCounted = true;
+  }
   world.status = 'PLAYING';
   saveGumShopWorldNow(world);
 }
 
 export function actionResetShop(world: GumShopWorld): void {
+  const preservedPlaySeconds = world.totalPlaySeconds;
+  const preservedSessions = Math.max(1, world.totalSessions + (world.sessionCounted ? 0 : 1));
   clearGumShopSave();
   const fresh = createFreshWorldData();
   world.money = fresh.money;
@@ -364,6 +505,7 @@ export function actionResetShop(world: GumShopWorld): void {
   world.solvedPuzzleIds = [];
   world.pendingHousePuzzle = false;
   world.pendingOpenStorage = false;
+  world.pendingOpenScooterShop = false;
   world.hasStorageRoom = false;
   world.storageStock = {};
   world.activeAds = [];
@@ -378,11 +520,23 @@ export function actionResetShop(world: GumShopWorld): void {
   world.todayRevenue = 0;
   world.todayWholesale = 0;
   world.todayPacksSold = 0;
+  world.rank = 1;
+  world.totalPlaySeconds = preservedPlaySeconds;
+  world.totalSessions = preservedSessions;
+  world.totalCustomersServed = 0;
+  world.totalDeliveriesCompleted = 0;
+  world.sessionCounted = true;
   world.shelves = fresh.shelves.map((s) => ({ ...s }));
   world.prices = { ...fresh.prices };
   world.cratesOutside = fresh.cratesOutside.map((c) => ({ ...c }));
   world.carriedCrate = null;
   world.upgrades = [];
+  world.ownedScooters = [];
+  world.equippedScooter = null;
+  world.ridingScooter = false;
+  world.availableDeliveries = [];
+  world.activeDelivery = null;
+  refillDeliveryOrders(world, 3);
   world.customers = [];
   world.nextCrateId = fresh.nextCrateId;
   world.playerX = 0;
@@ -391,6 +545,314 @@ export function actionResetShop(world: GumShopWorld): void {
   world.status = 'PLAYING';
   world.version += 1;
   saveGumShopWorldNow(world);
+}
+
+export function actionRefreshDeliveryOrders(
+  world: GumShopWorld,
+  audio: GumShopAudio
+): void {
+  world.availableDeliveries = [];
+  refillDeliveryOrders(world, 3);
+  audio.playPickup();
+  pushNotice(
+    world,
+    '📱 تم تحديث طلبات التوصيل من جيران الحي!',
+    '📱 Refreshed neighborhood delivery orders!',
+    'info'
+  );
+  world.version += 1;
+}
+
+export function actionAcceptDeliveryOrder(
+  world: GumShopWorld,
+  orderId: number,
+  audio: GumShopAudio
+): boolean {
+  if (world.activeDelivery) {
+    audio.playWarn();
+    pushNotice(
+      world,
+      'لديك طلب توصيل جاري بالفعل! وصّله للبيت أولاً.',
+      'You already have an active delivery! Drop it off first.',
+      'warn'
+    );
+    return false;
+  }
+
+  const idx = world.availableDeliveries.findIndex((o) => o.id === orderId);
+  if (idx === -1) return false;
+  const order = world.availableDeliveries[idx];
+  const spec = GUM_FLAVOR_MAP[order.flavor];
+  const available = getAvailableStockForFlavor(world, order.flavor);
+
+  if (available < order.quantity) {
+    audio.playWarn();
+    pushNotice(
+      world,
+      `تحتاج ${order.quantity} علب من ${spec.nameAr} في الرفوف أو المخزن لتجهيز التوصيل (المتوفر: ${available}).`,
+      `Need ${order.quantity} packs of ${spec.nameEn} in shelves/warehouse (have ${available}).`,
+      'warn'
+    );
+    return false;
+  }
+
+  // Deduct required packs: storage first, then shelves, then carried crate
+  let remaining = order.quantity;
+  const inStorage = Math.max(0, world.storageStock[order.flavor] ?? 0);
+  if (inStorage > 0 && remaining > 0) {
+    const take = Math.min(inStorage, remaining);
+    const left = inStorage - take;
+    if (left > 0) {
+      world.storageStock[order.flavor] = left;
+    } else {
+      delete world.storageStock[order.flavor];
+    }
+    remaining -= take;
+  }
+  if (remaining > 0) {
+    for (const s of world.shelves) {
+      if (s.flavor === order.flavor && s.stock > 0 && remaining > 0) {
+        const take = Math.min(s.stock, remaining);
+        s.stock -= take;
+        if (s.stock <= 0) {
+          s.stock = 0;
+          s.flavor = null;
+        }
+        remaining -= take;
+      }
+    }
+  }
+  if (remaining > 0 && world.carriedCrate && world.carriedCrate.flavor === order.flavor) {
+    const take = Math.min(world.carriedCrate.packs, remaining);
+    world.carriedCrate.packs -= take;
+    if (world.carriedCrate.packs <= 0) {
+      world.carriedCrate = null;
+    }
+    remaining -= take;
+  }
+
+  world.availableDeliveries.splice(idx, 1);
+  world.activeDelivery = { ...order };
+  refillDeliveryOrders(world, 3);
+  world.version += 1;
+  audio.playPickup();
+  pushNotice(
+    world,
+    `📱 تم تجهيز الطلب لـ ${order.customerNameAr}! وصّله واربح ${order.totalReward} ريال (التوصيل +${order.deliveryFee})`,
+    `📱 Order packed for ${order.customerNameEn}! Deliver for +${order.totalReward} SAR (Fee +${order.deliveryFee})`,
+    'good'
+  );
+  saveGumShopWorldNow(world);
+  return true;
+}
+
+export function actionCancelActiveDelivery(
+  world: GumShopWorld,
+  audio: GumShopAudio
+): boolean {
+  const order = world.activeDelivery;
+  if (!order) return false;
+  world.activeDelivery = null;
+
+  // Return packs safely to storage or as a crate outside the door
+  const freeStorage = world.hasStorageRoom
+    ? STORAGE_MAX_PACKS - getStorageTotalPacks(world.storageStock)
+    : 0;
+  if (freeStorage >= order.quantity) {
+    world.storageStock[order.flavor] = (world.storageStock[order.flavor] ?? 0) + order.quantity;
+  } else {
+    world.cratesOutside.push({
+      id: world.nextCrateId++,
+      flavor: order.flavor,
+      packs: order.quantity,
+      x: -3.2,
+      z: 5.8,
+    });
+  }
+  world.version += 1;
+  audio.playWarn();
+  pushNotice(
+    world,
+    'تم إلغاء طلب التوصيل وإرجاع علب العلك لمتجرك.',
+    'Delivery canceled and gum packs returned to your shop.',
+    'info'
+  );
+  saveGumShopWorldNow(world);
+  return true;
+}
+
+export function actionCompleteActiveDelivery(
+  world: GumShopWorld,
+  audio: GumShopAudio
+): boolean {
+  const order = world.activeDelivery;
+  if (!order) return false;
+
+  world.money += order.totalReward;
+  world.totalEarned += order.totalReward;
+  world.todayRevenue += order.totalReward;
+  world.totalPacksSold += order.quantity;
+  world.todayPacksSold += order.quantity;
+  world.totalCustomersServed += 1;
+  world.totalDeliveriesCompleted += 1;
+  world.activeDelivery = null;
+  refillDeliveryOrders(world, 3);
+  world.version += 1;
+  audio.playCash();
+  pushNotice(
+    world,
+    `🛵 تم التوصيل لـ ${order.customerNameAr}! +${order.totalReward} ريال (علك ${order.gumTotal} + توصيل ${order.deliveryFee})`,
+    `🛵 Delivered to ${order.customerNameEn}! +${order.totalReward} SAR (Gum ${order.gumTotal} + Fee ${order.deliveryFee})`,
+    'good'
+  );
+  saveGumShopWorldNow(world);
+  return true;
+}
+
+export function actionBuyScooter(
+  world: GumShopWorld,
+  scooterId: ScooterId,
+  audio: GumShopAudio
+): boolean {
+  const spec = SCOOTER_MAP[scooterId];
+  if (!spec) return false;
+
+  if (world.ownedScooters.includes(scooterId)) {
+    return actionEquipScooter(world, scooterId, audio);
+  }
+
+  if (world.money < spec.cost) {
+    audio.playWarn();
+    pushNotice(
+      world,
+      `رصيدك لا يكفي لشراء ${spec.nameAr} (${spec.cost} ريال)!`,
+      `Not enough money for ${spec.nameEn} (${spec.cost} SAR)!`,
+      'warn'
+    );
+    return false;
+  }
+
+  world.money -= spec.cost;
+  world.ownedScooters.push(scooterId);
+  world.equippedScooter = scooterId;
+  world.ridingScooter = true;
+  world.version += 1;
+  audio.playBuyUpgrade();
+  pushNotice(
+    world,
+    `🛴 مبروك! اشتريت ${spec.nameAr} وانطلقت به الآن!`,
+    `🛴 Bought ${spec.nameEn} and hopped on!`,
+    'good'
+  );
+  saveGumShopWorldNow(world);
+  return true;
+}
+
+export function actionEquipScooter(
+  world: GumShopWorld,
+  scooterId: ScooterId,
+  audio: GumShopAudio
+): boolean {
+  if (!world.ownedScooters.includes(scooterId)) return false;
+  const spec = SCOOTER_MAP[scooterId];
+  world.equippedScooter = scooterId;
+  world.ridingScooter = true;
+  world.version += 1;
+  audio.playPickup();
+  pushNotice(
+    world,
+    `🛴 تم اختيار وركوب ${spec.nameAr}!`,
+    `🛴 Equipped & riding ${spec.nameEn}!`,
+    'good'
+  );
+  saveGumShopWorldNow(world);
+  return true;
+}
+
+export function actionToggleRideScooter(
+  world: GumShopWorld,
+  audio: GumShopAudio
+): boolean {
+  if (!world.equippedScooter) {
+    audio.playWarn();
+    pushNotice(
+      world,
+      'اشترِ سكوتر أولاً من محل السكوترات بجانب البيوت!',
+      'Buy a scooter first at the Scooter Shop next to the houses!',
+      'info'
+    );
+    return false;
+  }
+  world.ridingScooter = !world.ridingScooter;
+  world.version += 1;
+  audio.playPickup();
+  const spec = SCOOTER_MAP[world.equippedScooter];
+  pushNotice(
+    world,
+    world.ridingScooter
+      ? `🛴 ركبت ${spec.nameAr}!`
+      : '🚶 نزلت من السكوتر وتمشي على قدميك.',
+    world.ridingScooter
+      ? `🛴 Riding ${spec.nameEn}!`
+      : '🚶 Dismounted scooter — walking on foot.',
+    'info'
+  );
+  saveGumShopWorldNow(world);
+  return true;
+}
+
+export function actionPromoteRank(world: GumShopWorld, audio: GumShopAudio): boolean {
+  const req = getNextRankRequirements(world.rank);
+
+  if (world.totalPacksSold < req.requiredPacksTotal) {
+    const missingPacks = req.requiredPacksTotal - world.totalPacksSold;
+    audio.playWarn();
+    pushNotice(
+      world,
+      `تحتاج بيع ${missingPacks} علك إضافي (الإجمالي المطلوب: ${req.requiredPacksTotal} علك) للترقية إلى رانك ${req.nextRank}!`,
+      `Sell ${missingPacks} more gum packs (total required: ${req.requiredPacksTotal}) to reach Rank ${req.nextRank}!`,
+      'warn'
+    );
+    return false;
+  }
+
+  if (world.money < req.cost) {
+    const missingMoney = req.cost - world.money;
+    audio.playWarn();
+    pushNotice(
+      world,
+      `تحتاج ${req.cost} ريال للترقية إلى رانك ${req.nextRank} (ناقصك ${missingMoney} ريال)!`,
+      `Need ${req.cost} SAR to promote to Rank ${req.nextRank} (${missingMoney} SAR short)!`,
+      'warn'
+    );
+    return false;
+  }
+
+  world.money -= req.cost;
+  world.rank = req.nextRank;
+  world.version += 1;
+  audio.playBuyUpgrade();
+  const newlyUnlocked = getFlavorsUnlockedAtRank(req.nextRank);
+  const unlockedAr =
+    newlyUnlocked.length > 1
+      ? ` — فتح ${newlyUnlocked.length} منتجات جديدة: ${newlyUnlocked.map((f) => f.nameAr).join(' + ')}!`
+      : newlyUnlocked.length === 1
+      ? ` — فتح منتج جديد: ${newlyUnlocked[0].nameAr}!`
+      : '!';
+  const unlockedEn =
+    newlyUnlocked.length > 1
+      ? ` — Unlocked ${newlyUnlocked.length} new products: ${newlyUnlocked.map((f) => f.nameEn).join(' + ')}!`
+      : newlyUnlocked.length === 1
+      ? ` — Unlocked new product: ${newlyUnlocked[0].nameEn}!`
+      : '!';
+  pushNotice(
+    world,
+    `🏆 مبروك! تمت ترقيتك إلى رانك ${req.nextRank} — «${req.nextSpec.nameAr}»${unlockedAr}`,
+    `🏆 Promoted to Rank ${req.nextRank} — "${req.nextSpec.nameEn}"${unlockedEn}`,
+    'good'
+  );
+  saveGumShopWorldNow(world);
+  return true;
 }
 
 function findNextCrateDropSpot(world: GumShopWorld): { x: number; z: number } {
@@ -418,6 +880,16 @@ export function actionOrderCrate(
 ): boolean {
   const spec = GUM_FLAVOR_MAP[flavor];
   if (!spec) return false;
+  if (world.rank < spec.requiredRank) {
+    audio.playWarn();
+    pushNotice(
+      world,
+      `🔒 منتج «${spec.nameAr}» يفتح عند الوصول إلى رانك ${spec.requiredRank}!`,
+      `🔒 "${spec.nameEn}" unlocks at Rank ${spec.requiredRank}!`,
+      'warn'
+    );
+    return false;
+  }
   if (world.cratesOutside.length >= 16) {
     audio.playWarn();
     pushNotice(
@@ -1166,6 +1638,7 @@ export function actionCheckoutCustomers(
   world.todayRevenue += earnedTotal;
   world.totalPacksSold += packsTotal;
   world.todayPacksSold += packsTotal;
+  world.totalCustomersServed += waiting.length;
   world.version += 1;
   audio.playCash();
   const arPacks = packsTotal === 1 ? 'علبة' : 'علب';
@@ -1324,6 +1797,27 @@ export function actionEmergencyGrant(world: GumShopWorld, audio: GumShopAudio): 
 export function findNearPrompt(world: GumShopWorld): GumShopHudSnapshot['nearPrompt'] {
   const bounds = getShopBounds(world.shopLevel);
 
+  // 0) Near Active Delivery Drop-off Porch!
+  if (
+    world.activeDelivery &&
+    Math.hypot(
+      world.playerX - world.activeDelivery.dropoffX,
+      world.playerZ - world.activeDelivery.dropoffZ
+    ) <= 3.3
+  ) {
+    return { kind: 'delivery_dropoff', orderId: world.activeDelivery.id };
+  }
+
+  // 0b) Near 3D Scooter Shop right beside the neighborhood houses!
+  if (
+    Math.hypot(
+      world.playerX - bounds.scooterShopDoorX,
+      world.playerZ - bounds.scooterShopDoorZ
+    ) <= 3.1
+  ) {
+    return { kind: 'scooter_shop' };
+  }
+
   // 1) Near Bed inside the unlocked Sleep House
   if (
     world.houseDoorUnlocked &&
@@ -1378,6 +1872,13 @@ export function findNearPrompt(world: GumShopWorld): GumShopHudSnapshot['nearPro
 export function actionInteractNearest(world: GumShopWorld, audio: GumShopAudio): boolean {
   const prompt = findNearPrompt(world);
   if (!prompt) return false;
+  if (prompt.kind === 'delivery_dropoff') {
+    return actionCompleteActiveDelivery(world, audio);
+  }
+  if (prompt.kind === 'scooter_shop') {
+    world.pendingOpenScooterShop = true;
+    return true;
+  }
   if (prompt.kind === 'house_door') {
     world.pendingHousePuzzle = true;
     return true;
@@ -1468,7 +1969,81 @@ function getSolidObstacles(world: GumShopWorld): SolidBox[] {
     });
   }
 
+  // Solid 3D Scooter Shop building right next to the neighborhood houses!
+  boxes.push({
+    cx: bounds.scooterShopX,
+    cz: bounds.scooterShopZ,
+    halfX: 2.75,
+    halfZ: 2.25,
+  });
+
+  // Surrounding 3D Neighborhood Houses (solid footprints with spacious walkways between every home)
+  const neighborHouses: Array<{ x: number; z: number; scale: number }> = [
+    { x: bounds.storageX - 6.8, z: -0.5, scale: 1.0 },
+    { x: bounds.storageX - 13.6, z: -0.8, scale: 0.96 },
+    { x: bounds.houseX + 7.2, z: -0.5, scale: 1.0 },
+    { x: bounds.houseX + 21.8, z: -0.8, scale: 0.96 },
+    { x: -21.5, z: bounds.backZ - 8.6, scale: 1.02 },
+    { x: -14.0, z: bounds.backZ - 8.6, scale: 1.04 },
+    { x: -6.8, z: bounds.backZ - 8.6, scale: 0.98 },
+    { x: 6.8, z: bounds.backZ - 8.6, scale: 1.0 },
+    { x: 14.0, z: bounds.backZ - 8.6, scale: 1.04 },
+    { x: 21.5, z: bounds.backZ - 8.6, scale: 1.0 },
+    { x: -16.5, z: 21.2, scale: 1.02 },
+    { x: -8.2, z: 21.2, scale: 1.0 },
+    { x: 0.0, z: 21.2, scale: 1.04 },
+    { x: 8.2, z: 21.2, scale: 1.0 },
+    { x: 16.5, z: 21.2, scale: 1.02 },
+  ];
+  for (const nh of neighborHouses) {
+    boxes.push({
+      cx: nh.x,
+      cz: nh.z,
+      halfX: 2.32 * nh.scale,
+      halfZ: 1.92 * nh.scale,
+    });
+  }
+
+  // Back neighborhood yard tree trunks
+  for (const tx of [-17.8, -10.4, 10.4, 17.8]) {
+    boxes.push({ cx: tx, cz: bounds.backZ - 7.6, halfX: 0.3, halfZ: 0.3 });
+  }
+
   return boxes;
+}
+
+function isPointInsideShop(x: number, z: number, bounds: ShopBounds): boolean {
+  return (
+    Math.abs(x) < bounds.halfW - 0.1 &&
+    z > bounds.backZ + 0.1 &&
+    z < DOOR_Z - 0.05
+  );
+}
+
+function pushOutOfRectFromOld(
+  oldX: number,
+  oldZ: number,
+  x: number,
+  z: number,
+  minX: number,
+  maxX: number,
+  minZ: number,
+  maxZ: number
+): { x: number; z: number } {
+  if (oldZ >= maxZ - 0.12) return { x, z: maxZ };
+  if (oldZ <= minZ + 0.12) return { x, z: minZ };
+  if (oldX <= minX + 0.12) return { x: minX, z };
+  if (oldX >= maxX - 0.12) return { x: maxX, z };
+
+  const dLeft = Math.abs(x - minX);
+  const dRight = Math.abs(maxX - x);
+  const dBack = Math.abs(z - minZ);
+  const dFront = Math.abs(maxZ - z);
+  const minD = Math.min(dLeft, dRight, dBack, dFront);
+  if (minD === dFront) return { x, z: maxZ };
+  if (minD === dBack) return { x, z: minZ };
+  if (minD === dLeft) return { x: minX, z };
+  return { x: maxX, z };
 }
 
 function pushOutOfBox(
@@ -1521,53 +2096,66 @@ function clampToWallsAndHouse(
   houseDoorUnlocked: boolean
 ): { x: number; z: number } {
   const bounds = getShopBounds(shopLevel);
-  let x = Math.max(bounds.storageX - 2.6, Math.min(bounds.houseX + 4.8, nextX));
-  let z = Math.max(bounds.backZ + 0.7, Math.min(8.3, nextZ));
+  // Generous full-neighborhood free-roam world bounds (across street, behind shop & all neighbor houses)
+  let x = Math.max(-52, Math.min(56, nextX));
+  let z = Math.max(bounds.backZ - 32, Math.min(42, nextZ));
 
-  // Shop front storefront glass wall at Z = DOOR_Z spans X in [-halfW, +halfW]
-  const wallBandMin = DOOR_Z - 0.35;
-  const wallBandMax = DOOR_Z + 0.35;
-  const insideFrontSpan = Math.abs(x) <= bounds.halfW + 0.35;
-  const crossingFrontWall =
-    (oldZ <= wallBandMin && z > wallBandMin) ||
-    (oldZ >= wallBandMax && z < wallBandMax) ||
-    (z > wallBandMin && z < wallBandMax);
+  // Gum Shop walls: enter/exit through front glass doorway, and freely walk around all 4 exterior sides!
+  const shopMinX = -(bounds.halfW + 0.45);
+  const shopMaxX = bounds.halfW + 0.45;
+  const shopBackOutZ = bounds.backZ - 0.45;
+  const shopFrontOutZ = DOOR_Z + 0.35;
+  const wasInsideShop = isPointInsideShop(oldX, oldZ, bounds);
 
-  if (insideFrontSpan && crossingFrontWall && Math.abs(x) > DOOR_HALF_WIDTH - 0.25) {
-    if (oldZ <= DOOR_Z) {
-      z = Math.min(z, wallBandMin);
-    } else {
-      z = Math.max(z, wallBandMax);
+  if (wasInsideShop) {
+    x = Math.max(-(bounds.halfW - 0.65), Math.min(bounds.halfW - 0.65, x));
+    z = Math.max(bounds.backZ + 0.65, z);
+    if (z > DOOR_Z - 0.35 && Math.abs(x) > DOOR_HALF_WIDTH - 0.25) {
+      z = Math.min(z, DOOR_Z - 0.35);
+    }
+  } else {
+    if (x > shopMinX && x < shopMaxX && z > shopBackOutZ && z < shopFrontOutZ) {
+      const enteringShopDoor =
+        Math.abs(x) <= DOOR_HALF_WIDTH - 0.25 && oldZ >= DOOR_Z - 0.15;
+      if (!enteringShopDoor) {
+        const pushed = pushOutOfRectFromOld(
+          oldX,
+          oldZ,
+          x,
+          z,
+          shopMinX,
+          shopMaxX,
+          shopBackOutZ,
+          shopFrontOutZ
+        );
+        x = pushed.x;
+        z = pushed.z;
+      }
     }
   }
 
-  // Separation between shop interior & left/right outdoor corridors (Warehouse on left, Sleep House on right)
-  if (z < DOOR_Z - 0.05) {
-    if (oldX >= -(bounds.halfW - 0.2) && oldX <= bounds.halfW - 0.2) {
-      x = Math.max(-(bounds.halfW - 0.7), Math.min(bounds.halfW - 0.7, x));
-    } else if (oldX > bounds.halfW - 0.2) {
-      x = Math.max(bounds.halfW + 0.55, x);
-    } else {
-      x = Math.min(-(bounds.halfW + 0.55), x);
-    }
-  }
-
-  // Sleep House walls (solid when locked; enterable through center door when unlocked!)
+  // Sleep House walls (solid when locked; enterable through center door when unlocked; walkable all around!)
   const houseMinX = bounds.houseX - 2.45;
   const houseMaxX = bounds.houseX + 2.45;
   const houseBackZ = bounds.houseZ - 2.25;
+  const houseBackOutZ = houseBackZ - 0.45;
   const houseFrontZ = bounds.houseFrontZ; // 1.9
   const houseDoorHalf = 0.62;
 
   if (!houseDoorUnlocked) {
-    if (x > houseMinX && x < houseMaxX && z < houseFrontZ + 0.55) {
-      if (oldZ >= houseFrontZ + 0.45) {
-        z = houseFrontZ + 0.55;
-      } else if (oldX <= houseMinX) {
-        x = houseMinX;
-      } else {
-        x = houseMaxX;
-      }
+    if (x > houseMinX && x < houseMaxX && z < houseFrontZ + 0.55 && z > houseBackOutZ) {
+      const pushed = pushOutOfRectFromOld(
+        oldX,
+        oldZ,
+        x,
+        z,
+        houseMinX,
+        houseMaxX,
+        houseBackOutZ,
+        houseFrontZ + 0.55
+      );
+      x = pushed.x;
+      z = pushed.z;
     }
   } else {
     const wasInsideHouse = isPointInsideHouse(oldX, oldZ, bounds);
@@ -1581,16 +2169,21 @@ function clampToWallsAndHouse(
       }
     } else {
       // Outside the unlocked Sleep House: allow entering through open doorway, block exterior walls
-      if (x > houseMinX && x < houseMaxX && z < houseFrontZ + 0.35 && z > houseBackZ - 0.35) {
+      if (x > houseMinX && x < houseMaxX && z < houseFrontZ + 0.35 && z > houseBackOutZ) {
         const inDoorLane = Math.abs(x - bounds.houseX) <= houseDoorHalf && oldZ >= houseFrontZ - 0.1;
         if (!inDoorLane) {
-          if (oldZ >= houseFrontZ + 0.25) {
-            z = houseFrontZ + 0.35;
-          } else if (oldX <= houseMinX) {
-            x = houseMinX;
-          } else {
-            x = houseMaxX;
-          }
+          const pushed = pushOutOfRectFromOld(
+            oldX,
+            oldZ,
+            x,
+            z,
+            houseMinX,
+            houseMaxX,
+            houseBackOutZ,
+            houseFrontZ + 0.35
+          );
+          x = pushed.x;
+          z = pushed.z;
         }
       }
     }
@@ -1713,6 +2306,15 @@ export function stepGumShopWorld(
     return dirty;
   }
 
+  // 0) Track cumulative Gum Shop play time (seconds)
+  world.playSecAccum += dt;
+  if (world.playSecAccum >= 1) {
+    const whole = Math.floor(world.playSecAccum);
+    world.playSecAccum -= whole;
+    world.totalPlaySeconds += whole;
+    dirty = true;
+  }
+
   const bounds = getShopBounds(world.shopLevel);
 
   // 1) Day -> Night countdown
@@ -1737,8 +2339,12 @@ export function stepGumShopWorld(
     }
   }
 
-  // 2) Player movement
-  const moveSpeed = world.upgrades.includes('sneakers') ? 6.8 : 4.8;
+  // 2) Player movement (boosted when riding an owned 3D Scooter!)
+  const baseWalkSpeed = world.upgrades.includes('sneakers') ? 6.8 : 4.8;
+  const moveSpeed =
+    world.ridingScooter && world.equippedScooter
+      ? SCOOTER_MAP[world.equippedScooter].speed + (world.upgrades.includes('sneakers') ? 0.6 : 0)
+      : baseWalkSpeed;
   const manualMag = Math.hypot(input.moveX, input.moveZ);
   if (manualMag > 0.08) {
     world.walkTarget = null;
@@ -1758,8 +2364,8 @@ export function stepGumShopWorld(
     dirty = true;
   } else if (world.walkTarget) {
     const wt = world.walkTarget;
-    const playerInsideShop = world.playerZ < DOOR_Z - 0.1 && Math.abs(world.playerX) <= bounds.halfW;
-    const targetInsideShop = wt.z < DOOR_Z - 0.1 && Math.abs(wt.x) <= bounds.halfW;
+    const playerInsideShop = isPointInsideShop(world.playerX, world.playerZ, bounds);
+    const targetInsideShop = isPointInsideShop(wt.x, wt.z, bounds);
     const playerInsideHouse = isPointInsideHouse(world.playerX, world.playerZ, bounds);
     const targetInsideHouse = isPointInsideHouse(wt.x, wt.z, bounds);
 
@@ -1780,6 +2386,17 @@ export function stepGumShopWorld(
         // Exit house doorway first before heading to shop
         stepTargetX = bounds.houseX;
         stepTargetZ = bounds.houseFrontZ + 1.1;
+      } else if (world.playerZ < DOOR_Z + 0.2) {
+        // Player is behind or beside the shop: walk around the nearest side to reach the front door
+        const sideSign = world.playerX >= 0 ? 1 : -1;
+        const sideLaneX = sideSign * (bounds.halfW + 1.25);
+        if (Math.abs(world.playerX) < bounds.halfW + 0.95) {
+          stepTargetX = sideLaneX;
+          stepTargetZ = Math.min(world.playerZ, bounds.backZ - 1.2);
+        } else {
+          stepTargetX = sideLaneX;
+          stepTargetZ = DOOR_Z + 1.35;
+        }
       } else {
         if (Math.abs(world.playerX) > 1.15) {
           stepTargetX = 0;
@@ -1853,6 +2470,10 @@ export function stepGumShopWorld(
           } else {
             world.pendingOpenStorage = true;
           }
+        } else if (pending.kind === 'scooter_shop') {
+          world.pendingOpenScooterShop = true;
+        } else if (pending.kind === 'delivery_dropoff') {
+          actionCompleteActiveDelivery(world, audio);
         }
       }
     } else if (movedDist < 0.003 && dt > 0.001) {
@@ -1861,6 +2482,18 @@ export function stepGumShopWorld(
     }
   } else {
     world.playerMoving = false;
+  }
+
+  // 2a-ii) Auto-complete active delivery upon arriving at the neighbor's glowing drop-off zone!
+  if (world.activeDelivery) {
+    const distToDropoff = Math.hypot(
+      world.playerX - world.activeDelivery.dropoffX,
+      world.playerZ - world.activeDelivery.dropoffZ
+    );
+    if (distToDropoff <= 2.45) {
+      actionCompleteActiveDelivery(world, audio);
+      dirty = true;
+    }
   }
 
   // 2b) Auto-pickup outdoor delivery crate on contact
@@ -1922,10 +2555,12 @@ export function stepGumShopWorld(
   // 3) Spawn neighborhood customers during daytime (boosted by Giant Outdoor Ads!)
   const adBonuses = getActiveAdBonuses(world.activeAds);
   if (!world.isNight) {
+    const rankTrafficBonus = Math.min(3, Math.floor(Math.max(0, world.rank - 1) / 3));
     const maxCustomers =
       (world.upgrades.includes('neon_sign') ? 6 : 4) +
       (world.shopLevel - 1) * 2 +
-      adBonuses.extraMaxCustomers;
+      adBonuses.extraMaxCustomers +
+      rankTrafficBonus;
     world.spawnTimer -= dt;
     if (world.spawnTimer <= 0) {
       const hasAnyStock = world.shelves.some((s) => s.stock > 0);
@@ -2096,15 +2731,33 @@ export function extractGumShopHud(world: GumShopWorld): GumShopHudSnapshot {
     todayRevenue: world.todayRevenue,
     todayWholesale: world.todayWholesale,
     todayPacksSold: world.todayPacksSold,
+    rank: world.rank,
+    totalPlaySeconds: world.totalPlaySeconds,
+    totalSessions: world.totalSessions,
+    totalCustomersServed: world.totalCustomersServed,
+    totalDeliveriesCompleted: world.totalDeliveriesCompleted,
     shelves: world.shelves.map((s) => ({ ...s })),
     prices: { ...world.prices },
     cratesOutsideCount: world.cratesOutside.length,
     carriedCrate: world.carriedCrate ? { ...world.carriedCrate } : null,
     upgrades: [...world.upgrades],
+    ownedScooters: [...world.ownedScooters],
+    equippedScooter: world.equippedScooter,
+    ridingScooter: world.ridingScooter && world.equippedScooter !== null,
+    availableDeliveries: world.availableDeliveries.map((o) => ({ ...o })),
+    activeDelivery: world.activeDelivery ? { ...world.activeDelivery } : null,
+    activeDeliveryDistance: world.activeDelivery
+      ? Math.round(
+          Math.hypot(
+            world.playerX - world.activeDelivery.dropoffX,
+            world.playerZ - world.activeDelivery.dropoffZ
+          )
+        )
+      : null,
     waitingCustomerCount: world.customers.filter((c) => c.stage === 'WAITING_PAY').length,
     nearPrompt: findNearPrompt(world),
     lastSavedAt: world.lastSavedAt,
     notice: world.notice ? { ...world.notice } : null,
-    isOutside: world.playerZ > DOOR_Z,
+    isOutside: !isPointInsideShop(world.playerX, world.playerZ, bounds),
   };
 }

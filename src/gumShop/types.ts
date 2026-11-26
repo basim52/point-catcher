@@ -9,7 +9,36 @@ export type GumFlavorId =
   | 'grape'
   | 'cola'
   | 'blueberry'
-  | 'golden';
+  | 'golden'
+  | 'cherry'
+  | 'blackberry'
+  | 'green_apple'
+  | 'kiwi'
+  | 'peach'
+  | 'apricot'
+  | 'pineapple'
+  | 'coconut'
+  | 'caramel'
+  | 'vanilla_cream'
+  | 'arabic_coffee'
+  | 'cinnamon'
+  | 'choco_mint'
+  | 'hazelnut_choco'
+  | 'pomegranate'
+  | 'prickly_pear'
+  | 'saffron'
+  | 'taif_rose'
+  | 'dragon_fruit'
+  | 'mangosteen'
+  | 'mountain_honey'
+  | 'pistachio'
+  | 'lychee'
+  | 'matcha'
+  | 'blue_crystal'
+  | 'ruby_berry'
+  | 'diamond_gum'
+  | 'royal_emerald'
+  | 'cosmic_crown';
 
 export interface GumFlavorSpec {
   id: GumFlavorId;
@@ -24,6 +53,7 @@ export interface GumFlavorSpec {
   fairPrice: number; // Ideal market selling price per pack
   minPrice: number;
   maxPrice: number;
+  requiredRank: number; // Rank required to unlock ordering this product
 }
 
 export const PACKS_PER_BOX = 8;
@@ -106,6 +136,11 @@ export interface ShopBounds {
   storageFrontZ: number;
   storageDoorX: number;
   storageDoorZ: number;
+  scooterShopX: number;
+  scooterShopZ: number;
+  scooterShopFrontZ: number;
+  scooterShopDoorX: number;
+  scooterShopDoorZ: number;
 }
 
 export const DEFAULT_CHECKOUT_POS = { x: 3.35, z: 1.35 };
@@ -119,6 +154,9 @@ export function getShopBounds(shopLevel: ShopLevel): ShopBounds {
   const storageX = -(tier.halfW + 3.9);
   const storageZ = -0.3;
   const storageFrontZ = storageZ + 2.1; // 1.8
+  const scooterShopX = houseX + 14.4;
+  const scooterShopZ = -0.4;
+  const scooterShopFrontZ = scooterShopZ + 2.2; // 1.8
   return {
     level: tier.level,
     halfW: tier.halfW,
@@ -139,6 +177,11 @@ export function getShopBounds(shopLevel: ShopLevel): ShopBounds {
     storageFrontZ,
     storageDoorX: storageX,
     storageDoorZ: storageFrontZ + 1.15, // 2.95 warehouse entry spot
+    scooterShopX,
+    scooterShopZ,
+    scooterShopFrontZ,
+    scooterShopDoorX: scooterShopX,
+    scooterShopDoorZ: scooterShopFrontZ + 1.8, // 3.6 showroom front spot
   };
 }
 
@@ -161,6 +204,7 @@ export const GUM_FLAVORS: GumFlavorSpec[] = [
     fairPrice: 13,
     minPrice: 5,
     maxPrice: 30,
+    requiredRank: 1,
   },
   {
     id: 'lemon',
@@ -175,6 +219,7 @@ export const GUM_FLAVORS: GumFlavorSpec[] = [
     fairPrice: 18,
     minPrice: 6,
     maxPrice: 40,
+    requiredRank: 1,
   },
   {
     id: 'strawberry',
@@ -189,6 +234,7 @@ export const GUM_FLAVORS: GumFlavorSpec[] = [
     fairPrice: 22,
     minPrice: 8,
     maxPrice: 50,
+    requiredRank: 1,
   },
   {
     id: 'bubblegum',
@@ -203,6 +249,7 @@ export const GUM_FLAVORS: GumFlavorSpec[] = [
     fairPrice: 27,
     minPrice: 10,
     maxPrice: 60,
+    requiredRank: 1,
   },
   {
     id: 'watermelon',
@@ -217,6 +264,7 @@ export const GUM_FLAVORS: GumFlavorSpec[] = [
     fairPrice: 32,
     minPrice: 12,
     maxPrice: 70,
+    requiredRank: 1,
   },
   {
     id: 'mango',
@@ -231,6 +279,7 @@ export const GUM_FLAVORS: GumFlavorSpec[] = [
     fairPrice: 40,
     minPrice: 15,
     maxPrice: 90,
+    requiredRank: 1,
   },
   {
     id: 'mastic',
@@ -245,6 +294,7 @@ export const GUM_FLAVORS: GumFlavorSpec[] = [
     fairPrice: 48,
     minPrice: 18,
     maxPrice: 105,
+    requiredRank: 1,
   },
   {
     id: 'grape',
@@ -259,6 +309,7 @@ export const GUM_FLAVORS: GumFlavorSpec[] = [
     fairPrice: 57,
     minPrice: 22,
     maxPrice: 125,
+    requiredRank: 1,
   },
   {
     id: 'cola',
@@ -273,6 +324,7 @@ export const GUM_FLAVORS: GumFlavorSpec[] = [
     fairPrice: 68,
     minPrice: 25,
     maxPrice: 150,
+    requiredRank: 1,
   },
   {
     id: 'blueberry',
@@ -287,6 +339,7 @@ export const GUM_FLAVORS: GumFlavorSpec[] = [
     fairPrice: 80,
     minPrice: 30,
     maxPrice: 175,
+    requiredRank: 1,
   },
   {
     id: 'golden',
@@ -301,6 +354,443 @@ export const GUM_FLAVORS: GumFlavorSpec[] = [
     fairPrice: 98,
     minPrice: 35,
     maxPrice: 215,
+    requiredRank: 1,
+  },
+  // Rank-Exclusive Products (2-3 new products unlocked at EVERY Rank from Rank 2 to Rank 15!)
+  {
+    id: 'cherry',
+    nameAr: 'علك الكرز الحلو',
+    nameEn: 'Sweet Cherry',
+    color: '#e11d48',
+    accent: '#fda4af',
+    boxColor: '#9f1239',
+    packsPerBox: PACKS_PER_BOX,
+    boxCost: 160, // 20 SAR/pack -> 24 SAR fairPrice (+4 SAR)
+    unitCost: 20,
+    fairPrice: 24,
+    minPrice: 10,
+    maxPrice: 55,
+    requiredRank: 2,
+  },
+  {
+    id: 'blackberry',
+    nameAr: 'علك التوت الأسود',
+    nameEn: 'Blackberry Pop',
+    color: '#6d28d9',
+    accent: '#ddd6fe',
+    boxColor: '#4c1d95',
+    packsPerBox: PACKS_PER_BOX,
+    boxCost: 176, // 22 SAR/pack -> 26 SAR fairPrice (+4 SAR)
+    unitCost: 22,
+    fairPrice: 26,
+    minPrice: 10,
+    maxPrice: 60,
+    requiredRank: 2,
+  },
+  {
+    id: 'green_apple',
+    nameAr: 'علك التفاح الأخضر الحامض',
+    nameEn: 'Sour Green Apple',
+    color: '#84cc16',
+    accent: '#ecfccb',
+    boxColor: '#4d7c0f',
+    packsPerBox: PACKS_PER_BOX,
+    boxCost: 200, // 25 SAR/pack -> 30 SAR fairPrice (+5 SAR)
+    unitCost: 25,
+    fairPrice: 30,
+    minPrice: 12,
+    maxPrice: 68,
+    requiredRank: 3,
+  },
+  {
+    id: 'kiwi',
+    nameAr: 'علك الكيوي المنعش',
+    nameEn: 'Kiwi Splash',
+    color: '#65a30d',
+    accent: '#d9f99d',
+    boxColor: '#3f6212',
+    packsPerBox: PACKS_PER_BOX,
+    boxCost: 216, // 27 SAR/pack -> 33 SAR fairPrice (+6 SAR)
+    unitCost: 27,
+    fairPrice: 33,
+    minPrice: 12,
+    maxPrice: 74,
+    requiredRank: 3,
+  },
+  {
+    id: 'peach',
+    nameAr: 'علك الخوخ المنعش',
+    nameEn: 'Fresh Peach',
+    color: '#fb7185',
+    accent: '#ffe4e6',
+    boxColor: '#e11d48',
+    packsPerBox: PACKS_PER_BOX,
+    boxCost: 248, // 31 SAR/pack -> 37 SAR fairPrice (+6 SAR)
+    unitCost: 31,
+    fairPrice: 37,
+    minPrice: 14,
+    maxPrice: 82,
+    requiredRank: 4,
+  },
+  {
+    id: 'apricot',
+    nameAr: 'علك المشمش الذهبي',
+    nameEn: 'Golden Apricot',
+    color: '#f97316',
+    accent: '#ffedd5',
+    boxColor: '#c2410c',
+    packsPerBox: PACKS_PER_BOX,
+    boxCost: 264, // 33 SAR/pack -> 40 SAR fairPrice (+7 SAR)
+    unitCost: 33,
+    fairPrice: 40,
+    minPrice: 15,
+    maxPrice: 88,
+    requiredRank: 4,
+  },
+  {
+    id: 'pineapple',
+    nameAr: 'علك الأناناس الاستوائي',
+    nameEn: 'Tropical Pineapple',
+    color: '#facc15',
+    accent: '#fef9c3',
+    boxColor: '#ca8a04',
+    packsPerBox: PACKS_PER_BOX,
+    boxCost: 296, // 37 SAR/pack -> 44 SAR fairPrice (+7 SAR)
+    unitCost: 37,
+    fairPrice: 44,
+    minPrice: 16,
+    maxPrice: 96,
+    requiredRank: 5,
+  },
+  {
+    id: 'coconut',
+    nameAr: 'علك جوز الهند الكريمي',
+    nameEn: 'Creamy Coconut',
+    color: '#e2e8f0',
+    accent: '#f8fafc',
+    boxColor: '#64748b',
+    packsPerBox: PACKS_PER_BOX,
+    boxCost: 312, // 39 SAR/pack -> 47 SAR fairPrice (+8 SAR)
+    unitCost: 39,
+    fairPrice: 47,
+    minPrice: 18,
+    maxPrice: 102,
+    requiredRank: 5,
+  },
+  {
+    id: 'caramel',
+    nameAr: 'علك الكراميل المملح',
+    nameEn: 'Salted Caramel',
+    color: '#d97706',
+    accent: '#fde68a',
+    boxColor: '#92400e',
+    packsPerBox: PACKS_PER_BOX,
+    boxCost: 352, // 44 SAR/pack -> 52 SAR fairPrice (+8 SAR)
+    unitCost: 44,
+    fairPrice: 52,
+    minPrice: 20,
+    maxPrice: 115,
+    requiredRank: 6,
+  },
+  {
+    id: 'vanilla_cream',
+    nameAr: 'علك الفانيلا بالكريمة',
+    nameEn: 'Vanilla Cream',
+    color: '#fde68a',
+    accent: '#fffbeb',
+    boxColor: '#b45309',
+    packsPerBox: PACKS_PER_BOX,
+    boxCost: 368, // 46 SAR/pack -> 55 SAR fairPrice (+9 SAR)
+    unitCost: 46,
+    fairPrice: 55,
+    minPrice: 20,
+    maxPrice: 120,
+    requiredRank: 6,
+  },
+  {
+    id: 'arabic_coffee',
+    nameAr: 'علك القهوة العربية',
+    nameEn: 'Arabic Coffee',
+    color: '#92400e',
+    accent: '#fcd34d',
+    boxColor: '#451a03',
+    packsPerBox: PACKS_PER_BOX,
+    boxCost: 416, // 52 SAR/pack -> 62 SAR fairPrice (+10 SAR)
+    unitCost: 52,
+    fairPrice: 62,
+    minPrice: 24,
+    maxPrice: 135,
+    requiredRank: 7,
+  },
+  {
+    id: 'cinnamon',
+    nameAr: 'علك القرفة الحارة',
+    nameEn: 'Spicy Cinnamon',
+    color: '#dc2626',
+    accent: '#fecaca',
+    boxColor: '#991b1b',
+    packsPerBox: PACKS_PER_BOX,
+    boxCost: 432, // 54 SAR/pack -> 65 SAR fairPrice (+11 SAR)
+    unitCost: 54,
+    fairPrice: 65,
+    minPrice: 24,
+    maxPrice: 142,
+    requiredRank: 7,
+  },
+  {
+    id: 'choco_mint',
+    nameAr: 'علك الشوكولاتة بالنعناع',
+    nameEn: 'Choco Mint',
+    color: '#10b981',
+    accent: '#a7f3d0',
+    boxColor: '#065f46',
+    packsPerBox: PACKS_PER_BOX,
+    boxCost: 488, // 61 SAR/pack -> 72 SAR fairPrice (+11 SAR)
+    unitCost: 61,
+    fairPrice: 72,
+    minPrice: 28,
+    maxPrice: 155,
+    requiredRank: 8,
+  },
+  {
+    id: 'hazelnut_choco',
+    nameAr: 'علك البندق بالشوكولاتة',
+    nameEn: 'Choco Hazelnut',
+    color: '#78350f',
+    accent: '#fed7aa',
+    boxColor: '#451a03',
+    packsPerBox: PACKS_PER_BOX,
+    boxCost: 504, // 63 SAR/pack -> 75 SAR fairPrice (+12 SAR)
+    unitCost: 63,
+    fairPrice: 75,
+    minPrice: 28,
+    maxPrice: 162,
+    requiredRank: 8,
+  },
+  {
+    id: 'pomegranate',
+    nameAr: 'علك الرمان الملكي',
+    nameEn: 'Royal Pomegranate',
+    color: '#be123c',
+    accent: '#fecdd3',
+    boxColor: '#881337',
+    packsPerBox: PACKS_PER_BOX,
+    boxCost: 560, // 70 SAR/pack -> 83 SAR fairPrice (+13 SAR)
+    unitCost: 70,
+    fairPrice: 83,
+    minPrice: 32,
+    maxPrice: 180,
+    requiredRank: 9,
+  },
+  {
+    id: 'prickly_pear',
+    nameAr: 'علك التين الشوكي',
+    nameEn: 'Prickly Pear',
+    color: '#ec4899',
+    accent: '#fce7f3',
+    boxColor: '#9d174d',
+    packsPerBox: PACKS_PER_BOX,
+    boxCost: 584, // 73 SAR/pack -> 87 SAR fairPrice (+14 SAR)
+    unitCost: 73,
+    fairPrice: 87,
+    minPrice: 34,
+    maxPrice: 190,
+    requiredRank: 9,
+  },
+  {
+    id: 'saffron',
+    nameAr: 'علك الزعفران والهيل',
+    nameEn: 'Saffron Cardamom',
+    color: '#ea580c',
+    accent: '#fed7aa',
+    boxColor: '#9a3412',
+    packsPerBox: PACKS_PER_BOX,
+    boxCost: 640, // 80 SAR/pack -> 95 SAR fairPrice (+15 SAR)
+    unitCost: 80,
+    fairPrice: 95,
+    minPrice: 36,
+    maxPrice: 205,
+    requiredRank: 10,
+  },
+  {
+    id: 'taif_rose',
+    nameAr: 'علك الورد الطائفي',
+    nameEn: 'Taif Rose',
+    color: '#f43f5e',
+    accent: '#ffe4e6',
+    boxColor: '#9f1239',
+    packsPerBox: PACKS_PER_BOX,
+    boxCost: 664, // 83 SAR/pack -> 99 SAR fairPrice (+16 SAR)
+    unitCost: 83,
+    fairPrice: 99,
+    minPrice: 38,
+    maxPrice: 215,
+    requiredRank: 10,
+  },
+  {
+    id: 'dragon_fruit',
+    nameAr: 'علك فاكهة التنين',
+    nameEn: 'Dragon Fruit',
+    color: '#d946ef',
+    accent: '#f5d0fe',
+    boxColor: '#86198f',
+    packsPerBox: PACKS_PER_BOX,
+    boxCost: 720, // 90 SAR/pack -> 107 SAR fairPrice (+17 SAR)
+    unitCost: 90,
+    fairPrice: 107,
+    minPrice: 40,
+    maxPrice: 230,
+    requiredRank: 11,
+  },
+  {
+    id: 'mangosteen',
+    nameAr: 'علك المانجوستين الاستوائي',
+    nameEn: 'Tropical Mangosteen',
+    color: '#9333ea',
+    accent: '#f3e8ff',
+    boxColor: '#581c87',
+    packsPerBox: PACKS_PER_BOX,
+    boxCost: 752, // 94 SAR/pack -> 112 SAR fairPrice (+18 SAR)
+    unitCost: 94,
+    fairPrice: 112,
+    minPrice: 42,
+    maxPrice: 242,
+    requiredRank: 11,
+  },
+  {
+    id: 'mountain_honey',
+    nameAr: 'علك العسل الجبلي',
+    nameEn: 'Mountain Honey',
+    color: '#f59e0b',
+    accent: '#fef3c7',
+    boxColor: '#78350f',
+    packsPerBox: PACKS_PER_BOX,
+    boxCost: 808, // 101 SAR/pack -> 120 SAR fairPrice (+19 SAR)
+    unitCost: 101,
+    fairPrice: 120,
+    minPrice: 45,
+    maxPrice: 260,
+    requiredRank: 12,
+  },
+  {
+    id: 'pistachio',
+    nameAr: 'علك الفستق الحلبي',
+    nameEn: 'Pistachio Royal',
+    color: '#4ade80',
+    accent: '#dcfce7',
+    boxColor: '#166534',
+    packsPerBox: PACKS_PER_BOX,
+    boxCost: 840, // 105 SAR/pack -> 125 SAR fairPrice (+20 SAR)
+    unitCost: 105,
+    fairPrice: 125,
+    minPrice: 48,
+    maxPrice: 270,
+    requiredRank: 12,
+  },
+  {
+    id: 'lychee',
+    nameAr: 'علك الليتشي الياباني',
+    nameEn: 'Japanese Lychee',
+    color: '#f472b6',
+    accent: '#fce7f3',
+    boxColor: '#9d174d',
+    packsPerBox: PACKS_PER_BOX,
+    boxCost: 904, // 113 SAR/pack -> 134 SAR fairPrice (+21 SAR)
+    unitCost: 113,
+    fairPrice: 134,
+    minPrice: 50,
+    maxPrice: 290,
+    requiredRank: 13,
+  },
+  {
+    id: 'matcha',
+    nameAr: 'علك الماتشا الياباني',
+    nameEn: 'Japanese Matcha',
+    color: '#16a34a',
+    accent: '#bbf7d0',
+    boxColor: '#14532d',
+    packsPerBox: PACKS_PER_BOX,
+    boxCost: 936, // 117 SAR/pack -> 140 SAR fairPrice (+23 SAR)
+    unitCost: 117,
+    fairPrice: 140,
+    minPrice: 52,
+    maxPrice: 302,
+    requiredRank: 13,
+  },
+  {
+    id: 'blue_crystal',
+    nameAr: 'علك الكريستال الأزرق',
+    nameEn: 'Blue Crystal',
+    color: '#06b6d4',
+    accent: '#cffafe',
+    boxColor: '#155e75',
+    packsPerBox: PACKS_PER_BOX,
+    boxCost: 1008, // 126 SAR/pack -> 150 SAR fairPrice (+24 SAR)
+    unitCost: 126,
+    fairPrice: 150,
+    minPrice: 58,
+    maxPrice: 325,
+    requiredRank: 14,
+  },
+  {
+    id: 'ruby_berry',
+    nameAr: 'علك الياقوت الأحمر',
+    nameEn: 'Ruby Berry',
+    color: '#e11d48',
+    accent: '#fecdd3',
+    boxColor: '#881337',
+    packsPerBox: PACKS_PER_BOX,
+    boxCost: 1048, // 131 SAR/pack -> 157 SAR fairPrice (+26 SAR)
+    unitCost: 131,
+    fairPrice: 157,
+    minPrice: 60,
+    maxPrice: 340,
+    requiredRank: 14,
+  },
+  {
+    id: 'diamond_gum',
+    nameAr: 'علك الماس الأسطوري',
+    nameEn: 'Diamond Legend',
+    color: '#38bdf8',
+    accent: '#fef08a',
+    boxColor: '#0369a1',
+    packsPerBox: PACKS_PER_BOX,
+    boxCost: 1120, // 140 SAR/pack -> 168 SAR fairPrice (+28 SAR)
+    unitCost: 140,
+    fairPrice: 168,
+    minPrice: 65,
+    maxPrice: 360,
+    requiredRank: 15,
+  },
+  {
+    id: 'royal_emerald',
+    nameAr: 'علك الزمرد الملكي',
+    nameEn: 'Royal Emerald',
+    color: '#059669',
+    accent: '#a7f3d0',
+    boxColor: '#064e3b',
+    packsPerBox: PACKS_PER_BOX,
+    boxCost: 1168, // 146 SAR/pack -> 176 SAR fairPrice (+30 SAR)
+    unitCost: 146,
+    fairPrice: 176,
+    minPrice: 68,
+    maxPrice: 380,
+    requiredRank: 15,
+  },
+  {
+    id: 'cosmic_crown',
+    nameAr: 'علك التاج الكوني',
+    nameEn: 'Cosmic Crown',
+    color: '#eab308',
+    accent: '#fef08a',
+    boxColor: '#713f12',
+    packsPerBox: PACKS_PER_BOX,
+    boxCost: 1240, // 155 SAR/pack -> 188 SAR fairPrice (+33 SAR)
+    unitCost: 155,
+    fairPrice: 188,
+    minPrice: 72,
+    maxPrice: 405,
+    requiredRank: 15,
   },
 ];
 
@@ -706,7 +1196,345 @@ export type GumShopModalTab =
   | 'shelves'
   | 'storage'
   | 'ads'
-  | 'puzzles';
+  | 'puzzles'
+  | 'ranks'
+  | 'phone'
+  | 'scooter';
+
+export type ScooterId =
+  | 'city_e'
+  | 'mint_turbo'
+  | 'crimson_racer'
+  | 'cyber_neon'
+  | 'golden_king';
+
+export interface ScooterSpec {
+  id: ScooterId;
+  nameAr: string;
+  nameEn: string;
+  descAr: string;
+  descEn: string;
+  cost: number;
+  speed: number;
+  bodyColor: string;
+  trimColor: string;
+  rimColor: string;
+  glowColor?: string;
+}
+
+export const SCOOTERS: ScooterSpec[] = [
+  {
+    id: 'city_e',
+    nameAr: 'سكوتر المدينة الكهربائي',
+    nameEn: 'City E-Scooter',
+    descAr: 'سكوتر اقتصادي عملي وسريع للتنقل والتوصيل في الحي',
+    descEn: 'Practical electric city scooter for fast neighborhood rides',
+    cost: 400,
+    speed: 8.6,
+    bodyColor: '#06b6d4',
+    trimColor: '#0f172a',
+    rimColor: '#e2e8f0',
+  },
+  {
+    id: 'mint_turbo',
+    nameAr: 'سكوتر التيربو الأخضر',
+    nameEn: 'Turbo Mint Scooter',
+    descAr: 'تسارع ممتاز وإطار رياضي أخضر لتوصيل الطلبات بسرعة',
+    descEn: 'Sporty emerald frame with punchy acceleration for deliveries',
+    cost: 650,
+    speed: 10.2,
+    bodyColor: '#10b981',
+    trimColor: '#064e3b',
+    rimColor: '#a7f3d0',
+  },
+  {
+    id: 'crimson_racer',
+    nameAr: 'سكوتر السباق الأحمر',
+    nameEn: 'Crimson Racer',
+    descAr: 'هيكل سباقات أحمر مع جنوط ذهبية وسرعة عالية جداً في الشارع',
+    descEn: 'Racing crimson chassis with golden rims and high street speed',
+    cost: 950,
+    speed: 11.8,
+    bodyColor: '#ef4444',
+    trimColor: '#1e293b',
+    rimColor: '#fbbf24',
+  },
+  {
+    id: 'cyber_neon',
+    nameAr: 'سكوتر سايبر النيون',
+    nameEn: 'Cyber Neon Scooter',
+    descAr: 'إضاءة نيون سفلية متوهجة وسرعة فائقة تجذب أنظار كل الحي',
+    descEn: 'Glowing neon under-deck strip and supercharged speed',
+    cost: 1400,
+    speed: 13.4,
+    bodyColor: '#a855f7',
+    trimColor: '#1e1b4b',
+    rimColor: '#38bdf8',
+    glowColor: '#ec4899',
+  },
+  {
+    id: 'golden_king',
+    nameAr: 'سكوتر الملك الذهبي VIP',
+    nameEn: 'Golden King VIP',
+    descAr: 'أسرع سكوتر فاخر بالحي بهيكل ذهبي لامع وإضاءة ملكية!',
+    descEn: 'Fastest luxury gold-plated scooter in the entire neighborhood!',
+    cost: 2000,
+    speed: 15.2,
+    bodyColor: '#f59e0b',
+    trimColor: '#451a03',
+    rimColor: '#fef08a',
+    glowColor: '#fde047',
+  },
+];
+
+export const SCOOTER_MAP: Record<ScooterId, ScooterSpec> = SCOOTERS.reduce(
+  (acc, s) => {
+    acc[s.id] = s;
+    return acc;
+  },
+  {} as Record<ScooterId, ScooterSpec>
+);
+
+export interface DeliveryHouseSpec {
+  houseId: string;
+  customerNameAr: string;
+  customerNameEn: string;
+  areaAr: string;
+  areaEn: string;
+  dropoffX: number;
+  dropoffZ: number;
+  baseDeliveryFee: number;
+}
+
+export function getNeighborhoodDeliveryHouses(bounds: ShopBounds): DeliveryHouseSpec[] {
+  return [
+    {
+      houseId: 'left-1',
+      customerNameAr: 'بيت أبو سعد',
+      customerNameEn: 'Abu Saad House',
+      areaAr: 'يسار المخزن',
+      areaEn: 'Left of Warehouse',
+      dropoffX: bounds.storageX - 6.8,
+      dropoffZ: 2.35,
+      baseDeliveryFee: 28,
+    },
+    {
+      houseId: 'left-2',
+      customerNameAr: 'بيت فهد',
+      customerNameEn: 'Fahad House',
+      areaAr: 'الشارع الغربي',
+      areaEn: 'West Street',
+      dropoffX: bounds.storageX - 13.6,
+      dropoffZ: 2.1,
+      baseDeliveryFee: 42,
+    },
+    {
+      houseId: 'right-1',
+      customerNameAr: 'بيت أبو ناصر',
+      customerNameEn: 'Abu Nasser House',
+      areaAr: 'بجانب بيت النوم',
+      areaEn: 'Next to Sleep House',
+      dropoffX: bounds.houseX + 7.2,
+      dropoffZ: 2.35,
+      baseDeliveryFee: 26,
+    },
+    {
+      houseId: 'right-2',
+      customerNameAr: 'بيت طارق',
+      customerNameEn: 'Tariq House',
+      areaAr: 'بجانب محل السكوترات',
+      areaEn: 'Next to Scooter Shop',
+      dropoffX: bounds.houseX + 21.8,
+      dropoffZ: 2.1,
+      baseDeliveryFee: 54,
+    },
+    {
+      houseId: 'front-1',
+      customerNameAr: 'بيت أم خالد',
+      customerNameEn: 'Um Khalid House',
+      areaAr: 'عبر الشارع (غرب)',
+      areaEn: 'Across Street (West)',
+      dropoffX: -16.5,
+      dropoffZ: 18.2,
+      baseDeliveryFee: 46,
+    },
+    {
+      houseId: 'front-2',
+      customerNameAr: 'بيت سلمان',
+      customerNameEn: 'Salman House',
+      areaAr: 'عبر الشارع',
+      areaEn: 'Across the Street',
+      dropoffX: -8.2,
+      dropoffZ: 18.2,
+      baseDeliveryFee: 36,
+    },
+    {
+      houseId: 'front-3',
+      customerNameAr: 'بيت أبو راشد',
+      customerNameEn: 'Abu Rashid House',
+      areaAr: 'مقابل المحل تماماً',
+      areaEn: 'Directly Across Shop',
+      dropoffX: 0.0,
+      dropoffZ: 18.2,
+      baseDeliveryFee: 32,
+    },
+    {
+      houseId: 'front-4',
+      customerNameAr: 'بيت نورة',
+      customerNameEn: 'Noura House',
+      areaAr: 'عبر الشارع (شرق)',
+      areaEn: 'Across Street (East)',
+      dropoffX: 8.2,
+      dropoffZ: 18.2,
+      baseDeliveryFee: 38,
+    },
+    {
+      houseId: 'front-5',
+      customerNameAr: 'بيت عبدالله',
+      customerNameEn: 'Abdullah House',
+      areaAr: 'عبر الشارع (أقصى الشرق)',
+      areaEn: 'Across Street (Far East)',
+      dropoffX: 16.5,
+      dropoffZ: 18.2,
+      baseDeliveryFee: 48,
+    },
+    {
+      houseId: 'back-2',
+      customerNameAr: 'بيت ماجد',
+      customerNameEn: 'Majed House',
+      areaAr: 'الممر الخلفي (غرب)',
+      areaEn: 'Back Lane (West)',
+      dropoffX: -14.0,
+      dropoffZ: bounds.backZ - 5.6,
+      baseDeliveryFee: 52,
+    },
+    {
+      houseId: 'back-3',
+      customerNameAr: 'بيت فيصل',
+      customerNameEn: 'Faisal House',
+      areaAr: 'خلف المحل',
+      areaEn: 'Behind the Shop',
+      dropoffX: -6.8,
+      dropoffZ: bounds.backZ - 5.6,
+      baseDeliveryFee: 44,
+    },
+    {
+      houseId: 'back-4',
+      customerNameAr: 'بيت بدر',
+      customerNameEn: 'Badr House',
+      areaAr: 'خلف المحل (شرق)',
+      areaEn: 'Behind Shop (East)',
+      dropoffX: 6.8,
+      dropoffZ: bounds.backZ - 5.6,
+      baseDeliveryFee: 44,
+    },
+    {
+      houseId: 'back-5',
+      customerNameAr: 'بيت زياد',
+      customerNameEn: 'Ziyad House',
+      areaAr: 'الممر الخلفي (أقصى الشرق)',
+      areaEn: 'Back Lane (Far East)',
+      dropoffX: 14.0,
+      dropoffZ: bounds.backZ - 5.6,
+      baseDeliveryFee: 55,
+    },
+  ];
+}
+
+export interface DeliveryOrder {
+  id: number;
+  houseId: string;
+  customerNameAr: string;
+  customerNameEn: string;
+  areaAr: string;
+  areaEn: string;
+  flavor: GumFlavorId;
+  quantity: number;
+  gumTotal: number;
+  deliveryFee: number;
+  totalReward: number;
+  dropoffX: number;
+  dropoffZ: number;
+}
+
+export const GUM_RANK_COST = 300;
+export const GUM_RANK_PACKS_STEP = 50;
+
+export interface GumRankSpec {
+  rank: number;
+  nameAr: string;
+  nameEn: string;
+  color: string;
+  badgeBg: string;
+  requiredPacksTotal: number;
+}
+
+export const GUM_RANKS: GumRankSpec[] = [
+  { rank: 1, nameAr: 'بائع مبتدئ', nameEn: 'Starter Seller', color: '#94a3b8', badgeBg: '#1e293b', requiredPacksTotal: 0 },
+  { rank: 2, nameAr: 'بائع نشيط', nameEn: 'Active Seller', color: '#34d399', badgeBg: '#064e3b', requiredPacksTotal: 50 },
+  { rank: 3, nameAr: 'بائع ماهر', nameEn: 'Skilled Seller', color: '#2dd4bf', badgeBg: '#134e4a', requiredPacksTotal: 100 },
+  { rank: 4, nameAr: 'تاجر الحي', nameEn: 'Local Merchant', color: '#38bdf8', badgeBg: '#0c4a6e', requiredPacksTotal: 150 },
+  { rank: 5, nameAr: 'خبير العلك', nameEn: 'Gum Expert', color: '#60a5fa', badgeBg: '#1e3a8a', requiredPacksTotal: 200 },
+  { rank: 6, nameAr: 'نجم السوق', nameEn: 'Market Star', color: '#a78bfa', badgeBg: '#4c1d95', requiredPacksTotal: 250 },
+  { rank: 7, nameAr: 'بطل المبيعات', nameEn: 'Sales Champion', color: '#e879f9', badgeBg: '#701a75', requiredPacksTotal: 300 },
+  { rank: 8, nameAr: 'تاجر VIP', nameEn: 'VIP Trader', color: '#fbbf24', badgeBg: '#78350f', requiredPacksTotal: 350 },
+  { rank: 9, nameAr: 'إمبراطور العلك', nameEn: 'Gum Emperor', color: '#fb923c', badgeBg: '#7c2d12', requiredPacksTotal: 400 },
+  { rank: 10, nameAr: 'أسطورة العلك', nameEn: 'Gum Legend', color: '#fde047', badgeBg: '#713f12', requiredPacksTotal: 450 },
+  { rank: 11, nameAr: 'تاجر المجرة', nameEn: 'Galaxy Trader', color: '#e879f9', badgeBg: '#4a044e', requiredPacksTotal: 500 },
+  { rank: 12, nameAr: 'سلطان النكهات', nameEn: 'Sultan of Flavors', color: '#f59e0b', badgeBg: '#451a03', requiredPacksTotal: 550 },
+  { rank: 13, nameAr: 'ملك المصانع', nameEn: 'Factory King', color: '#f472b6', badgeBg: '#500724', requiredPacksTotal: 600 },
+  { rank: 14, nameAr: 'إمبراطور العالم', nameEn: 'World Emperor', color: '#22d3ee', badgeBg: '#164e63', requiredPacksTotal: 650 },
+  { rank: 15, nameAr: 'سيد العلك الأبدي', nameEn: 'Eternal Gum Master', color: '#fef08a', badgeBg: '#422006', requiredPacksTotal: 700 },
+];
+
+export function getFlavorsUnlockedAtRank(rank: number): GumFlavorSpec[] {
+  return GUM_FLAVORS.filter((f) => f.requiredRank === rank);
+}
+
+export function getGumRankSpec(rank: number): GumRankSpec {
+  const safeRank = Math.max(1, Math.floor(rank));
+  const preset = GUM_RANKS[safeRank - 1];
+  if (preset) return preset;
+  return {
+    rank: safeRank,
+    nameAr: `أسطورة العلك ★${safeRank}`,
+    nameEn: `Gum Legend ★${safeRank}`,
+    color: '#fde047',
+    badgeBg: '#713f12',
+    requiredPacksTotal: (safeRank - 1) * GUM_RANK_PACKS_STEP,
+  };
+}
+
+export function getNextRankRequirements(currentRank: number): {
+  nextRank: number;
+  cost: number;
+  requiredPacksTotal: number;
+  nextSpec: GumRankSpec;
+} {
+  const safeRank = Math.max(1, Math.floor(currentRank));
+  const nextRank = safeRank + 1;
+  return {
+    nextRank,
+    cost: GUM_RANK_COST,
+    requiredPacksTotal: safeRank * GUM_RANK_PACKS_STEP,
+    nextSpec: getGumRankSpec(nextRank),
+  };
+}
+
+export function formatGumPlayTime(totalSeconds: number, lang: 'ar' | 'en'): string {
+  const safe = Math.max(0, Math.floor(totalSeconds));
+  const hours = Math.floor(safe / 3600);
+  const mins = Math.floor((safe % 3600) / 60);
+  const secs = safe % 60;
+  if (lang === 'ar') {
+    if (hours > 0) return `${hours} س ${mins} د ${secs} ث`;
+    if (mins > 0) return `${mins} د ${secs} ث`;
+    return `${secs} ث`;
+  }
+  if (hours > 0) return `${hours}h ${mins}m ${secs}s`;
+  if (mins > 0) return `${mins}m ${secs}s`;
+  return `${secs}s`;
+}
 
 export interface GumShopSaveData {
   version: number;
@@ -729,11 +1557,19 @@ export interface GumShopSaveData {
   todayRevenue: number;
   todayWholesale: number;
   todayPacksSold: number;
+  rank: number;
+  totalPlaySeconds: number;
+  totalSessions: number;
+  totalCustomersServed: number;
   shelves: ShelfState[];
   prices: Record<GumFlavorId, number>;
   cratesOutside: DeliveryCrateState[];
   carriedCrate: CarriedCrateState | null;
   upgrades: UpgradeId[];
+  ownedScooters: ScooterId[];
+  equippedScooter: ScooterId | null;
+  ridingScooter: boolean;
+  totalDeliveriesCompleted: number;
   nextCrateId: number;
   savedAt: number;
 }
@@ -744,6 +1580,9 @@ export interface GumShopHubStats {
   money: number;
   shelvesCount: number;
   totalPacksSold: number;
+  rank: number;
+  totalPlaySeconds: number;
+  totalSessions: number;
 }
 
 export interface FloatingNotice {
@@ -779,11 +1618,22 @@ export interface GumShopHudSnapshot {
   todayRevenue: number;
   todayWholesale: number;
   todayPacksSold: number;
+  rank: number;
+  totalPlaySeconds: number;
+  totalSessions: number;
+  totalCustomersServed: number;
+  totalDeliveriesCompleted: number;
   shelves: ShelfState[];
   prices: Record<GumFlavorId, number>;
   cratesOutsideCount: number;
   carriedCrate: CarriedCrateState | null;
   upgrades: UpgradeId[];
+  ownedScooters: ScooterId[];
+  equippedScooter: ScooterId | null;
+  ridingScooter: boolean;
+  availableDeliveries: DeliveryOrder[];
+  activeDelivery: DeliveryOrder | null;
+  activeDeliveryDistance: number | null;
   waitingCustomerCount: number;
   nearPrompt:
     | { kind: 'pickup_crate'; crateId: number; flavor: GumFlavorId }
@@ -791,6 +1641,8 @@ export interface GumShopHudSnapshot {
     | { kind: 'house_door' }
     | { kind: 'bed' }
     | { kind: 'storage_door' }
+    | { kind: 'scooter_shop' }
+    | { kind: 'delivery_dropoff'; orderId: number }
     | null;
   lastSavedAt: number;
   notice: FloatingNotice | null;
@@ -801,19 +1653,11 @@ export const GUM_SHOP_SAVE_KEY = 'point_catcher_gum_shop_3d_save_v1';
 const GUM_SHOP_SOUND_KEY = 'point_catcher_gum_shop_3d_sound_v1';
 
 export function createDefaultPrices(): Record<GumFlavorId, number> {
-  return {
-    mint: GUM_FLAVOR_MAP.mint.fairPrice,
-    lemon: GUM_FLAVOR_MAP.lemon.fairPrice,
-    strawberry: GUM_FLAVOR_MAP.strawberry.fairPrice,
-    bubblegum: GUM_FLAVOR_MAP.bubblegum.fairPrice,
-    watermelon: GUM_FLAVOR_MAP.watermelon.fairPrice,
-    mango: GUM_FLAVOR_MAP.mango.fairPrice,
-    mastic: GUM_FLAVOR_MAP.mastic.fairPrice,
-    grape: GUM_FLAVOR_MAP.grape.fairPrice,
-    cola: GUM_FLAVOR_MAP.cola.fairPrice,
-    blueberry: GUM_FLAVOR_MAP.blueberry.fairPrice,
-    golden: GUM_FLAVOR_MAP.golden.fairPrice,
-  };
+  const prices = {} as Record<GumFlavorId, number>;
+  for (const f of GUM_FLAVORS) {
+    prices[f.id] = f.fairPrice;
+  }
+  return prices;
 }
 
 export function computeDailyRent(day: number, shelvesCount: number): number {
@@ -1037,6 +1881,22 @@ export function readGumShopSave(): GumShopSaveData | null {
       Math.min(DAY_DURATION_SEC, Number(parsed.dayTimeLeft ?? DAY_DURATION_SEC))
     );
 
+    const ownedScooters: ScooterId[] = Array.isArray(parsed.ownedScooters)
+      ? Array.from(
+          new Set(
+            parsed.ownedScooters.filter(
+              (s): s is ScooterId => typeof s === 'string' && s in SCOOTER_MAP
+            )
+          )
+        )
+      : [];
+
+    const equippedScooter: ScooterId | null =
+      typeof parsed.equippedScooter === 'string' &&
+      ownedScooters.includes(parsed.equippedScooter as ScooterId)
+        ? (parsed.equippedScooter as ScooterId)
+        : (ownedScooters[ownedScooters.length - 1] ?? null);
+
     return {
       version: 7,
       money: Math.max(0, Math.round(parsed.money)),
@@ -1058,11 +1918,36 @@ export function readGumShopSave(): GumShopSaveData | null {
       todayRevenue: Math.max(0, Math.round(parsed.todayRevenue ?? 0)),
       todayWholesale: Math.max(0, Math.round(parsed.todayWholesale ?? 0)),
       todayPacksSold: Math.max(0, Math.floor(parsed.todayPacksSold ?? 0)),
+      rank:
+        typeof parsed.rank === 'number' && Number.isFinite(parsed.rank)
+          ? Math.max(1, Math.floor(parsed.rank))
+          : 1,
+      totalPlaySeconds:
+        typeof parsed.totalPlaySeconds === 'number' && Number.isFinite(parsed.totalPlaySeconds)
+          ? Math.max(0, Math.floor(parsed.totalPlaySeconds))
+          : 0,
+      totalSessions:
+        typeof parsed.totalSessions === 'number' && Number.isFinite(parsed.totalSessions)
+          ? Math.max(0, Math.floor(parsed.totalSessions))
+          : 1,
+      totalCustomersServed:
+        typeof parsed.totalCustomersServed === 'number' &&
+        Number.isFinite(parsed.totalCustomersServed)
+          ? Math.max(0, Math.floor(parsed.totalCustomersServed))
+          : 0,
+      totalDeliveriesCompleted:
+        typeof parsed.totalDeliveriesCompleted === 'number' &&
+        Number.isFinite(parsed.totalDeliveriesCompleted)
+          ? Math.max(0, Math.floor(parsed.totalDeliveriesCompleted))
+          : 0,
       shelves: validShelves,
       prices,
       cratesOutside,
       carriedCrate,
       upgrades: validUpgrades,
+      ownedScooters,
+      equippedScooter,
+      ridingScooter: Boolean(parsed.ridingScooter) && equippedScooter !== null,
       nextCrateId: Math.max(1, Math.floor(parsed.nextCrateId ?? 1)),
       savedAt: typeof parsed.savedAt === 'number' ? parsed.savedAt : Date.now(),
     };
@@ -1090,7 +1975,16 @@ export function clearGumShopSave(): void {
 export function readGumShopHubStats(): GumShopHubStats {
   const saved = readGumShopSave();
   if (!saved) {
-    return { hasSave: false, day: 1, money: 0, shelvesCount: 2, totalPacksSold: 0 };
+    return {
+      hasSave: false,
+      day: 1,
+      money: 0,
+      shelvesCount: 2,
+      totalPacksSold: 0,
+      rank: 1,
+      totalPlaySeconds: 0,
+      totalSessions: 0,
+    };
   }
   return {
     hasSave: true,
@@ -1098,6 +1992,9 @@ export function readGumShopHubStats(): GumShopHubStats {
     money: saved.money,
     shelvesCount: saved.shelves.length,
     totalPacksSold: saved.totalPacksSold,
+    rank: saved.rank,
+    totalPlaySeconds: saved.totalPlaySeconds,
+    totalSessions: saved.totalSessions,
   };
 }
 

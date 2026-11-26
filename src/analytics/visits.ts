@@ -1,5 +1,6 @@
 import { useEffect, useSyncExternalStore } from 'react';
 import {
+  analyticsFirestoreDatabaseId,
   firebaseWebConfig,
   GAME_STATS_COLLECTION,
   isAnalyticsConfigured,
@@ -87,8 +88,8 @@ function sendRemoteIncrement(gameId: TrackedGameId): void {
   const apiKey = firebaseWebConfig.apiKey!;
   const url =
     `https://firestore.googleapis.com/v1/projects/${encodeURIComponent(projectId)}` +
-    `/databases/(default)/documents:commit?key=${encodeURIComponent(apiKey)}`;
-  const documentPath = `projects/${projectId}/databases/(default)/documents/${GAME_STATS_COLLECTION}/${gameId}`;
+    `/databases/${encodeURIComponent(analyticsFirestoreDatabaseId)}/documents:commit?key=${encodeURIComponent(apiKey)}`;
+  const documentPath = `projects/${projectId}/databases/${analyticsFirestoreDatabaseId}/documents/${GAME_STATS_COLLECTION}/${gameId}`;
   const body = JSON.stringify({
     writes: [
       {
@@ -153,7 +154,7 @@ export function refreshGameVisits(force = false): Promise<void> {
   const apiKey = firebaseWebConfig.apiKey!;
   const url =
     `https://firestore.googleapis.com/v1/projects/${encodeURIComponent(projectId)}` +
-    `/databases/(default)/documents/${GAME_STATS_COLLECTION}?pageSize=50&key=${encodeURIComponent(apiKey)}`;
+    `/databases/${encodeURIComponent(analyticsFirestoreDatabaseId)}/documents/${GAME_STATS_COLLECTION}?pageSize=50&key=${encodeURIComponent(apiKey)}`;
 
   inFlightFetch = fetch(url, { credentials: 'omit' })
     .then(async (res) => {

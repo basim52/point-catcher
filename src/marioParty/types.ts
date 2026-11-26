@@ -802,43 +802,14 @@ export interface MarioPartyLocalStats {
   wins: number;
   starsTotal: number;
   bestScore: number;
+  roundsPlayed: number;
+  totalPlaySeconds: number;
+  visits: number;
 }
 
 const MARIO_PARTY_STATS_KEY = 'point_catcher_mario_party_stats_v1';
 
-export function readMarioPartyStats(): MarioPartyLocalStats {
-  if (typeof window === 'undefined') {
-    return { gamesPlayed: 0, wins: 0, starsTotal: 0, bestScore: 0 };
-  }
-  try {
-    const raw = window.localStorage.getItem(MARIO_PARTY_STATS_KEY);
-    if (!raw) return { gamesPlayed: 0, wins: 0, starsTotal: 0, bestScore: 0 };
-    const p = JSON.parse(raw) as Partial<MarioPartyLocalStats>;
-    const num = (v: unknown) =>
-      typeof v === 'number' && Number.isFinite(v) && v >= 0 ? Math.floor(v) : 0;
-    return {
-      gamesPlayed: num(p.gamesPlayed),
-      wins: num(p.wins),
-      starsTotal: num(p.starsTotal),
-      bestScore: num(p.bestScore),
-    };
-  } catch {
-    return { gamesPlayed: 0, wins: 0, starsTotal: 0, bestScore: 0 };
-  }
-}
-
-export function recordMarioPartyLocalStats(update: {
-  won: boolean;
-  stars: number;
-  bestRoundScore: number;
-}): MarioPartyLocalStats {
-  const cur = readMarioPartyStats();
-  const next: MarioPartyLocalStats = {
-    gamesPlayed: cur.gamesPlayed + 1,
-    wins: cur.wins + (update.won ? 1 : 0),
-    starsTotal: cur.starsTotal + Math.max(0, Math.floor(update.stars)),
-    bestScore: Math.max(cur.bestScore, Math.max(0, Math.floor(update.bestRoundScore))),
-  };
+function writeMarioPartyStats(next: MarioPartyLocalStats): MarioPartyLocalStats {
   if (typeof window !== 'undefined') {
     try {
       window.localStorage.setItem(MARIO_PARTY_STATS_KEY, JSON.stringify(next));
@@ -847,4 +818,99 @@ export function recordMarioPartyLocalStats(update: {
     }
   }
   return next;
+}
+
+export function readMarioPartyStats(): MarioPartyLocalStats {
+  const empty: MarioPartyLocalStats = {
+    gamesPlayed: 0,
+    wins: 0,
+    starsTotal: 0,
+    bestScore: 0,
+    roundsPlayed: 0,
+    totalPlaySeconds: 0,
+    visits: 0,
+  };
+  if (typeof window === 'undefined') {
+    return empty;
+  }
+  try {
+    const raw = window.localStorage.getItem(MARIO_PARTY_STATS_KEY);
+    if (!raw) return empty;
+    const p = JSON.parse(raw) as Partial<MarioPartyLocalStats>;
+    const num = (v: unknown) =>
+      typeof v === 'number' && Number.isFinite(v) && v >= 0 ? Math.floor(v) : 0;
+    const gamesPlayed = num(p.gamesPlayed);
+    const roundsPlayed = Math.max(num(p.roundsPlayed), gamesPlayed);
+    return {
+      gamesPlayed,
+      wins: num(p.wins),
+      starsTotal: num(p.starsTotal),
+      bestScore: num(p.bestScore),
+      roundsPlayed,
+      totalPlaySeconds: num(p.totalPlaySeconds),
+      visits: Math.max(num(p.visits), gamesPlayed > 0 ? 1 : 0),
+    };
+  } catch {
+    return empty;
+  }
+}
+
+export function recordMarioPartyVisit(): MarioPartyLocalStats {
+  const cur = readMarioPartyStats();
+  return writeMarioPartyStats({
+    ...cur,
+    visits: cur.visits + 1,
+  });
+}
+
+export function recordMarioPartyPlaySeconds(deltaSeconds: number): MarioPartyLocalStats {
+  const safe = Math.max(0, Math.floor(deltaSeconds));
+  const cur = readMarioPartyStats();
+  if (safe <= 0) return cur;
+  return writeMarioPartyStats({
+    ...cur,
+    totalPlaySeconds: cur.totalPlaySeconds + safe,
+  });
+}
+
+export function recordMarioPartyRoundStats(update: {
+  starsEarned: number;
+  roundScore: number;
+}): MarioPartyLocalStats {
+  const cur = readMarioPartyStats();
+  return writeMarioPartyStats({
+    ...cur,
+    roundsPlayed: cur.roundsPlayed + 1,
+    starsTotal: cur.starsTotal + Math.max(0, Math.floor(update.starsEarned)),
+    bestScore: Math.max(cur.bestScore, Math.max(0, Math.floor(update.roundScore))),
+  });
+}
+
+export function recordMarioPartyMatchFinish(update: {
+  won: boolean;
+  bestRoundScore: number;
+}): MarioPartyLocalStats {
+  const cur = readMarioPartyStats();
+  return writeMarioPartyStats({
+    ...cur,
+    gamesPlayed: cur.gamesPlayed + 1,
+    wins: cur.wins + (update.won ? 1 : 0),
+    bestScore: Math.max(cur.bestScore, Math.max(0, Math.floor(update.bestRoundScore))),
+  });
+}
+
+export function recordMarioPartyLocalStats(update: {
+  won: boolean;
+  stars: number;
+  bestRoundScore: number;
+}): MarioPartyLocalStats {
+  const cur = readMarioPartyStats();
+  return writeMarioPartyStats({
+    ...cur,
+    gamesPlayed: cur.gamesPlayed + 1,
+    roundsPlayed: cur.roundsPlayed + 1,
+    wins: cur.wins + (update.won ? 1 : 0),
+    starsTotal: cur.starsTotal + Math.max(0, Math.floor(update.stars)),
+    bestScore: Math.max(cur.bestScore, Math.max(0, Math.floor(update.bestRoundScore))),
+  });
 }

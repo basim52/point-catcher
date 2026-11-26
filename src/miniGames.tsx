@@ -78,6 +78,10 @@ import {
   MarioPartyGame,
   MarioPartyPreviewArt,
 } from './marioParty/MarioPartyGame';
+import {
+  readMarioPartyStats,
+  type MarioPartyLocalStats,
+} from './marioParty/types';
 
 type Dir = 'UP' | 'DOWN' | 'LEFT' | 'RIGHT';
 type TierKey = 'intro' | 'curved' | 'woven' | 'hard' | 'master' | 'legend';
@@ -2552,6 +2556,15 @@ export const GamesModal: React.FC<GamesModalProps> = ({
   const [fruitSlashStats, setFruitSlashStats] = useState<FruitSlashStats>(() =>
     readFruitSlashStats()
   );
+  const [marioPartyStats, setMarioPartyStats] = useState<MarioPartyLocalStats>(() =>
+    readMarioPartyStats()
+  );
+
+  useEffect(() => {
+    if (initialGame) {
+      setActiveGame(initialGame);
+    }
+  }, [initialGame]);
 
   // Private analytics: visit + active minutes for the open mini game.
   useGamePlayTracking(miniGameId(activeGame), activeGame !== null);
@@ -2590,6 +2603,7 @@ export const GamesModal: React.FC<GamesModalProps> = ({
     setDevilTrapStats(readDevilTrapStats());
     setGumShopStats(readGumShopHubStats());
     setFruitSlashStats(readFruitSlashStats());
+    setMarioPartyStats(readMarioPartyStats());
     void refreshGameVisits();
     setActiveGame(null);
   }, []);
@@ -2835,13 +2849,21 @@ export const GamesModal: React.FC<GamesModalProps> = ({
                   </p>
                 </div>
                 <div className="space-y-2 pt-2 border-t border-white/10">
-                  <div className="flex items-center justify-between gap-2 text-xs text-sky-200 font-bold">
+                  <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-sky-200 font-bold">
                     <span>{ht.marioPartyMeta}</span>
-                    <span className="font-num text-amber-300">
-                      {visitCountsReady || (visitCounts['mini-mario-party'] ?? 0) > 0
-                        ? formatVisitLabel(visitCounts['mini-mario-party'] ?? 0, lang)
-                        : '…'}
-                    </span>
+                    <div className="flex items-center gap-2.5 font-num">
+                      {(marioPartyStats.starsTotal > 0 || marioPartyStats.roundsPlayed > 0) && (
+                        <span className="text-emerald-300">
+                          ★ {marioPartyStats.starsTotal} · {marioPartyStats.roundsPlayed}{' '}
+                          {lang === 'ar' ? 'جولة' : 'rds'}
+                        </span>
+                      )}
+                      <span className="text-amber-300">
+                        {visitCountsReady || (visitCounts['mini-mario-party'] ?? 0) > 0
+                          ? formatVisitLabel(visitCounts['mini-mario-party'] ?? 0, lang)
+                          : '…'}
+                      </span>
+                    </div>
                   </div>
                   <button
                     type="button"
@@ -3388,7 +3410,7 @@ export const GamesModal: React.FC<GamesModalProps> = ({
                   <span className="truncate">{ht.progressLabel}</span>
                   <span className="font-num font-bold text-emerald-300 whitespace-nowrap">
                     {gumShopStats.hasSave
-                      ? `${lang === 'ar' ? 'يوم' : 'Day'} ${gumShopStats.day} · ${gumShopStats.shelvesCount}/${MAX_SHELVES} · ${gumShopStats.money}`
+                      ? `🏆 ${lang === 'ar' ? `رانك ${gumShopStats.rank}` : `R${gumShopStats.rank}`} · ${lang === 'ar' ? 'يوم' : 'Day'} ${gumShopStats.day} · ${gumShopStats.shelvesCount}/${MAX_SHELVES} · ${gumShopStats.money}`
                       : lang === 'ar'
                       ? 'محل جديد'
                       : 'New Shop'}

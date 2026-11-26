@@ -1,27 +1,35 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { GumShopAudio } from './audio';
 import {
+  actionAcceptDeliveryOrder,
   actionAutoStockFromStorage,
   actionBuyAdCampaign,
+  actionBuyScooter,
   actionBuyShelf,
   actionBuyStorageRoom,
   actionBuyUpgrade,
+  actionCancelActiveDelivery,
   actionCheckoutCustomers,
+  actionCompleteActiveDelivery,
   actionDepositCrateToStorage,
   actionEmergencyGrant,
+  actionEquipScooter,
   actionExpandShop,
   actionInteractNearest,
   actionMoveCashier,
   actionMoveShelf,
   actionOrderCrate,
   actionPayRentAndNextDay,
+  actionPromoteRank,
   actionRecordSolvedPuzzle,
+  actionRefreshDeliveryOrders,
   actionResetShop,
   actionRotateShelf,
   actionSetPrice,
   actionSleepInHouse,
   actionStartOrResume,
   actionSweepCratesToStorage,
+  actionToggleRideScooter,
   actionUnlockHouseDoor,
   actionWithdrawFromStorage,
   createGumShopWorld,
@@ -41,6 +49,7 @@ import {
   type GumFlavorId,
   type GumShopHudSnapshot,
   type GumShopModalTab,
+  type ScooterId,
   type UpgradeId,
 } from './types';
 
@@ -282,6 +291,109 @@ export const GumShopGame: React.FC<GumShopGameProps> = ({ lang, onExit }) => {
     [syncNow]
   );
 
+  const handlePromoteRank = useCallback(() => {
+    actionPromoteRank(worldRef.current, audioRef.current);
+    syncNow();
+  }, [syncNow]);
+
+  const handleAcceptDeliveryOrder = useCallback(
+    (orderId: number) => {
+      const ok = actionAcceptDeliveryOrder(worldRef.current, orderId, audioRef.current);
+      if (ok) {
+        setActiveTab('none');
+      }
+      syncNow();
+    },
+    [syncNow]
+  );
+
+  const handleCancelActiveDelivery = useCallback(() => {
+    actionCancelActiveDelivery(worldRef.current, audioRef.current);
+    syncNow();
+  }, [syncNow]);
+
+  const handleRefreshDeliveries = useCallback(() => {
+    actionRefreshDeliveryOrders(worldRef.current, audioRef.current);
+    syncNow();
+  }, [syncNow]);
+
+  const handleGoToActiveDelivery = useCallback(() => {
+    const world = worldRef.current;
+    if (world.status !== 'PLAYING' || !world.activeDelivery) return;
+    setActiveTab('none');
+    setMoveCashierMode(false);
+    setMoveShelfMode(false);
+    setSelectedShelfSlot(null);
+    const dist = Math.hypot(
+      world.playerX - world.activeDelivery.dropoffX,
+      world.playerZ - world.activeDelivery.dropoffZ
+    );
+    if (dist <= 3.1) {
+      actionCompleteActiveDelivery(world, audioRef.current);
+      syncNow();
+    } else {
+      world.walkTarget = {
+        x: world.activeDelivery.dropoffX,
+        z: world.activeDelivery.dropoffZ,
+        action: { kind: 'delivery_dropoff' },
+      };
+    }
+  }, [syncNow]);
+
+  const handleOpenScooterShopModal = useCallback(() => {
+    worldRef.current.pendingOpenScooterShop = false;
+    setMoveCashierMode(false);
+    setMoveShelfMode(false);
+    setSelectedShelfSlot(null);
+    setHousePuzzleOpen(false);
+    setActiveTab('scooter');
+  }, []);
+
+  const handleScooterShopClick = useCallback(() => {
+    const world = worldRef.current;
+    if (world.status !== 'PLAYING') return;
+    setMoveCashierMode(false);
+    setMoveShelfMode(false);
+    setSelectedShelfSlot(null);
+    setHousePuzzleOpen(false);
+    const bounds = getShopBounds(world.shopLevel);
+    const dist = Math.hypot(
+      world.playerX - bounds.scooterShopDoorX,
+      world.playerZ - bounds.scooterShopDoorZ
+    );
+    if (dist <= 4.5) {
+      setActiveTab('scooter');
+    } else {
+      setActiveTab('none');
+      world.walkTarget = {
+        x: bounds.scooterShopDoorX,
+        z: bounds.scooterShopDoorZ,
+        action: { kind: 'scooter_shop' },
+      };
+    }
+  }, []);
+
+  const handleBuyScooter = useCallback(
+    (scooterId: ScooterId) => {
+      actionBuyScooter(worldRef.current, scooterId, audioRef.current);
+      syncNow();
+    },
+    [syncNow]
+  );
+
+  const handleEquipScooter = useCallback(
+    (scooterId: ScooterId) => {
+      actionEquipScooter(worldRef.current, scooterId, audioRef.current);
+      syncNow();
+    },
+    [syncNow]
+  );
+
+  const handleToggleRideScooter = useCallback(() => {
+    actionToggleRideScooter(worldRef.current, audioRef.current);
+    syncNow();
+  }, [syncNow]);
+
   const handleOpenStorageModal = useCallback(() => {
     worldRef.current.pendingOpenStorage = false;
     setMoveCashierMode(false);
@@ -368,6 +480,13 @@ export const GumShopGame: React.FC<GumShopGameProps> = ({ lang, onExit }) => {
       setSelectedShelfSlot(null);
       setHousePuzzleOpen(false);
       setActiveTab('storage');
+    } else if (world.pendingOpenScooterShop) {
+      world.pendingOpenScooterShop = false;
+      setMoveCashierMode(false);
+      setMoveShelfMode(false);
+      setSelectedShelfSlot(null);
+      setHousePuzzleOpen(false);
+      setActiveTab('scooter');
     }
     syncNow();
   }, [syncNow]);
@@ -678,6 +797,16 @@ export const GumShopGame: React.FC<GumShopGameProps> = ({ lang, onExit }) => {
         return;
       }
       if (
+        e.code === 'KeyR' &&
+        worldRef.current.status === 'PLAYING' &&
+        activeTab === 'none' &&
+        !housePuzzleOpen
+      ) {
+        e.preventDefault();
+        handleToggleRideScooter();
+        return;
+      }
+      if (
         e.code === 'KeyW' ||
         e.code === 'KeyA' ||
         e.code === 'KeyS' ||
@@ -720,6 +849,7 @@ export const GumShopGame: React.FC<GumShopGameProps> = ({ lang, onExit }) => {
     moveShelfMode,
     handleExit,
     handleInteractNearest,
+    handleToggleRideScooter,
     recomputeInput,
   ]);
 
@@ -760,9 +890,12 @@ export const GumShopGame: React.FC<GumShopGameProps> = ({ lang, onExit }) => {
         onHouseDoorClick={handleHouseDoorClick}
         onBedClick={handleBedClick}
         onStorageClick={handleStorageClick}
+        onScooterShopClick={handleScooterShopClick}
+        onDeliveryBeaconClick={handleGoToActiveDelivery}
         onAdScreenClick={handleAdScreenClick}
         onOpenHousePuzzle={handleOpenHousePuzzle}
         onOpenStorageModal={handleOpenStorageModal}
+        onOpenScooterShopModal={handleOpenScooterShopModal}
       />
 
       <GumShopUI
@@ -806,6 +939,15 @@ export const GumShopGame: React.FC<GumShopGameProps> = ({ lang, onExit }) => {
         onSweepCratesToStorage={handleSweepCratesToStorage}
         onAutoStockFromStorage={handleAutoStockFromStorage}
         onBuyAdCampaign={handleBuyAdCampaign}
+        onPromoteRank={handlePromoteRank}
+        onAcceptDeliveryOrder={handleAcceptDeliveryOrder}
+        onCancelActiveDelivery={handleCancelActiveDelivery}
+        onRefreshDeliveries={handleRefreshDeliveries}
+        onGoToActiveDelivery={handleGoToActiveDelivery}
+        onGoToScooterShop={handleScooterShopClick}
+        onBuyScooter={handleBuyScooter}
+        onEquipScooter={handleEquipScooter}
+        onToggleRideScooter={handleToggleRideScooter}
         onPayRent={handlePayRent}
         onEmergencyGrant={handleEmergencyGrant}
         onInteractNearest={handleInteractNearest}

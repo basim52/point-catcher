@@ -1,5 +1,10 @@
 import { useEffect, useRef } from 'react';
-import { firebaseWebConfig, isAnalyticsConfigured, SESSIONS_COLLECTION } from './config';
+import {
+  analyticsFirestoreDatabaseId,
+  firebaseWebConfig,
+  isAnalyticsConfigured,
+  SESSIONS_COLLECTION,
+} from './config';
 import { gameNameFor, type TrackedGameId } from './games';
 import { recordGameVisit } from './visits';
 
@@ -7,6 +12,7 @@ import { recordGameVisit } from './visits';
 // when, and how many seconds were actively played (visible tab only).
 
 const MAX_SESSION_SECONDS = 6 * 60 * 60;
+const HEARTBEAT_FLUSH_MS = 60_000;
 
 type SessionPayload = {
   gameId: TrackedGameId;
@@ -23,7 +29,7 @@ function sendSession(p: SessionPayload): void {
   const { projectId, apiKey } = firebaseWebConfig;
   const url =
     `https://firestore.googleapis.com/v1/projects/${encodeURIComponent(projectId!)}` +
-    `/databases/(default)/documents/${SESSIONS_COLLECTION}?key=${encodeURIComponent(apiKey!)}`;
+    `/databases/${encodeURIComponent(analyticsFirestoreDatabaseId)}/documents/${SESSIONS_COLLECTION}?key=${encodeURIComponent(apiKey!)}`;
   const body = JSON.stringify({
     fields: {
       gameId: { stringValue: p.gameId },
@@ -67,7 +73,24 @@ class PlaySession {
   private wantActive = false;
   private suspended = false;
 
-  constructor(private readonly gameId: TrackedGameId) {}
+  private heartbeatTimer: number | null = null;
+
+  constructor(private readonly gameId: TrackedGameId) {
+    if (typeof window !== 'undefined') {
+      this.heartbeatTimer = window.setInterval(() => {
+        if (this.suspended) return;
+        this.applyClock();
+        if (this.activeSince !== null) {
+          const now = performance.now();
+          this.activeMs += now - this.activeSince;
+          this.activeSince = now;
+        }
+        if (this.activeMs >= 5000) {
+          this.flush();
+        }
+      }, HEARTBEAT_FLUSH_MS);
+    }
+  }
 
   setActive(active: boolean): void {
     this.wantActive = active;
@@ -107,6 +130,10 @@ class PlaySession {
   }
 
   finish(): void {
+    if (this.heartbeatTimer !== null && typeof window !== 'undefined') {
+      window.clearInterval(this.heartbeatTimer);
+      this.heartbeatTimer = null;
+    }
     if (this.suspended) return; // already flushed when hidden
     this.suspended = true;
     this.applyClock();
@@ -118,15 +145,17 @@ class PlaySession {
       MAX_SESSION_SECONDS,
       Math.max(0, Math.round(this.activeMs / 1000))
     );
+    const now = new Date();
     sendSession({
       gameId: this.gameId,
       gameName: gameNameFor(this.gameId),
       startedAt: this.startedAt,
-      endedAt: new Date(),
+      endedAt: now,
       durationSeconds,
       visit: false,
     });
     this.activeMs = 0;
+    this.startedAt = now;
   }
 }
 

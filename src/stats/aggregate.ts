@@ -39,13 +39,24 @@ const round1 = (n: number) => Math.round(n * 10) / 10;
 export function summarize(
   records: SessionRecord[],
   period: Period,
-  now: Date = new Date()
+  now: Date = new Date(),
+  catalogNames?: Record<string, string>
 ): StatsSummary {
   const since = periodStart(period, now);
   const byGame = new Map<string, { gameName: string; visits: number; seconds: number }>();
+  if (catalogNames) {
+    for (const [id, label] of Object.entries(catalogNames)) {
+      byGame.set(id, { gameName: label, visits: 0, seconds: 0 });
+    }
+  }
   for (const r of records) {
     if (since && r.startedAt < since) continue;
-    const g = byGame.get(r.gameId) ?? { gameName: r.gameName, visits: 0, seconds: 0 };
+    const g = byGame.get(r.gameId) ?? {
+      gameName: catalogNames?.[r.gameId] ?? r.gameName,
+      visits: 0,
+      seconds: 0,
+    };
+    if (catalogNames?.[r.gameId]) g.gameName = catalogNames[r.gameId];
     if (r.visit) g.visits += 1;
     g.seconds += Math.max(0, r.durationSeconds);
     byGame.set(r.gameId, g);
