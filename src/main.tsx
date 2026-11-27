@@ -2,6 +2,7 @@ import { lazy, Suspense } from 'react';
 import {createRoot} from 'react-dom/client';
 import App from './App.tsx';
 import './index.css';
+import { AuthGate } from './authGate/AuthGate';
 
 // Private dashboard lives at /stats and is not linked from the game.
 // It is lazy-loaded so the game bundle never includes Firebase.
@@ -14,6 +15,9 @@ createRoot(document.getElementById('root')!).render(
       <StatsPage />
     </Suspense>
   ) : (
-    <App />
+    // Mandatory Google sign-in comes first; the game only renders after login.
+    <AuthGate>
+      <App />
+    </AuthGate>
   )
 );
