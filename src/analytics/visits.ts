@@ -1,6 +1,8 @@
 import { useEffect, useSyncExternalStore } from 'react';
 import {
   analyticsFirestoreDatabaseId,
+  analyticsReady,
+  canSendAnalytics,
   firebaseWebConfig,
   GAME_STATS_COLLECTION,
   isAnalyticsConfigured,
@@ -83,7 +85,7 @@ function markReady(): void {
 }
 
 function sendRemoteIncrement(gameId: TrackedGameId): void {
-  if (!isAnalyticsConfigured) return;
+  if (!canSendAnalytics()) return;
   const projectId = firebaseWebConfig.projectId!;
   const apiKey = firebaseWebConfig.apiKey!;
   const url =
@@ -145,6 +147,11 @@ export function recordGameVisit(gameId: TrackedGameId): void {
 
 /** Fetch all public per-game visit counts from Firestore (throttled). */
 export function refreshGameVisits(force = false): Promise<void> {
+  // Env-less hosts (AI Studio preview) load the public config first.
+  return analyticsReady.then(() => fetchGameVisits(force));
+}
+
+function fetchGameVisits(force: boolean): Promise<void> {
   if (!isAnalyticsConfigured) return Promise.resolve();
   const now = Date.now();
   if (!force && now - lastFetchAt < REFRESH_TTL_MS) return Promise.resolve();
