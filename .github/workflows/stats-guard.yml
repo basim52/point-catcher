@@ -1,0 +1,14 @@
+name: stats-guard
+on:
+  push:
+    branches: [main]
+  pull_request:
+jobs:
+  guard:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22 }
+      # Fails if AI Studio (or anyone) removed/rewired the private stats system.
+      - run: STATS_GUARD=strict node stats-kit/prebuild.mjs

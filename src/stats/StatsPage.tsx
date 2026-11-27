@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import type { User } from 'firebase/auth';
-import { isAnalyticsConfigured, STATS_ADMIN_EMAILS } from '../analytics/config';
+import { analyticsReady, isAnalyticsConfigured, STATS_ADMIN_EMAILS } from '../analytics/config';
 import { applyAllTimeVisitFloor, periodStart, summarize, type Period, type SessionRecord } from './aggregate';
 import {
   completeRedirectSignIn,
@@ -156,7 +156,7 @@ const CenterCard: React.FC<{
 
 type StatsPageProps = { variant?: Variant; onClose?: () => void };
 
-const StatsPage: React.FC<StatsPageProps> = ({ variant = 'page', onClose }) => {
+const StatsPageInner: React.FC<StatsPageProps> = ({ variant = 'page', onClose }) => {
   const [user, setUser] = useState<User | null>(null);
   const [authReady, setAuthReady] = useState(demoMode !== null);
   const [period, setPeriod] = useState<Period>('all');
@@ -494,6 +494,21 @@ const StatsPage: React.FC<StatsPageProps> = ({ variant = 'page', onClose }) => {
       </div>
     </Shell>
   );
+};
+
+/** Waits for the stats config (instant when baked in; fetched on env-less hosts). */
+const StatsPage: React.FC<StatsPageProps> = (props) => {
+  const [ready, setReady] = useState(isAnalyticsConfigured);
+  useEffect(() => {
+    if (ready) return;
+    let alive = true;
+    void analyticsReady.then(() => alive && setReady(true));
+    return () => {
+      alive = false;
+    };
+  }, [ready]);
+  if (!ready) return null;
+  return <StatsPageInner {...props} />;
 };
 
 export default StatsPage;

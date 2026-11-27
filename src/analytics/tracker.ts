@@ -1,8 +1,8 @@
 import { useEffect, useRef } from 'react';
 import {
   analyticsFirestoreDatabaseId,
+  canSendAnalytics,
   firebaseWebConfig,
-  isAnalyticsConfigured,
   SESSIONS_COLLECTION,
 } from './config';
 import { gameNameFor, type TrackedGameId } from './games';
@@ -35,7 +35,7 @@ function makeSessionDocId(): string {
 }
 
 function sendSession(p: SessionPayload): void {
-  if (!isAnalyticsConfigured) return;
+  if (!canSendAnalytics()) return;
   if (!p.visit && p.durationSeconds < 1) return;
   const { projectId, apiKey } = firebaseWebConfig;
   const docId = makeSessionDocId();
@@ -206,7 +206,7 @@ export function useGamePlayTracking(gameId: TrackedGameId | null, active: boolea
     // still leaves a durable visit even if play-time is never flushed.
     recordGameVisit(gameId);
     recordVisitAtStart(gameId);
-    if (!isAnalyticsConfigured) return;
+    if (!canSendAnalytics()) return;
     installPageListeners();
     const session = new PlaySession(gameId);
     session.setActive(activeRef.current);
