@@ -1,5 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { onAuthStateChanged, type User } from 'firebase/auth';
+import { marioPartyMiniGameId } from '../analytics/games';
+import { useGamePlayTracking } from '../analytics/tracker';
 import { partyAudio } from './audio';
 import { HeroAvatarSvg } from './CharacterArt';
 import {
@@ -541,6 +543,18 @@ const MarioPartyGameInner: React.FC<MarioPartyGameProps> = ({
       room.status === 'playing' &&
       room.roundStartedAtMs === 0 &&
       onlineUnlockedSeed !== room.roundSeed
+  );
+
+  // Admin analytics: track each individual Mario Party mini-game played (solo & online).
+  const activeMarioSubGame: MarioMiniGameId | null =
+    solo && solo.phase === 'playing'
+      ? solo.currentGameId
+      : room && room.status === 'playing' && !isOnlineWaitingTutorial
+        ? room.currentGameId
+        : null;
+  useGamePlayTracking(
+    marioPartyMiniGameId(activeMarioSubGame),
+    Boolean(activeMarioSubGame) && countdownNum === 0
   );
 
   // Unlock online round immediately once EVERY player in the room clicks Ready (NO timer!)

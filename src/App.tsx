@@ -2372,8 +2372,8 @@ export default function App() {
   const statusBeforeModalRef = useRef<GameStatus>('START');
   // Private analytics: one visit per world entry, minutes only while PLAYING.
   useGamePlayTracking(
-    status === 'START' ? null : worldGameId(gameMode),
-    status === 'PLAYING'
+    status === 'START' || showLanding || gamesModalOpen ? null : worldGameId(gameMode),
+    status === 'PLAYING' && !showLanding && !gamesModalOpen
   );
   const stagesModalOpenRef = useRef<boolean>(false);
   const indexModalOpenRef = useRef<boolean>(false);

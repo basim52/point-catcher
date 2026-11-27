@@ -142,7 +142,11 @@ export function recordGameVisit(gameId: TrackedGameId): void {
   countsCache = { ...countsCache, [gameId]: next };
   saveLocalVisits(countsCache);
   notify();
-  sendRemoteIncrement(gameId);
+  if (isAnalyticsConfigured) {
+    sendRemoteIncrement(gameId);
+  } else {
+    void analyticsReady.then(() => sendRemoteIncrement(gameId));
+  }
 }
 
 /** Fetch all public per-game visit counts from Firestore (throttled). */
@@ -229,7 +233,7 @@ function fetchGameVisits(force: boolean): Promise<void> {
       // Fallback to listDocuments for Standard Firestore setups if batchGet ever fails
       const listUrl =
         `https://firestore.googleapis.com/v1/projects/${encodeURIComponent(projectId)}` +
-        `/databases/${encodeURIComponent(analyticsFirestoreDatabaseId)}/documents/${GAME_STATS_COLLECTION}?pageSize=50&key=${encodeURIComponent(apiKey)}`;
+        `/databases/${encodeURIComponent(analyticsFirestoreDatabaseId)}/documents/${GAME_STATS_COLLECTION}?pageSize=100&key=${encodeURIComponent(apiKey)}`;
       const fallbackRes = await fetch(listUrl, { credentials: 'omit' });
       if (!fallbackRes.ok) {
         markReady();

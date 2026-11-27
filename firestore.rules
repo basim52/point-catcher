@@ -61,7 +61,17 @@ service cloud.firestore {
         'mini-devil-trap', 'mini-monster-arena', 'mini-plant-merge', 'mini-shawarma-shop',
         'mini-desert-rally', 'mini-date-catcher', 'mini-arrow-escape', 'mini-arrow-mosaic',
         'mini-fruit-merge', 'mini-neon-2048', 'mini-neon-snake', 'mini-apple-catch',
-        'mini-brick-breaker', 'mini-gum-shop', 'mini-fruit-slash', 'mini-mario-party'
+        'mini-brick-breaker', 'mini-gum-shop', 'mini-fruit-slash', 'mini-mario-party',
+        'mini-mp-coin-block-bash', 'mini-mp-pipe-sprint', 'mini-mp-star-rain-catch',
+        'mini-mp-cloud-tower-climb', 'mini-mp-balloon-pump-burst', 'mini-mp-lava-bridge-dash',
+        'mini-mp-whack-goomba', 'mini-mp-mushroom-memory', 'mini-mp-fireball-duel',
+        'mini-mp-boo-red-light', 'mini-mp-count-toads', 'mini-mp-brick-smash-rush',
+        'mini-mp-bullet-bill-dodge', 'mini-mp-coin-magnet-maze', 'mini-mp-paint-tiles-party',
+        'mini-mp-star-rhythm-beat', 'mini-mp-cheep-fishing', 'mini-mp-penguin-ice-slide',
+        'mini-mp-shell-soccer-kick', 'mini-mp-fire-bar-jump', 'mini-mp-hammer-nail-bash',
+        'mini-mp-mushroom-color-dash', 'mini-mp-bob-omb-pass', 'mini-mp-sky-balloon-pop',
+        'mini-mp-crown-castle-sprint', 'mini-mp-kart-drift-3d', 'mini-mp-sky-island-hop-3d',
+        'mini-mp-bumper-arena-3d', 'mini-mp-star-stadium-3d', 'mini-mp-bowser-tower-3d'
       ];
     }
 

@@ -77,7 +77,7 @@ export function summarize(
     totalVisits,
     totalMinutes: round1(totalSeconds / 60),
     rows,
-    topGame: rows.length > 0 && rows[0].totalSeconds > 0 ? rows[0] : null,
+    topGame: rows.length > 0 && (rows[0].totalSeconds > 0 || rows[0].visits > 0) ? rows[0] : null,
   };
 }
 
@@ -130,6 +130,6 @@ export function applyAllTimeVisitFloor(
     totalVisits: rows.reduce((n, r) => n + r.visits, 0),
     totalMinutes: summary.totalMinutes,
     rows,
-    topGame: rows.length > 0 && rows[0].totalSeconds > 0 ? rows[0] : null,
+    topGame: rows.length > 0 && (rows[0].totalSeconds > 0 || rows[0].visits > 0) ? rows[0] : null,
   };
 }

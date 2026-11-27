@@ -11,7 +11,11 @@ import {
   syncPublicVisitCounts,
   watchUser,
 } from './firebaseClient';
-import { TRACKED_GAMES } from '../analytics/games';
+import {
+  isMarioSubGameId,
+  MAIN_TRACKED_GAMES,
+  MARIO_SUB_TRACKED_GAMES,
+} from '../analytics/games';
 import { consumeStatsRedirectPending, setStatsAdminFlag } from './adminAccess';
 import { makeDemoSessions } from './demoData';
 
@@ -294,11 +298,31 @@ const StatsPageInner: React.FC<StatsPageProps> = ({ variant = 'page', onClose })
     setVisitFloors(cached.floors);
   }, [records]);
 
-  const summary = useMemo(() => {
-    const base = summarize(records ?? [], appliedPeriod, new Date(), TRACKED_GAMES);
-    return appliedPeriod === 'all'
-      ? applyAllTimeVisitFloor(base, visitFloors, TRACKED_GAMES)
-      : base;
+  const { summary, marioSummary } = useMemo(() => {
+    const allRecords = records ?? [];
+    const mainRecords = allRecords.filter((r) => !isMarioSubGameId(r.gameId));
+    const marioRecords = allRecords.filter((r) => isMarioSubGameId(r.gameId));
+
+    const mainFloors: Record<string, number> = {};
+    const marioFloors: Record<string, number> = {};
+    for (const [id, count] of Object.entries(visitFloors)) {
+      if (isMarioSubGameId(id)) marioFloors[id] = count;
+      else mainFloors[id] = count;
+    }
+
+    const baseMain = summarize(mainRecords, appliedPeriod, new Date(), MAIN_TRACKED_GAMES);
+    const baseMario = summarize(marioRecords, appliedPeriod, new Date(), MARIO_SUB_TRACKED_GAMES);
+
+    return {
+      summary:
+        appliedPeriod === 'all'
+          ? applyAllTimeVisitFloor(baseMain, mainFloors, MAIN_TRACKED_GAMES)
+          : baseMain,
+      marioSummary:
+        appliedPeriod === 'all'
+          ? applyAllTimeVisitFloor(baseMario, marioFloors, MARIO_SUB_TRACKED_GAMES)
+          : baseMario,
+    };
   }, [records, appliedPeriod, visitFloors]);
 
   if (!demoMode && !isAnalyticsConfigured) {
@@ -361,6 +385,7 @@ const StatsPageInner: React.FC<StatsPageProps> = ({ variant = 'page', onClose })
   }
 
   const maxSeconds = summary.rows[0]?.totalSeconds || 1;
+  const maxMarioSeconds = marioSummary.rows[0]?.totalSeconds || 1;
   const email = demoMode ? 'بيانات تجريبية' : displayUser?.email ?? user?.email ?? '';
 
   return (
@@ -488,6 +513,81 @@ const StatsPageInner: React.FC<StatsPageProps> = ({ variant = 'page', onClose })
             </div>
           </section>
         </div>
+        <section className="mt-4 rounded-3xl border border-amber-300/25 bg-white/[0.03] p-4">
+          <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+            <div>
+              <h2 className="text-base font-extrabold text-amber-200 sm:text-lg">
+                🍄 إحصائيات ألعاب حفلة ماريو ({marioSummary.rows.length} لعبة)
+              </h2>
+              <p className="text-xs text-slate-400">
+                تفصيل كل لعبة داخل حفلة ماريو أونلاين (25 كلاسيك + 5 ألعاب 3D)
+              </p>
+            </div>
+            <div className="flex flex-wrap items-center gap-2 text-xs font-bold">
+              <span className="rounded-xl border border-cyan-400/25 bg-cyan-400/10 px-3 py-1.5 text-cyan-200 tabular-nums">
+                {fmt(marioSummary.totalVisits)} جولة
+              </span>
+              <span className="rounded-xl border border-lime-400/25 bg-lime-400/10 px-3 py-1.5 text-lime-200 tabular-nums">
+                {fmt(marioSummary.totalMinutes)} دقيقة لعب
+              </span>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
+            <div className="min-w-0 rounded-2xl border border-white/10 bg-white/5 p-3.5">
+              <h3 className="mb-2.5 text-sm font-extrabold text-slate-100">الدقائق والزيارات لكل لعبة ماريو</h3>
+              <ul className="space-y-2">
+                {marioSummary.rows.map((r, i) => (
+                  <li key={r.gameId} className="grid grid-cols-[8.5rem_1fr_auto] items-center gap-2 text-xs sm:grid-cols-[10.5rem_1fr_auto] sm:text-sm">
+                    <span className="truncate font-bold" title={r.gameName}>{r.gameName}</span>
+                    <span className="h-3.5 overflow-hidden rounded-full bg-white/10">
+                      <span
+                        className={`block h-full rounded-full ${i === 0 && r.totalSeconds > 0 ? 'bg-amber-300' : 'bg-fuchsia-400'}`}
+                        style={{
+                          width: `${r.totalSeconds > 0 ? Math.max(2, (r.totalSeconds / maxMarioSeconds) * 100) : 0}%`,
+                        }}
+                      />
+                    </span>
+                    <span className="text-left tabular-nums whitespace-nowrap text-slate-300">
+                      <span className="text-cyan-300 font-bold">{fmt(r.visits)} جولة</span>
+                      <span className="mx-1 text-slate-500">·</span>
+                      <span>{fmt(r.totalMinutes)} د</span>
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+
+            <div className="min-w-0 rounded-2xl border border-white/10 bg-white/5 p-3.5">
+              <h3 className="mb-2.5 text-sm font-extrabold text-slate-100">تفاصيل ألعاب ماريو</h3>
+              <div className="overflow-x-auto">
+                <table className="w-full min-w-[20rem] text-right text-xs sm:text-sm">
+                  <thead className="text-slate-400">
+                    <tr className="border-b border-white/10">
+                      <th className="py-2 pe-2 font-bold">#</th>
+                      <th className="py-2 pe-2 font-bold">اللعبة</th>
+                      <th className="py-2 pe-2 font-bold">الجولات</th>
+                      <th className="py-2 pe-2 font-bold">الدقائق</th>
+                      <th className="py-2 font-bold whitespace-nowrap">المتوسط</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {marioSummary.rows.map((r, i) => (
+                      <tr key={r.gameId} className={`border-b border-white/5 ${i === 0 && (r.totalSeconds > 0 || r.visits > 0) ? 'text-amber-200' : ''}`}>
+                        <td className="py-2 pe-2 tabular-nums text-slate-400">{i + 1}</td>
+                        <td className="py-2 pe-2 font-bold">{r.gameName}</td>
+                        <td className="py-2 pe-2 tabular-nums">{fmt(r.visits)}</td>
+                        <td className="py-2 pe-2 tabular-nums">{fmt(r.totalMinutes)}</td>
+                        <td className="py-2 tabular-nums">{fmt(r.avgMinutesPerVisit)} د</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </section>
+
         <p className="mt-4 text-center text-[11px] text-slate-500">
           الوقت المحسوب هو وقت اللعب الفعلي فقط (لا يُحسب وقت الخلفية). لا تُحفظ أي بيانات شخصية عن اللاعبين.
         </p>

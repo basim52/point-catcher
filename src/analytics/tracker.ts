@@ -1,8 +1,10 @@
 import { useEffect, useRef } from 'react';
 import {
   analyticsFirestoreDatabaseId,
+  analyticsReady,
   canSendAnalytics,
   firebaseWebConfig,
+  isAnalyticsConfigured,
   SESSIONS_COLLECTION,
 } from './config';
 import { gameNameFor, type TrackedGameId } from './games';
@@ -202,20 +204,36 @@ export function useGamePlayTracking(gameId: TrackedGameId | null, active: boolea
 
   useEffect(() => {
     if (!gameId) return;
-    // Count the visit immediately (counter + session doc) so a killed tab
-    // still leaves a durable visit even if play-time is never flushed.
-    recordGameVisit(gameId);
-    recordVisitAtStart(gameId);
-    if (!canSendAnalytics()) return;
-    installPageListeners();
-    const session = new PlaySession(gameId);
-    session.setActive(activeRef.current);
-    sessionRef.current = session;
-    liveSessions.add(session);
+    let cancelled = false;
+    let session: PlaySession | null = null;
+
+    const startTracking = () => {
+      if (cancelled) return;
+      // Count the visit immediately (counter + session doc) so a killed tab
+      // still leaves a durable visit even if play-time is never flushed.
+      recordGameVisit(gameId);
+      recordVisitAtStart(gameId);
+      if (!canSendAnalytics()) return;
+      installPageListeners();
+      session = new PlaySession(gameId);
+      session.setActive(activeRef.current);
+      sessionRef.current = session;
+      liveSessions.add(session);
+    };
+
+    if (isAnalyticsConfigured) {
+      startTracking();
+    } else {
+      void analyticsReady.then(startTracking);
+    }
+
     return () => {
-      liveSessions.delete(session);
-      session.finish();
-      if (sessionRef.current === session) sessionRef.current = null;
+      cancelled = true;
+      if (session) {
+        liveSessions.delete(session);
+        session.finish();
+        if (sessionRef.current === session) sessionRef.current = null;
+      }
     };
   }, [gameId]);
 
