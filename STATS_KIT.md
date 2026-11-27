@@ -40,3 +40,11 @@ and the in-game 📊 overlay) lives in **one dedicated Firebase project: `point-
 
 Run `node stats-kit/prebuild.mjs` — it lists exactly what is missing. Restore the files from git
 history (`git log -- src/stats`) or the last merged stats PR, then re-add the hook lines listed above.
+
+## Mandatory Google sign-in gate
+
+`src/authGate/*` shows a full-screen "ادخل بحساب غوغل" screen before anything else; the game renders
+only after login. It is wired in `src/main.tsx` (`<AuthGate><App /></AuthGate>`) and shares the Firebase
+auth instance of Mario Party (`mario-party-applet`). Do not remove it or render `<App />` outside it.
+The `/stats` route intentionally stays outside the gate (it has its own admin login). The build guard
+checks for it.

@@ -22,7 +22,7 @@ const warns = [];
 const mustExist = [
   'src/analytics/config.ts', 'src/analytics/games.ts', 'src/analytics/tracker.ts', 'src/analytics/visits.ts',
   'src/stats/StatsPage.tsx', 'src/stats/InGameStats.tsx', 'src/stats/firebaseClient.ts',
-  'src/stats/aggregate.ts', 'src/stats/adminAccess.ts', 'firestore.rules', 'vercel.json',
+  'src/stats/aggregate.ts', 'src/stats/adminAccess.ts', 'src/authGate/AuthGate.tsx', 'src/authGate/gateAuth.ts', 'firestore.rules', 'vercel.json',
 ];
 for (const f of mustExist) if (read(f) === null) errors.push(`missing file: ${f}`);
 
@@ -34,6 +34,8 @@ const mustContain = (file, needle, why) => {
 
 // Entry hooks AI Studio tends to rewrite.
 mustContain('src/main.tsx', 'stats/StatsPage', 'the /stats route is gone');
+mustContain('src/main.tsx', 'AuthGate', 'the mandatory Google sign-in gate is gone');
+mustContain('src/authGate/AuthGate.tsx', 'signInPlayer', 'the sign-in gate was rewritten');
 mustContain('src/App.tsx', 'StatsOverlayHost', 'in-game admin dashboard overlay is gone');
 mustContain('src/App.tsx', 'useGamePlayTracking', 'world play tracking is gone');
 mustContain('src/miniGames.tsx', 'useGamePlayTracking', 'mini-game play tracking is gone');
