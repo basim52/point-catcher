@@ -14805,11 +14805,6 @@ export default function App() {
             setShowLanding(false);
             openBagModal();
           }}
-          onOpenSettings={() => {
-            setShowLanding(false);
-            setSettingsTab('stats');
-            openSettingsModal();
-          }}
           onReplayIntro={() => setShowIntro(true)}
           onToggleLang={() => setLang((prev) => (prev === 'ar' ? 'en' : 'ar'))}
         />

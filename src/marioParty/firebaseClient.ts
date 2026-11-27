@@ -856,7 +856,7 @@ export async function hostStartRound(
       roundIndex,
       totalRounds,
       roundSeed: Math.floor(Math.random() * 1_000_000_000) + 1,
-      roundStartedAtMs: Date.now() + 2600,
+      roundStartedAtMs: 0,
       roundDurationSec: Math.max(10, Math.min(60, Math.round(durationSec))),
       cupQueue,
       winnerUid: '',
@@ -1000,6 +1000,7 @@ function parseRoomData(d: Record<string, unknown>): PartyRoom {
       : ['coin_block_bash'],
     winnerUid: String(d.winnerUid ?? ''),
     winnerName: String(d.winnerName ?? ''),
+    updatedAtMs: d.updatedAt instanceof Timestamp ? d.updatedAt.toMillis() : 0,
   };
 }
 
@@ -1043,6 +1044,7 @@ export function subscribeRoomPlayers(
           roundScore: Number(data.roundScore ?? 0),
           roundProgress: Number(data.roundProgress ?? 0),
           roundDone: Boolean(data.roundDone),
+          updatedAtMs: data.updatedAt instanceof Timestamp ? data.updatedAt.toMillis() : 0,
         };
       });
       list.sort((a, b) => b.stars - a.stars || b.roundScore - a.roundScore);

@@ -782,6 +782,7 @@ export interface PartyRoom {
   cupQueue: MarioMiniGameId[];
   winnerUid: string;
   winnerName: string;
+  updatedAtMs?: number;
 }
 
 export interface PartyRoomPlayer {
@@ -795,6 +796,7 @@ export interface PartyRoomPlayer {
   roundScore: number;
   roundProgress: number;
   roundDone: boolean;
+  updatedAtMs?: number;
 }
 
 export interface MarioPartyLocalStats {

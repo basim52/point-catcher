@@ -38,6 +38,11 @@ import { MiniGamesArcadeCanvas } from './MiniGamesArcadeCanvas';
 import { MiniGamesInteractiveBoard } from './MiniGamesInteractiveBoard';
 import { MiniGames3DCanvas } from './MiniGames3DCanvas';
 import {
+  MiniGameTutorialScreen,
+  PartyQuickGuideModal,
+  type TutorialReadyPlayer,
+} from './MiniGameTutorial';
+import {
   MARIO_3D_MINI_GAMES,
   MARIO_CLASSIC_MINI_GAMES,
   MARIO_MINI_GAME_MAP,
@@ -217,7 +222,7 @@ class PartyErrorBoundary extends React.Component<
 }
 
 interface SoloState {
-  phase: 'character_select' | 'playing' | 'round_result' | 'podium';
+  phase: 'character_select' | 'tutorial' | 'playing' | 'round_result' | 'podium';
   mode: 'cup' | 'single';
   cupLength: 3 | 5 | 7 | 10;
   characterId: PartyCharacterId;
@@ -296,8 +301,33 @@ const MarioPartyGameInner: React.FC<MarioPartyGameProps> = ({
   const [gameCategory, setGameCategory] = useState<'all' | MiniGameCategory>('all');
   const [roomBusy, setRoomBusy] = useState(false);
 
-  // Countdown before starting each mini-game
+  // Countdown & Pre-Game Tutorial before starting each mini-game (Zero-timer Ready system)
   const [countdownNum, setCountdownNum] = useState<number>(0);
+  const [onlineUnlockedSeed, setOnlineUnlockedSeed] = useState<number>(0);
+  const [myTutorialReadySeed, setMyTutorialReadySeed] = useState<number>(0);
+  const [tutorialReadyBusy, setTutorialReadyBusy] = useState<boolean>(false);
+  const onlineActiveStartAtMsRef = useRef<number>(0);
+  const [showTutorialBeforeRound, setShowTutorialBeforeRound] = useState<boolean>(() => {
+    if (typeof window === 'undefined') return true;
+    try {
+      return window.localStorage.getItem('point_catcher_mario_tutorial_v1') !== '0';
+    } catch {
+      return true;
+    }
+  });
+  const [previewTutorialGameId, setPreviewTutorialGameId] = useState<MarioMiniGameId | null>(null);
+  const [showQuickGuide, setShowQuickGuide] = useState<boolean>(false);
+
+  const toggleShowTutorialBeforeRound = useCallback((next: boolean) => {
+    setShowTutorialBeforeRound(next);
+    if (typeof window !== 'undefined') {
+      try {
+        window.localStorage.setItem('point_catcher_mario_tutorial_v1', next ? '1' : '0');
+      } catch {
+        // ignore storage errors
+      }
+    }
+  }, []);
 
   // Solo / Practice vs Rival Bot mode (accessible immediately, also has full Character Select + 25 Mini-Games)
   const [solo, setSolo] = useState<SoloState | null>(null);
@@ -485,17 +515,120 @@ const MarioPartyGameInner: React.FC<MarioPartyGameProps> = ({
 
   const isHost = Boolean(room && profile && room.hostUid === profile.uid);
 
-  // Sync round countdown whenever room enters 'playing'
+  // Per-player Ready status during the zero-timer Online pre-game tutorial
+  const onlineTutorialReadyList = useMemo<TutorialReadyPlayer[]>(() => {
+    if (!room || room.status !== 'playing' || room.roundStartedAtMs !== 0) return [];
+    const roomTs = room.updatedAtMs ?? 0;
+    return roomPlayers.map((p) => {
+      const isMe = p.uid === profile?.uid;
+      const pTs = p.updatedAtMs ?? 0;
+      const serverReady = Boolean(p.ready && roomTs > 0 && pTs >= roomTs);
+      const localPendingReady = Boolean(
+        isMe && p.ready && pTs === 0 && myTutorialReadySeed === room.roundSeed
+      );
+      return {
+        uid: p.uid,
+        displayName: p.displayName,
+        characterId: p.characterId,
+        isReady: serverReady || localPendingReady,
+        isMe,
+      };
+    });
+  }, [room, roomPlayers, profile?.uid, myTutorialReadySeed]);
+
+  const isOnlineWaitingTutorial = Boolean(
+    room &&
+      room.status === 'playing' &&
+      room.roundStartedAtMs === 0 &&
+      onlineUnlockedSeed !== room.roundSeed
+  );
+
+  // Unlock online round immediately once EVERY player in the room clicks Ready (NO timer!)
+  useEffect(() => {
+    if (!room || room.status !== 'playing') {
+      setOnlineUnlockedSeed(0);
+      setMyTutorialReadySeed(0);
+      onlineActiveStartAtMsRef.current = 0;
+      return;
+    }
+    if (room.roundStartedAtMs !== 0) return;
+    if (onlineUnlockedSeed === room.roundSeed) return;
+    if (
+      onlineTutorialReadyList.length > 0 &&
+      onlineTutorialReadyList.every((p) => p.isReady)
+    ) {
+      onlineActiveStartAtMsRef.current = Date.now() + 2100;
+      setCountdownNum(3);
+      setOnlineUnlockedSeed(room.roundSeed);
+    }
+  }, [room?.status, room?.roundSeed, room?.roundStartedAtMs, onlineUnlockedSeed, onlineTutorialReadyList]);
+
+  const handleToggleOnlineTutorialReady = useCallback(async () => {
+    if (!room || !profile || !myPlayer || tutorialReadyBusy) return;
+    const currentlyReady =
+      onlineTutorialReadyList.find((p) => p.uid === profile.uid)?.isReady ?? false;
+    const nextReady = !currentlyReady;
+    setTutorialReadyBusy(true);
+    partyAudio.playSelect();
+    try {
+      setMyTutorialReadySeed(nextReady ? room.roundSeed : 0);
+      await updateMyRoomCharacter(
+        room.roomCode,
+        profile.uid,
+        profile.displayName,
+        myPlayer.characterId,
+        nextReady
+      );
+    } catch {
+      showToast(ar ? 'تعذر تحديث الجاهزية. حاول مرة أخرى.' : 'Could not update ready state.', 'err');
+    } finally {
+      setTutorialReadyBusy(false);
+    }
+  }, [room, profile, myPlayer, tutorialReadyBusy, onlineTutorialReadyList, ar, showToast]);
+
+  // Run crisp 3-2-1 kickoff countdown once online players are all Ready (or for legacy timed rooms)
   useEffect(() => {
     if (!room || room.status !== 'playing') {
       setCountdownNum(0);
       return;
     }
+
+    // Zero-timer tutorial mode: wait until everyone clicked Ready!
+    if (room.roundStartedAtMs === 0) {
+      if (onlineUnlockedSeed !== room.roundSeed) {
+        setCountdownNum(0);
+        return;
+      }
+      myLocalScoreRef.current = 0;
+      if (profile) {
+        void syncMyLiveScore(room.roomCode, profile.uid, 0, 0, false);
+      }
+      setCountdownNum(3);
+      partyAudio.playCountdown(false);
+      const t1 = window.setTimeout(() => {
+        setCountdownNum(2);
+        partyAudio.playCountdown(false);
+      }, 700);
+      const t2 = window.setTimeout(() => {
+        setCountdownNum(1);
+        partyAudio.playCountdown(false);
+      }, 1400);
+      const t3 = window.setTimeout(() => {
+        setCountdownNum(0);
+        partyAudio.playCountdown(true);
+      }, 2100);
+      return () => {
+        window.clearTimeout(t1);
+        window.clearTimeout(t2);
+        window.clearTimeout(t3);
+      };
+    }
+
+    // Fallback for rooms with an explicit roundStartedAtMs timestamp
     myLocalScoreRef.current = 0;
     if (profile) {
       void syncMyLiveScore(room.roomCode, profile.uid, 0, 0, false);
     }
-
     const updateCd = () => {
       const msLeft = room.roundStartedAtMs - Date.now();
       if (msLeft <= 0) {
@@ -521,22 +654,28 @@ const MarioPartyGameInner: React.FC<MarioPartyGameProps> = ({
       }
     }, 120);
     return () => window.clearInterval(interval);
-  }, [room?.status, room?.roundSeed, room?.roundStartedAtMs, room?.roomCode, profile?.uid]);
+  }, [room?.status, room?.roundSeed, room?.roundStartedAtMs, room?.roomCode, profile?.uid, onlineUnlockedSeed]);
 
   // Host watchdog: ends the round when all players finish or grace timer expires
   useEffect(() => {
     if (!isHost || !room || room.status !== 'playing') return;
     if (hostFinishedSeedRef.current === room.roundSeed) return;
+    // Never finish a round while players are reading the zero-timer tutorial!
+    if (room.roundStartedAtMs === 0 && onlineUnlockedSeed !== room.roundSeed) return;
 
     const checkAndFinish = () => {
       if (hostFinishedSeedRef.current === room.roundSeed) return;
 
       const now = Date.now();
+      const baseStartMs =
+        room.roundStartedAtMs > 0
+          ? room.roundStartedAtMs
+          : onlineActiveStartAtMsRef.current || now;
       // CRITICAL: Never finish a round during the 3-2-1 countdown or early gameplay!
       // Stale `roundDone: true` flags from the previous round would otherwise cancel the new round instantly.
       const minFinishAt =
-        room.roundStartedAtMs + Math.max(5000, (room.roundDurationSec - 6) * 1000);
-      const hardDeadline = room.roundStartedAtMs + (room.roundDurationSec + 4) * 1000;
+        baseStartMs + Math.max(5000, (room.roundDurationSec - 6) * 1000);
+      const hardDeadline = baseStartMs + (room.roundDurationSec + 4) * 1000;
       if (now < minFinishAt) return;
 
       const allDone =
@@ -571,7 +710,7 @@ const MarioPartyGameInner: React.FC<MarioPartyGameProps> = ({
     checkAndFinish();
     const timer = window.setInterval(checkAndFinish, 500);
     return () => window.clearInterval(timer);
-  }, [isHost, room, roomPlayers]);
+  }, [isHost, room, roomPlayers, onlineUnlockedSeed]);
 
   // Each player awards THEIR OWN stars & coins idempotently when round finishes
   useEffect(() => {
@@ -609,6 +748,14 @@ const MarioPartyGameInner: React.FC<MarioPartyGameProps> = ({
       addCoins,
       myScore
     );
+    // Clear tutorial Ready flag for the upcoming round so everyone explicitly clicks Ready next round
+    void updateMyRoomCharacter(
+      room.roomCode,
+      profile.uid,
+      profile.displayName,
+      myPlayer.characterId,
+      false
+    ).catch(() => undefined);
 
     // Record every completed Online round so stats update even before the final podium
     recordMarioPartyRoundStats({
@@ -700,7 +847,7 @@ const MarioPartyGameInner: React.FC<MarioPartyGameProps> = ({
       setRoomBot({ characterId: botChar, roundScore: 0, roundProgress: 0, stars: 0, coins: 0 });
       return;
     }
-    if (room.status !== 'playing' || countdownNum > 0) return;
+    if (room.status !== 'playing' || countdownNum > 0 || isOnlineWaitingTutorial) return;
 
     setRoomBot((prev) => ({
       ...prev,
@@ -724,7 +871,7 @@ const MarioPartyGameInner: React.FC<MarioPartyGameProps> = ({
       }));
     }, 250);
     return () => window.clearInterval(timer);
-  }, [room?.status, room?.roundSeed, room?.roundDurationSec, roomPlayers.length, countdownNum, myPlayer?.characterId]);
+  }, [room?.status, room?.roundSeed, room?.roundDurationSec, roomPlayers.length, countdownNum, isOnlineWaitingTutorial, myPlayer?.characterId]);
 
   // Award roomBot stars/coins once per round when playing alone in an online room
   useEffect(() => {
@@ -1185,7 +1332,8 @@ const MarioPartyGameInner: React.FC<MarioPartyGameProps> = ({
   };
 
   const startSoloRound = (idx = 0, reshuffleNewCup = false) => {
-    setCountdownNum(3);
+    const enterTutorial = showTutorialBeforeRound;
+    setCountdownNum(enterTutorial ? 0 : 3);
     myLocalScoreRef.current = 0;
     setSolo((prev) => {
       if (!prev) return prev;
@@ -1197,7 +1345,7 @@ const MarioPartyGameInner: React.FC<MarioPartyGameProps> = ({
         prev.mode === 'cup' ? nextQueue[idx] ?? prev.currentGameId : prev.currentGameId;
       return {
         ...prev,
-        phase: 'playing',
+        phase: enterTutorial ? 'tutorial' : 'playing',
         cupQueue: nextQueue,
         roundIndex: idx,
         currentGameId: gId,
@@ -1209,6 +1357,13 @@ const MarioPartyGameInner: React.FC<MarioPartyGameProps> = ({
         ...(idx === 0 ? { myStars: 0, myCoins: 0, botStars: 0, botCoins: 0 } : {}),
       };
     });
+  };
+
+  const beginSoloPlayingAfterTutorial = () => {
+    partyAudio.playSelect();
+    setCountdownNum(3);
+    myLocalScoreRef.current = 0;
+    setSolo((prev) => (prev && prev.phase === 'tutorial' ? { ...prev, phase: 'playing' } : prev));
   };
 
   // Live callback from Mini-Game engines (Online & Solo)
@@ -1697,13 +1852,35 @@ const MarioPartyGameInner: React.FC<MarioPartyGameProps> = ({
           <p className="text-xs text-sky-200">{ar ? spec.controlsAr : spec.controlsEn}</p>
         </div>
 
-        {/* Countdown Overlay OR Active Game Engine */}
+        {/* Pre-Game Tutorial (Zero-Timer Ready) OR Countdown Overlay OR Active Game Engine */}
         {(() => {
+          if (!isSolo && isOnlineWaitingTutorial) {
+            const amIReady =
+              onlineTutorialReadyList.find((p) => p.uid === profile?.uid)?.isReady ?? false;
+            return (
+              <MiniGameTutorialScreen
+                lang={lang}
+                gameId={gameId}
+                roundLabel={roundLabel}
+                myCharId={myCharId}
+                rivalCharId={rival?.characterId}
+                readyPlayers={onlineTutorialReadyList}
+                isMyReady={amIReady}
+                readyBusy={tutorialReadyBusy}
+                onToggleReady={() => void handleToggleOnlineTutorialReady()}
+              />
+            );
+          }
+
+          const msUntilOnlineStart =
+            !isSolo && room && room.roundStartedAtMs > 0
+              ? Math.max(0, room.roundStartedAtMs - Date.now())
+              : 0;
           const effectiveCountdown =
             countdownNum > 0
               ? countdownNum
-              : !isSolo && room && room.roundStartedAtMs > Date.now()
-              ? Math.min(3, Math.ceil((room.roundStartedAtMs - Date.now()) / 800))
+              : !isSolo && msUntilOnlineStart > 0
+              ? Math.min(3, Math.ceil(msUntilOnlineStart / 800))
               : 0;
           if (effectiveCountdown > 0) {
             return (
@@ -2341,7 +2518,17 @@ const MarioPartyGameInner: React.FC<MarioPartyGameProps> = ({
               </div>
             </div>
 
-            <div className="flex items-center gap-3 shrink-0">
+            <div className="flex flex-wrap items-center gap-2.5 shrink-0">
+              <button
+                type="button"
+                onClick={() => {
+                  partyAudio.playSelect();
+                  setPreviewTutorialGameId(currentGameId);
+                }}
+                className="h-12 px-4 rounded-xl border border-amber-300/45 bg-amber-400/15 hover:bg-amber-400/25 text-amber-200 font-black text-xs sm:text-sm whitespace-nowrap cursor-pointer"
+              >
+                {ar ? 'تعليم اللعبة' : 'Game Tutorial'}
+              </button>
               {isSolo ? (
                 <button
                   type="button"
@@ -2888,11 +3075,54 @@ const MarioPartyGameInner: React.FC<MarioPartyGameProps> = ({
     );
   };
 
+  // RENDER: SOLO PRE-GAME TUTORIAL SCREEN (before each mini-game starts)
+  const renderSoloTutorial = () => {
+    if (!solo) return null;
+    const spec = MARIO_MINI_GAME_MAP[solo.currentGameId];
+    const roundLabel =
+      solo.mode === 'cup'
+        ? ar
+          ? `الجولة ${solo.roundIndex + 1} / ${solo.cupQueue.length}`
+          : `Round ${solo.roundIndex + 1} / ${solo.cupQueue.length}`
+        : `#${spec.num}`;
+    return (
+      <div className="mx-auto max-w-[880px] space-y-3 py-1">
+        <div className="flex items-center justify-between gap-2">
+          <button
+            type="button"
+            onClick={() =>
+              setSolo((prev) => (prev ? { ...prev, phase: 'character_select' } : prev))
+            }
+            className="h-9 px-3.5 rounded-xl border border-white/15 bg-white/5 hover:bg-white/10 text-xs font-bold text-slate-200 cursor-pointer"
+          >
+            {ar ? 'رجوع لاختيار الشخصية والألعاب' : 'Back to Hero & Game Select'}
+          </button>
+          <span className="font-num text-xs font-bold text-amber-300">
+            {ar ? `النجوم: ★ ${solo.myStars}` : `Stars: ★ ${solo.myStars}`}
+          </span>
+        </div>
+
+        <MiniGameTutorialScreen
+          lang={lang}
+          gameId={solo.currentGameId}
+          roundLabel={roundLabel}
+          myCharId={solo.characterId}
+          rivalCharId={solo.botCharacterId}
+          onStartNow={beginSoloPlayingAfterTutorial}
+          showEveryRound={showTutorialBeforeRound}
+          onToggleShowEveryRound={toggleShowTutorialBeforeRound}
+        />
+      </div>
+    );
+  };
+
   // Decide active view
   let content: React.ReactNode;
   if (solo) {
     if (solo.phase === 'character_select') {
       content = renderCharacterSelectLobby();
+    } else if (solo.phase === 'tutorial') {
+      content = renderSoloTutorial();
     } else if (solo.phase === 'playing') {
       content = renderPlayingArena();
     } else {
@@ -2943,12 +3173,22 @@ const MarioPartyGameInner: React.FC<MarioPartyGameProps> = ({
           </div>
 
           <div className="flex items-center gap-2 shrink-0">
+            <button
+              type="button"
+              onClick={() => {
+                partyAudio.playSelect();
+                setShowQuickGuide(true);
+              }}
+              className="h-8 px-3 rounded-lg border border-amber-300/45 bg-amber-400/15 hover:bg-amber-400/25 text-amber-200 text-xs font-black whitespace-nowrap cursor-pointer"
+            >
+              {ar ? 'كيف تلعب؟' : 'How to Play'}
+            </button>
             {profile && !solo && (
               <span className="hidden sm:inline-block font-num text-xs font-bold text-amber-300 whitespace-nowrap">
                 {profile.displayName} · {profile.friendCode}
               </span>
             )}
-            <span className="text-xs font-bold text-sky-300 whitespace-nowrap">
+            <span className="hidden md:inline-block text-xs font-bold text-sky-300 whitespace-nowrap">
               {ar ? '8 شخصيات' : '8 Heroes'}
             </span>
           </div>
@@ -2976,6 +3216,39 @@ const MarioPartyGameInner: React.FC<MarioPartyGameProps> = ({
       <main className="flex-1 min-h-0 overflow-y-auto px-3 sm:px-5 py-4 sm:py-6">
         {content}
       </main>
+
+      {/* Preview Tutorial Modal (opened from Lobby "تعليم اللعبة" button) */}
+      {previewTutorialGameId && (
+        <div
+          className="fixed inset-0 z-[70] flex items-center justify-center bg-slate-950/80 backdrop-blur-sm p-3 sm:p-5"
+          onClick={() => setPreviewTutorialGameId(null)}
+        >
+          <div
+            className="w-full max-w-3xl max-h-[90dvh] overflow-y-auto"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <MiniGameTutorialScreen
+              lang={lang}
+              gameId={previewTutorialGameId}
+              roundLabel={`#${MARIO_MINI_GAME_MAP[previewTutorialGameId].num}`}
+              myCharId={
+                solo
+                  ? solo.characterId
+                  : myPlayer?.characterId ?? profile?.favoriteCharacter ?? 'marco'
+              }
+              rivalCharId={solo ? solo.botCharacterId : undefined}
+              onClosePreview={() => setPreviewTutorialGameId(null)}
+              onStartNow={() => setPreviewTutorialGameId(null)}
+              startLabel={ar ? 'فهمت، جاهز للعب!' : 'Got It, Ready!'}
+            />
+          </div>
+        </div>
+      )}
+
+      {/* Quick Start Guide Modal */}
+      {showQuickGuide && (
+        <PartyQuickGuideModal lang={lang} onClose={() => setShowQuickGuide(false)} />
+      )}
     </div>
   );
 };

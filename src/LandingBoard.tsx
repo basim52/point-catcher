@@ -35,7 +35,6 @@ export interface LandingBoardProps {
   onOpenSpaceShop: () => void;
   onOpenIndex: () => void;
   onOpenBag: () => void;
-  onOpenSettings?: () => void;
   onReplayIntro: () => void;
   onToggleLang: () => void;
 }
@@ -47,7 +46,6 @@ const LANDING_COPY = {
     navGames: 'صالة الألعاب',
     navShop: 'المتجر',
     navIndex: 'الاندكس',
-    navStats: 'الإحصائيات',
     topCta: 'ابدأ اللعب',
     heroKicker: '5 عوالم · 235 مرحلة · 16 لعبة مصغرة',
     heroTitle: 'التقط النقاط النادرة، طوّر أدواتك، وتحدَّ صالة الألعاب',
@@ -101,7 +99,6 @@ const LANDING_COPY = {
     openBagBtn: 'الحقيبة',
     openIndexBtn: 'الاندكس',
     footerNote: 'جميع التقدمات والمراحل والأرقام القياسية محفوظة تلقائياً على جهازك.',
-    openStatsLabel: 'الإعدادات والإحصائيات',
     replayIntro: 'عرض الشعار والموسيقى',
     langSwitch: 'English',
   },
@@ -111,7 +108,6 @@ const LANDING_COPY = {
     navGames: 'Games Hub',
     navShop: 'Shop',
     navIndex: 'Index',
-    navStats: 'Stats',
     topCta: 'Start Playing',
     heroKicker: '5 Worlds · 235 Stages · 16 Mini-Games',
     heroTitle: 'Catch Rare Gems, Upgrade Your Gear, and Master the Arcade',
@@ -165,7 +161,6 @@ const LANDING_COPY = {
     openBagBtn: 'Bag',
     openIndexBtn: 'Index',
     footerNote: 'All stage progress and high scores are saved locally on your device.',
-    openStatsLabel: 'Settings & Stats',
     replayIntro: 'Replay Intro Logo',
     langSwitch: 'العربية',
   },
@@ -196,7 +191,6 @@ export const LandingBoard: React.FC<LandingBoardProps> = ({
   onOpenSpaceShop,
   onOpenIndex,
   onOpenBag,
-  onOpenSettings,
   onReplayIntro,
   onToggleLang,
 }) => {
@@ -282,28 +276,10 @@ export const LandingBoard: React.FC<LandingBoardProps> = ({
             >
               {t.navIndex}
             </button>
-            {onOpenSettings && (
-              <button
-                type="button"
-                onClick={onOpenSettings}
-                className="text-amber-300 hover:text-amber-200 font-semibold transition-colors whitespace-nowrap shrink-0 cursor-pointer"
-              >
-                {t.navStats}
-              </button>
-            )}
           </nav>
 
           {/* Zone 3: Single Primary Action */}
           <div className="flex items-center gap-2 shrink-0">
-            {onOpenSettings && (
-              <button
-                type="button"
-                onClick={onOpenSettings}
-                className="md:hidden h-9 px-3 rounded-lg border border-amber-300/35 bg-amber-400/10 hover:bg-amber-400/20 text-amber-200 text-xs font-bold transition-colors whitespace-nowrap shrink-0 cursor-pointer"
-              >
-                {t.navStats}
-              </button>
-            )}
             <StatsAdminButton />
             <button
               type="button"
@@ -668,20 +644,6 @@ export const LandingBoard: React.FC<LandingBoardProps> = ({
         <div className="mx-auto max-w-[1160px] px-4 sm:px-6 py-5 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-slate-400">
           <span>{t.footerNote}</span>
           <div className="flex flex-wrap items-center justify-center gap-4">
-            {onOpenSettings && (
-              <>
-                <button
-                  type="button"
-                  onClick={onOpenSettings}
-                  className="text-amber-300 hover:text-amber-200 font-semibold transition-colors whitespace-nowrap cursor-pointer"
-                >
-                  {t.openStatsLabel}
-                </button>
-                <span aria-hidden="true" className="text-slate-600">
-                  ·
-                </span>
-              </>
-            )}
             <button
               type="button"
               onClick={onReplayIntro}
